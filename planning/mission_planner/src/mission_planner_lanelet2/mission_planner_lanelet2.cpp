@@ -31,12 +31,14 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #endif
 
+#include <chrono>
 #include <limits>
 #include <memory>
 #include <unordered_set>
 
 namespace
 {
+
 using RouteSections = std::vector<autoware_auto_mapping_msgs::msg::HADMapSegment>;
 RouteSections combineConsecutiveRouteSections(
   const RouteSections & route_sections1, const RouteSections & route_sections2)
@@ -126,13 +128,30 @@ bool isInParkingLot(
 
 namespace mission_planner
 {
+
 MissionPlannerLanelet2::MissionPlannerLanelet2(const rclcpp::NodeOptions & node_options)
 : MissionPlanner("mission_planner_node", node_options), is_graph_ready_(false)
 {
   using std::placeholders::_1;
+  using std::placeholders::_2;
+  using std::placeholders::_3;
   map_subscriber_ = create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
     "input/vector_map", rclcpp::QoS{10}.transient_local(),
     std::bind(&MissionPlannerLanelet2::mapCallback, this, _1));
+
+  // Note that we must create groups to realize nested service callback
+  inner_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  inner_callback_group2_ =
+    this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  srv_autopark_ = this->create_service<std_srvs::srv::Trigger>(
+    "service/autopark", std::bind(&MissionPlannerLanelet2::autoparkCallback, this, _1, _2, _3),
+    rmw_qos_profile_services_default, inner_callback_group_);
+
+  parking_mission_plan_client_ =
+    this->create_client<autoware_parking_srvs::srv::ParkingMissionPlan>(
+      "/planning/scenario_planning/parking/service/plan_parking_mission",
+      rmw_qos_profile_services_default, inner_callback_group2_);
 }
 
 void MissionPlannerLanelet2::mapCallback(
@@ -296,6 +315,42 @@ autoware_auto_planning_msgs::msg::HADMapRoute MissionPlannerLanelet2::planRoute(
   route_msg.goal_pose = goal_pose_.pose;
 
   return route_msg;
+}
+
+bool MissionPlannerLanelet2::autoparkCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+  std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+  (void)request;
+  (void)request_header;
+  response->success = true;
+  response->message = "autopark success.";
+
+  const auto request_and_publish = [&](const std::string plan_type) -> std::string {
+    auto plan_req = std::make_shared<autoware_parking_srvs::srv::ParkingMissionPlan::Request>();
+    plan_req->type = plan_type;
+    const auto fut = parking_mission_plan_client_->async_send_request(plan_req);
+    const auto fut_status = fut.wait_for(std::chrono::seconds{20});
+    if (fut_status != std::future_status::ready) {
+      RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "could not get response");
+      return plan_req->END;
+    }
+    const auto result = fut.get();
+    if (!result->prohibit_publish) this->publishRoute(result->route);
+    return result->next_type;
+  };
+
+  using autoware_parking_srvs::srv::ParkingMissionPlan;
+
+  std::string plan_type = ParkingMissionPlan::Request::CIRCULAR;
+  while (plan_type != ParkingMissionPlan::Request::END) {
+    RCLCPP_INFO_STREAM(get_logger(), "mode: " << plan_type);
+    const auto next_plan_type = request_and_publish(plan_type);
+    plan_type = next_plan_type;
+    RCLCPP_INFO_STREAM(get_logger(), "next mode: " << plan_type);
+  }
+  return true;
 }
 
 }  // namespace mission_planner

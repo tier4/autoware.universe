@@ -15,10 +15,13 @@
 #ifndef MISSION_PLANNER__LANELET2_IMPL__MISSION_PLANNER_LANELET2_HPP_
 #define MISSION_PLANNER__LANELET2_IMPL__MISSION_PLANNER_LANELET2_HPP_
 
+#include <memory>
 #include <string>
 #include <vector>
 
 // ROS
+#include "std_srvs/srv/trigger.hpp"
+
 #include <rclcpp/rclcpp.hpp>
 
 #include <tf2_ros/buffer.h>
@@ -55,8 +58,17 @@ private:
   route_handler::RouteHandler route_handler_;
 
   rclcpp::Subscription<autoware_auto_mapping_msgs::msg::HADMapBin>::SharedPtr map_subscriber_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr srv_autopark_;
+  rclcpp::Client<autoware_parking_srvs::srv::ParkingMissionPlan>::SharedPtr
+    parking_mission_plan_client_;
+  rclcpp::CallbackGroup::SharedPtr inner_callback_group_;
+  rclcpp::CallbackGroup::SharedPtr inner_callback_group2_;
 
   void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
+  bool autoparkCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   bool isGoalValid() const;
 
   // virtual functions

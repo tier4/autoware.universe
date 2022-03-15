@@ -27,6 +27,8 @@
 #include <tf2_ros/transform_listener.h>
 
 // Autoware
+#include "autoware_parking_srvs/srv/parking_mission_plan.hpp"
+
 #include <autoware_auto_planning_msgs/msg/had_map_route.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
