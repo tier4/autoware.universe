@@ -1,0 +1,6 @@
+geometry_msgs/PoseStamped[] start_poses
+geometry_msgs/PoseStamped[] goal_poses
+float64 timeout
+
+---
+bool[] successes

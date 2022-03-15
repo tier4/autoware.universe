@@ -1,0 +1,10 @@
+string CIRCULAR=circular
+string PREPARKING=preparking
+string PARKING=parking
+string END=end
+
+string type
+---
+autoware_auto_planning_msgs/HADMapRoute route
+string next_type
+bool prohibit_publish
