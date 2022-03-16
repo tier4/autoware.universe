@@ -44,6 +44,7 @@ namespace auto_parking_planner
 {
 
 using autoware_auto_mapping_msgs::msg::HADMapBin;
+using autoware_auto_mapping_msgs::msg::HADMapSegment;
 using autoware_auto_planning_msgs::msg::HADMapRoute;
 using autoware_auto_planning_msgs::msg::Trajectory;
 using autoware_parking_srvs::srv::ParkingMissionPlan;
@@ -67,6 +68,18 @@ struct SubscribedMessages
   autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr state_ptr;
   geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_ptr_;
   autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr traj_ptr_;
+};
+
+struct PlanningResult
+{
+  std::string next_phase;
+  HADMapRoute next_route;
+};
+
+struct CircularPlanCache
+{
+  std::deque<lanelet::ConstLanelets> path_seq;
+  lanelet::ConstLanelets current_path;
 };
 
 enum class ParkingLaneletType : int { ENTRANCE, EXIT, NORMAL };
@@ -126,7 +139,6 @@ public:
     const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
-  // Related to prepare metdod
   void prepare();
   PlanningResult planCircularRoute() const;  // except circular_plan_cache_
 };

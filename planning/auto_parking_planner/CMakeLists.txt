@@ -16,6 +16,7 @@ ament_auto_find_build_dependencies()
 ament_auto_add_library(auto_parking_planner_node SHARED
   src/auto_parking_planner.cpp
   src/preparation.cpp
+  src/circular_route_planning.cpp
 )
 
 # ament_auto_add_executable(auto_parking_planner_debug_node src/main.cpp)
