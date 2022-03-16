@@ -14,6 +14,8 @@
 
 #include "route_handler/route_handler.hpp"
 
+#include "lanelet2_core/Forward.h"
+
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <lanelet2_extension/utility/query.hpp>
 #include <lanelet2_extension/utility/utilities.hpp>
@@ -227,6 +229,40 @@ void RouteHandler::setRoute(const HADMapRoute & route_msg)
       logger_,
       "Loop detected within route! Currently, no loop is allowed for route! Using previous route");
   }
+}
+
+RouteHandler RouteHandler::get_sub_route_handler(const lanelet::ConstPolygon3d & focus_region) const
+{
+  const auto containLanelet =
+    [](const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt) -> bool {
+    // if one of the vertexes of the lanlet is contained by the polygon
+    // this function returns true
+    const lanelet::CompoundPolygon3d llt_poly = llt.polygon3d();
+    for (const auto & pt : llt_poly) {
+      if (lanelet::geometry::within(pt, polygon.basicPolygon())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  lanelet::ConstLanelets all_lanelets = lanelet::utils::query::laneletLayer(lanelet_map_ptr_);
+
+  lanelet::Lanelets llts_inside;
+  for (const lanelet::ConstLanelet & llt : all_lanelets) {
+    if (containLanelet(focus_region, llt)) {
+      lanelet::Lanelet llt_ = lanelet_map_ptr_->laneletLayer.get(llt.id());
+      llts_inside.push_back(llt_);
+    }
+  }
+  lanelet::LaneletMapUPtr sub_map_uptr = lanelet::utils::createSubmap(llts_inside)->laneletMap();
+  lanelet::LaneletMapPtr sub_map_ptr = std::move(sub_map_uptr);
+
+  lanelet::routing::RoutingGraphUPtr sub_graph_uptr =
+    lanelet::routing::RoutingGraph::build(*sub_map_ptr, *traffic_rules_ptr_);
+  lanelet::routing::RoutingGraphPtr sub_graph_ptr = std::move(sub_graph_uptr);
+
+  return RouteHandler(sub_map_ptr, traffic_rules_ptr_, sub_graph_ptr);
 }
 
 bool RouteHandler::isHandlerReady() const { return is_handler_ready_; }

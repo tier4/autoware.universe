@@ -63,6 +63,8 @@ public:
     lanelet::LaneletMapPtr lanelet_map_ptr,
     lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr,
     lanelet::routing::RoutingGraphPtr routing_graph_ptr);
+  RouteHandler get_sub_route_handler(const lanelet::ConstPolygon3d & focus_region) const;
+
   RouteHandler get_partial(const lanelet::ConstPolygon3d & focus_region) const;
 
   // non-const methods
