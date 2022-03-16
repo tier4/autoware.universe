@@ -14,6 +14,8 @@
 
 #include "auto_parking_planner.hpp"
 
+#include <stdexcept>
+
 namespace auto_parking_planner
 {
 
@@ -30,7 +32,25 @@ bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::Cons
   return false;
 }
 
-void AutoParkingPlanner::build_partial_map_info(
+std::map<size_t, ParkingLaneletType> build_llt_type_table(
+  lanelet::routing::RoutingGraphPtr routing_graph_ptr, const lanelet::ConstLanelets & road_llts)
+{
+  auto table = std::map<size_t, ParkingLaneletType>();
+
+  for (const auto & llt : road_llts) {
+    if (routing_graph_ptr->following(llt).empty()) {
+      table[llt.id()] = ParkingLaneletType::EXIT;
+    } else if (routing_graph_ptr->previous(llt).empty()) {
+      table[llt.id()] = ParkingLaneletType::ENTRANCE;
+    } else {
+      table[llt.id()] = ParkingLaneletType::NORMAL;
+    }
+    throw std::logic_error("logically strange");
+  }
+  return table;
+}
+
+void build_partial_map_info(
   lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region,
   PartialMapInfo & partial_map_info)
 {
@@ -48,14 +68,17 @@ void AutoParkingPlanner::build_partial_map_info(
 
   const lanelet::LaneletMapPtr sub_lanelet_map_ptr =
     lanelet::utils::createSubmap(llts_inside)->laneletMap();
-  const lanelet::routing::RoutingGraphPtr sub_rouging_graph_ptr =
+  const lanelet::routing::RoutingGraphPtr sub_routing_graph_ptr =
     lanelet::routing::RoutingGraph::build(*sub_lanelet_map_ptr, *traffic_rules_ptr);
+  const auto road_llts = lanelet::utils::query::roadLanelets(all_lanelets);
+  const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
 
   partial_map_info.lanelet_map_ptr = sub_lanelet_map_ptr;
-  partial_map_info.routing_graph_ptr = sub_rouging_graph_ptr;
+  partial_map_info.routing_graph_ptr = sub_routing_graph_ptr;
   partial_map_info.traffic_rules_ptr = traffic_rules_ptr;
   partial_map_info.focus_region = focus_region;
-  partial_map_info.road_llts = lanelet::utils::query::roadLanelets(all_lanelets);
+  partial_map_info.road_llts = road_llts;
+  partial_map_info.llt_types = llt_types;
 }
 
 void AutoParkingPlanner::prepare()
@@ -66,7 +89,7 @@ void AutoParkingPlanner::prepare()
   const auto all_parking_lots = lanelet::utils::query::getAllParkingLots(lanelet_map_ptr);
   const auto nearest_parking_lot = all_parking_lots[0];  // TODO(HiroIshida): temp
 
-  build_partial_map_info(lanelet_map_ptr, nearest_parking_lot, this->partial_map_info_);
+  build_partial_map_info(lanelet_map_ptr, nearest_parking_lot, partial_map_info_);
 }
 
 }  // namespace auto_parking_planner

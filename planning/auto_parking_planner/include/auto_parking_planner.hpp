@@ -35,6 +35,7 @@
 #include <boost/optional.hpp>
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -68,6 +69,8 @@ struct SubscribedMessages
   autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr traj_ptr_;
 };
 
+enum class ParkingLaneletType : int { ENTRANCE, EXIT, NORMAL };
+
 struct PartialMapInfo
 {
   lanelet::ConstPolygon3d focus_region;
@@ -75,6 +78,7 @@ struct PartialMapInfo
   lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
   lanelet::routing::RoutingGraphPtr routing_graph_ptr;
   lanelet::ConstLanelets road_llts;
+  std::map<size_t, ParkingLaneletType> llt_types;
 };
 
 class AutoParkingPlanner : public rclcpp::Node
@@ -113,9 +117,7 @@ public:
     const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
-  static void build_partial_map_info(
-    lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region,
-    PartialMapInfo & partial_map_info);
+  // Related to prepare metdod
   void prepare();
 };
 
