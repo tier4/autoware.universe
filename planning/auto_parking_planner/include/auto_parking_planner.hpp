@@ -15,6 +15,7 @@
 #ifndef AUTO_PARKING_PLANNER_HPP_
 #define AUTO_PARKING_PLANNER_HPP_
 
+#include "autoware_parking_srvs/srv/detail/parking_mission_plan__struct.hpp"
 #include "autoware_parking_srvs/srv/freespace_plan.hpp"
 #include "autoware_parking_srvs/srv/parking_mission_plan.hpp"
 #include "lanelet2_extension/utility/message_conversion.hpp"
@@ -42,14 +43,83 @@
 namespace auto_parking_planner
 {
 
+using autoware_auto_mapping_msgs::msg::HADMapBin;
 using autoware_auto_planning_msgs::msg::HADMapRoute;
 using autoware_auto_planning_msgs::msg::Trajectory;
 using autoware_parking_srvs::srv::ParkingMissionPlan;
-using geometry_msgs::msg::Pose;
-using geometry_msgs::msg::PoseArray;
+
 using geometry_msgs::msg::PoseStamped;
 using geometry_msgs::msg::TwistStamped;
 
+struct AutoParkingConfig
+{
+  double lookahead_length;
+  double reedsshepp_threashold_length;
+  double euclid_threashold_length;
+  double reedsshepp_radius;
+  double freespace_plan_timeout;
+};
+
+struct SubscribedMessages
+{
+  autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr map_ptr;
+  autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr state_ptr;
+  geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_ptr_;
+  autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr traj_ptr_;
+};
+
+struct PartialMapInfo
+{
+  lanelet::ConstPolygon3d focus_region;
+  lanelet::LaneletMapPtr lanelet_map_ptr;
+  lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
+  lanelet::routing::RoutingGraphPtr routing_graph_ptr;
+  lanelet::ConstLanelets road_llts;
+};
+
+class AutoParkingPlanner : public rclcpp::Node
+{
+public:
+  explicit AutoParkingPlanner(const rclcpp::NodeOptions & node_options);
+
+  // Node stuff
+  rclcpp::CallbackGroup::SharedPtr cb_group_;
+  rclcpp::CallbackGroup::SharedPtr cb_group_nested_;
+
+  rclcpp::Subscription<autoware_auto_system_msgs::msg::AutowareState>::SharedPtr state_subscriber_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr twist_subscriber_;
+  rclcpp::Subscription<autoware_auto_mapping_msgs::msg::HADMapBin>::SharedPtr map_subscriber_;
+  rclcpp::Subscription<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr traj_subscriber_;
+  rclcpp::Service<autoware_parking_srvs::srv::ParkingMissionPlan>::SharedPtr srv_parking_mission_;
+  rclcpp::Client<autoware_parking_srvs::srv::FreespacePlan>::SharedPtr freespaceplane_client_;
+
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener tf_listener_;
+
+  AutoParkingConfig config_;
+  SubscribedMessages sub_msgs_;
+  PartialMapInfo partial_map_info_;
+
+  std::string base_link_frame_;
+  std::string map_frame_;
+
+  void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
+  void stateCallback(const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg);
+  void twistCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr msg);
+  void trajCallback(const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg);
+
+  bool parkingMissionPlanCallback(
+    const std::shared_ptr<rmw_request_id_t> request_header,
+    const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
+    std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
+
+  static void build_partial_map_info(
+    lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region,
+    PartialMapInfo & partial_map_info);
+  void prepare();
+};
+
+/*
 bool is_straight(const lanelet::ConstLanelet & llt);
 
 Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet);
@@ -175,6 +245,7 @@ private:
   boost::optional<PoseStamped> getAheadPlanningStartPose(double ahead_dist);
   std::vector<PoseStamped> getCandidateGoalPoses(const PoseStamped & start_pose);
 };
+*/
 
 }  // namespace auto_parking_planner
 

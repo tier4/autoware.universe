@@ -27,6 +27,139 @@ namespace auto_parking_planner
 AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
 : rclcpp::Node("auto_parking_planner_node", node_options),
   tf_buffer_(get_clock()),
+  tf_listener_(tf_buffer_)
+{
+  map_frame_ = declare_parameter("map_frame", "map");
+  base_link_frame_ = declare_parameter("base_link_frame", "base_link");
+
+  {  // set node config
+    config_.lookahead_length = declare_parameter("lookahead_length", 4.0);
+    config_.reedsshepp_threashold_length = declare_parameter("reedsshepp_threashold_length", 6.0);
+    config_.euclid_threashold_length = declare_parameter("euclid_threashold_length", 2.0);
+    config_.reedsshepp_radius = declare_parameter("reedsshepp_radius", 5.0);
+    config_.freespace_plan_timeout = declare_parameter("freespace_plan_timeout", 1.0);
+  }
+
+  cb_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cb_group_nested_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  using std::placeholders::_1;
+  using std::placeholders::_2;
+  using std::placeholders::_3;
+  map_subscriber_ = create_subscription<autoware_auto_mapping_msgs::msg::HADMapBin>(
+    "~/input/vector_map", rclcpp::QoS{10}.transient_local(),
+    std::bind(&AutoParkingPlanner::mapCallback, this, _1));
+  state_subscriber_ = create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
+    "~/input/state", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::stateCallback, this, _1));
+
+  twist_subscriber_ = create_subscription<geometry_msgs::msg::TwistStamped>(
+    "~/input/twist", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::twistCallback, this, _1));
+
+  traj_subscriber_ = create_subscription<Trajectory>(
+    "~/input/trajectory", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::trajCallback, this, _1));
+
+  srv_parking_mission_ = this->create_service<autoware_parking_srvs::srv::ParkingMissionPlan>(
+    "service/plan_parking_mission",
+    std::bind(&AutoParkingPlanner::parkingMissionPlanCallback, this, _1, _2, _3),
+    rmw_qos_profile_services_default, cb_group_);
+
+  freespaceplane_client_ = this->create_client<autoware_parking_srvs::srv::FreespacePlan>(
+    "/planning/scenario_planning/parking/freespace_planner/service/freespace_plan",
+    rmw_qos_profile_services_default, cb_group_nested_);
+}
+
+void AutoParkingPlanner::mapCallback(
+  const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg)
+{
+  sub_msgs_.map_ptr = msg;
+}
+
+void AutoParkingPlanner::stateCallback(
+  const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg)
+{
+  sub_msgs_.state_ptr = msg;
+}
+
+void AutoParkingPlanner::twistCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr msg)
+{
+  sub_msgs_.twist_ptr_ = msg;
+}
+
+void AutoParkingPlanner::trajCallback(
+  const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg)
+{
+  sub_msgs_.traj_ptr_ = msg;
+}
+
+bool AutoParkingPlanner::parkingMissionPlanCallback(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
+  std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response)
+{
+  (void)request_header;
+  (void)response;
+  boost::optional<HADMapRoute> route = boost::none;
+
+  RCLCPP_INFO_STREAM(
+    get_logger(), "reciedved ParkingMissionPlan srv request: type " << request->type);
+
+  /*
+  const bool is_initilized = (sub_graph_ptr_ != nullptr);
+  if (!is_initilized) {
+    const bool success = reset();
+    if (!success) {
+      RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "cannot reset subgraph");
+      return false;
+    }
+  }
+
+  std::string next_plan_type;
+  if (request->type == request->CIRCULAR) {
+    if (previous_mode_ != request->PARKING) {
+      waitForPreviousRouteFinished();
+    }
+    next_plan_type = planCircularRoute(route);
+  } else if (request->type == request->PREPARKING) {
+    // Don't have to waitForPreviousRouteFinished
+    next_plan_type = planPreparkingRoute(route);
+  } else if (request->type == request->PARKING) {
+    waitForPreviousRouteFinished();
+    next_plan_type = planParkingRoute(route);
+  } else {
+    RCLCPP_WARN(get_logger(), "type field seemes to be invaid value.");
+    next_plan_type = request->END;
+  }
+  RCLCPP_INFO_STREAM(get_logger(), "processed");
+
+  const bool prohibit_publish = (route == boost::none);
+
+  // create debug goal pose
+  if (!prohibit_publish) {
+    auto debug_pose = PoseStamped();
+    debug_pose.header.stamp = this->now();
+    debug_pose.header.frame_id = map_frame_;
+    debug_pose.pose = route.get().goal_pose;
+    debug_goal_pose_publisher_->publish(debug_pose);
+  }
+
+  previous_mode_ = request->type;
+  previous_route_ = route;
+  if (!prohibit_publish) {
+    response->route = route.get();
+  }
+
+  response->next_type = next_plan_type;
+  response->prohibit_publish = prohibit_publish;
+  */
+  response->next_type = request->CIRCULAR;
+  response->prohibit_publish = false;
+  return true;
+}
+
+/*
+AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
+: rclcpp::Node("auto_parking_planner_node", node_options),
+  tf_buffer_(get_clock()),
   tf_listener_(tf_buffer_),
   previous_mode_(boost::none),
   previous_route_(boost::none)
@@ -224,6 +357,7 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   return true;
 }
 
+*/
 }  // namespace auto_parking_planner
 
 #include "rclcpp_components/register_node_macro.hpp"
