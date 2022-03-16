@@ -108,10 +108,18 @@ public:
   std::string base_link_frame_;
   std::string map_frame_;
 
+  mutable CircularPlanCache circular_plan_cache_;
+  boost::optional<std::string> previous_mode_;
+
   void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
   void stateCallback(const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg);
   void twistCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr msg);
   void trajCallback(const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg);
+
+  bool transformPose(
+    const PoseStamped & input_pose, PoseStamped * output_pose,
+    const std::string target_frame) const;
+  PoseStamped getEgoVehiclePose() const;
 
   bool parkingMissionPlanCallback(
     const std::shared_ptr<rmw_request_id_t> request_header,
@@ -120,6 +128,7 @@ public:
 
   // Related to prepare metdod
   void prepare();
+  PlanningResult planCircularRoute() const;  // except circular_plan_cache_
 };
 
 /*

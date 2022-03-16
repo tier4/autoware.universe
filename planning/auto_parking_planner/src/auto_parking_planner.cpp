@@ -27,7 +27,8 @@ namespace auto_parking_planner
 AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
 : rclcpp::Node("auto_parking_planner_node", node_options),
   tf_buffer_(get_clock()),
-  tf_listener_(tf_buffer_)
+  tf_listener_(tf_buffer_),
+  previous_mode_(boost::none)
 {
   map_frame_ = declare_parameter("map_frame", "map");
   base_link_frame_ = declare_parameter("base_link_frame", "base_link");
@@ -89,6 +90,39 @@ void AutoParkingPlanner::trajCallback(
   const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg)
 {
   sub_msgs_.traj_ptr_ = msg;
+}
+
+bool AutoParkingPlanner::transformPose(
+  const geometry_msgs::msg::PoseStamped & input_pose, geometry_msgs::msg::PoseStamped * output_pose,
+  const std::string target_frame) const
+{
+  geometry_msgs::msg::TransformStamped transform;
+  try {
+    transform =
+      tf_buffer_.lookupTransform(target_frame, input_pose.header.frame_id, tf2::TimePointZero);
+    tf2::doTransform(input_pose, *output_pose, transform);
+    return true;
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN(get_logger(), "%s", ex.what());
+    return false;
+  }
+}
+
+geometry_msgs::msg::PoseStamped AutoParkingPlanner::getEgoVehiclePose() const
+{
+  geometry_msgs::msg::PoseStamped base_link_origin;
+  base_link_origin.header.frame_id = base_link_frame_;
+  base_link_origin.pose.position.x = 0;
+  base_link_origin.pose.position.y = 0;
+  base_link_origin.pose.position.z = 0;
+  base_link_origin.pose.orientation.x = 0;
+  base_link_origin.pose.orientation.y = 0;
+  base_link_origin.pose.orientation.z = 0;
+  base_link_origin.pose.orientation.w = 1;
+
+  geometry_msgs::msg::PoseStamped ego_vehicle_pose;
+  transformPose(base_link_origin, &ego_vehicle_pose, map_frame_);
+  return ego_vehicle_pose;
 }
 
 bool AutoParkingPlanner::parkingMissionPlanCallback(
