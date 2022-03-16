@@ -59,9 +59,18 @@ class RouteHandler
 public:
   RouteHandler() = default;
   explicit RouteHandler(const HADMapBin & map_msg);
+  explicit RouteHandler(
+    lanelet::LaneletMapPtr lanelet_map_ptr,
+    lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr,
+    lanelet::routing::RoutingGraphPtr routing_graph_ptr);
+  RouteHandler get_partial(const lanelet::ConstPolygon3d & focus_region) const;
 
   // non-const methods
   void setMap(const HADMapBin & map_msg);
+  void setMapInfo(
+    lanelet::LaneletMapPtr lanelet_map_ptr,
+    lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr,
+    lanelet::routing::RoutingGraphPtr routing_graph_ptr);
   void setRoute(const HADMapRoute & route_msg);
   void setRouteLanelets(const lanelet::ConstLanelets & path_lanelets);
   void setPullOverGoalPose(

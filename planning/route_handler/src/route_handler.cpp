@@ -171,11 +171,28 @@ namespace route_handler
 {
 RouteHandler::RouteHandler(const HADMapBin & map_msg) { setMap(map_msg); }
 
+RouteHandler::RouteHandler(
+  lanelet::LaneletMapPtr lanelet_map_ptr, lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr,
+  lanelet::routing::RoutingGraphPtr routing_graph_ptr)
+{
+  setMapInfo(lanelet_map_ptr, traffic_rules_ptr, routing_graph_ptr);
+}
+
 void RouteHandler::setMap(const HADMapBin & map_msg)
 {
   lanelet_map_ptr_ = std::make_shared<lanelet::LaneletMap>();
   lanelet::utils::conversion::fromBinMsg(
     map_msg, lanelet_map_ptr_, &traffic_rules_ptr_, &routing_graph_ptr_);
+  setMapInfo(lanelet_map_ptr_, traffic_rules_ptr_, routing_graph_ptr_);
+}
+
+void RouteHandler::setMapInfo(
+  lanelet::LaneletMapPtr lanelet_map_ptr, lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr,
+  lanelet::routing::RoutingGraphPtr routing_graph_ptr)
+{
+  lanelet_map_ptr_ = lanelet_map_ptr;
+  traffic_rules_ptr_ = traffic_rules_ptr;
+  routing_graph_ptr_ = routing_graph_ptr;
 
   const auto traffic_rules = lanelet::traffic_rules::TrafficRulesFactory::create(
     lanelet::Locations::Germany, lanelet::Participants::Vehicle);
