@@ -18,14 +18,13 @@
 #include "autoware_parking_srvs/srv/detail/parking_mission_plan__struct.hpp"
 #include "autoware_parking_srvs/srv/freespace_plan.hpp"
 #include "autoware_parking_srvs/srv/parking_mission_plan.hpp"
-#include "lanelet2_extension/utility/message_conversion.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "route_handler/route_handler.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
-#include "tier4_autoware_utils/tier4_autoware_utils.hpp"
 
 #include "autoware_auto_mapping_msgs/msg/had_map_bin.hpp"
+#include "autoware_auto_planning_msgs/msg/detail/had_map_route__struct.hpp"
 #include "autoware_auto_planning_msgs/msg/had_map_route.hpp"
 #include "autoware_auto_planning_msgs/msg/trajectory.hpp"
 #include "autoware_auto_system_msgs/msg/autoware_state.hpp"
@@ -49,6 +48,7 @@ using autoware_auto_planning_msgs::msg::HADMapRoute;
 using autoware_auto_planning_msgs::msg::Trajectory;
 using autoware_parking_srvs::srv::ParkingMissionPlan;
 
+using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::PoseStamped;
 using geometry_msgs::msg::TwistStamped;
 
@@ -71,13 +71,14 @@ struct SubscribedMessages
 
 enum class ParkingLaneletType : int { ENTRANCE, EXIT, NORMAL };
 
-struct PartialMapInfo
+struct ParkingMapInfo
 {
   lanelet::ConstPolygon3d focus_region;
   lanelet::LaneletMapPtr lanelet_map_ptr;
   lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
   lanelet::routing::RoutingGraphPtr routing_graph_ptr;
   lanelet::ConstLanelets road_llts;
+  std::vector<Pose> parking_poses;
   std::map<size_t, ParkingLaneletType> llt_types;
 };
 
@@ -102,7 +103,7 @@ public:
 
   AutoParkingConfig config_;
   SubscribedMessages sub_msgs_;
-  PartialMapInfo partial_map_info_;
+  ParkingMapInfo parking_map_info_;
 
   std::string base_link_frame_;
   std::string map_frame_;

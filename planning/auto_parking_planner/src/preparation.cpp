@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "auto_parking_planner.hpp"
+#include "lanelet2_extension/utility/message_conversion.hpp"
+#include "lanelet2_extension/utility/utilities.hpp"
+#include "tier4_autoware_utils/tier4_autoware_utils.hpp"
 
 #include <stdexcept>
 
@@ -50,9 +53,44 @@ std::map<size_t, ParkingLaneletType> build_llt_type_table(
   return table;
 }
 
-void build_partial_map_info(
+std::vector<Pose> get_possible_parking_poses(lanelet::LaneletMapPtr lanelet_map_ptr)
+{
+  std::vector<Pose> poses;
+  const lanelet::ConstLineStrings3d parking_spaces =
+    lanelet::utils::query::getAllParkingSpaces(lanelet_map_ptr);
+  for (const auto & parking_space : parking_spaces) {
+    lanelet::ConstPolygon3d polygon;
+    lanelet::utils::lineStringWithWidthToPolygon(parking_space, &polygon);
+
+    Eigen::Vector3d p0 = polygon[0];
+    Eigen::Vector3d p1 = polygon[1];
+    Eigen::Vector3d p2 = polygon[2];
+    Eigen::Vector3d p3 = polygon[3];
+
+    const auto center = (p0 + p1 + p2 + p3) * 0.25;
+    const auto parking_space_d0 = (p1 - p0).norm();
+    const auto parking_space_d1 = (p2 - p1).norm();
+
+    const double yaw =
+      (parking_space_d1 > parking_space_d0
+         ? std::atan2(p1.y() - p0.y(), p1.x() - p0.x()) + M_PI * 0.5
+         : std::atan2(p2.y() - p1.y(), p2.x() - p1.x()) + M_PI * 0.5);
+
+    Pose pose;
+    pose.position.x = center.x();
+    pose.position.y = center.y();
+    tf2::convert(tier4_autoware_utils::createQuaternionFromRPY(0, 0, yaw), pose.orientation);
+
+    Pose pose_back = pose;
+    tf2::convert(tier4_autoware_utils::createQuaternionFromRPY(0, 0, -yaw), pose_back.orientation);
+    poses.push_back(pose);
+  }
+  return poses;
+}
+
+void build_parking_map_info(
   lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region,
-  PartialMapInfo & partial_map_info)
+  ParkingMapInfo & parking_map_info)
 {
   lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
   traffic_rules_ptr = lanelet::traffic_rules::TrafficRulesFactory::create(
@@ -71,14 +109,16 @@ void build_partial_map_info(
   const lanelet::routing::RoutingGraphPtr sub_routing_graph_ptr =
     lanelet::routing::RoutingGraph::build(*sub_lanelet_map_ptr, *traffic_rules_ptr);
   const auto road_llts = lanelet::utils::query::roadLanelets(all_lanelets);
+  const auto parking_poses = get_possible_parking_poses(sub_lanelet_map_ptr);
   const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
 
-  partial_map_info.lanelet_map_ptr = sub_lanelet_map_ptr;
-  partial_map_info.routing_graph_ptr = sub_routing_graph_ptr;
-  partial_map_info.traffic_rules_ptr = traffic_rules_ptr;
-  partial_map_info.focus_region = focus_region;
-  partial_map_info.road_llts = road_llts;
-  partial_map_info.llt_types = llt_types;
+  parking_map_info.lanelet_map_ptr = sub_lanelet_map_ptr;
+  parking_map_info.routing_graph_ptr = sub_routing_graph_ptr;
+  parking_map_info.traffic_rules_ptr = traffic_rules_ptr;
+  parking_map_info.focus_region = focus_region;
+  parking_map_info.road_llts = road_llts;
+  parking_map_info.parking_poses = parking_poses;
+  parking_map_info.llt_types = llt_types;
 }
 
 void AutoParkingPlanner::prepare()
@@ -89,7 +129,7 @@ void AutoParkingPlanner::prepare()
   const auto all_parking_lots = lanelet::utils::query::getAllParkingLots(lanelet_map_ptr);
   const auto nearest_parking_lot = all_parking_lots[0];  // TODO(HiroIshida): temp
 
-  build_partial_map_info(lanelet_map_ptr, nearest_parking_lot, partial_map_info_);
+  build_parking_map_info(lanelet_map_ptr, nearest_parking_lot, parking_map_info_);
 }
 
 }  // namespace auto_parking_planner
