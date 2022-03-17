@@ -150,8 +150,7 @@ MissionPlannerLanelet2::MissionPlannerLanelet2(const rclcpp::NodeOptions & node_
 
   parking_mission_plan_client_ =
     this->create_client<autoware_parking_srvs::srv::ParkingMissionPlan>(
-      "/planning/scenario_planning/parking/service/plan_parking_mission",
-      rmw_qos_profile_services_default, inner_callback_group2_);
+      "/service/plan_parking_mission", rmw_qos_profile_services_default, inner_callback_group2_);
 }
 
 void MissionPlannerLanelet2::mapCallback(
