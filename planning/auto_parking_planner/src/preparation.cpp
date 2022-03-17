@@ -48,7 +48,6 @@ std::map<size_t, ParkingLaneletType> build_llt_type_table(
     } else {
       table[llt.id()] = ParkingLaneletType::NORMAL;
     }
-    throw std::logic_error("logically strange");
   }
   return table;
 }
