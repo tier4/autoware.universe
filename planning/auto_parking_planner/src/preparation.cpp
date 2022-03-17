@@ -129,7 +129,7 @@ void AutoParkingPlanner::prepare()
   const auto all_parking_lots = lanelet::utils::query::getAllParkingLots(lanelet_map_ptr);
   const auto nearest_parking_lot = all_parking_lots[0];  // TODO(HiroIshida): temp
 
-  build_parking_map_info(lanelet_map_ptr, nearest_parking_lot, parking_map_info_);
+  build_parking_map_info(lanelet_map_ptr, nearest_parking_lot, *parking_map_info_);
 }
 
 }  // namespace auto_parking_planner

@@ -190,15 +190,15 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   }
 
   if (circular_plan_cache_.path_seq.empty()) {
-    circular_plan_cache_.path_seq = computeCircularPathSequence(parking_map_info_, current_pose);
+    circular_plan_cache_.path_seq = computeCircularPathSequence(*parking_map_info_, current_pose);
   }
   const auto circular_path = circular_plan_cache_.path_seq.front();
   circular_plan_cache_.path_seq.pop_front();
   circular_plan_cache_.current_path = circular_path;
 
   route_handler::RouteHandler route_handler(
-    parking_map_info_.lanelet_map_ptr, parking_map_info_.traffic_rules_ptr,
-    parking_map_info_.routing_graph_ptr);
+    parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,
+    parking_map_info_->routing_graph_ptr);
 
   // time stamp will be set outsode of this method as this class is not a "rclcpp::Node"
   HADMapRoute next_route;

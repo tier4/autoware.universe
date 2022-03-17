@@ -137,16 +137,11 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   RCLCPP_INFO_STREAM(
     get_logger(), "reciedved ParkingMissionPlan srv request: type " << request->type);
 
-  /*
-  const bool is_initilized = (sub_graph_ptr_ != nullptr);
-  if (!is_initilized) {
-    const bool success = reset();
-    if (!success) {
-      RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "cannot reset subgraph");
-      return false;
-    }
+  if (!parking_map_info_.is_initialized()) {
+    prepare();
   }
 
+  /*
   std::string next_plan_type;
   if (request->type == request->CIRCULAR) {
     if (previous_mode_ != request->PARKING) {
@@ -163,8 +158,6 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
     RCLCPP_WARN(get_logger(), "type field seemes to be invaid value.");
     next_plan_type = request->END;
   }
-  RCLCPP_INFO_STREAM(get_logger(), "processed");
-
   const bool prohibit_publish = (route == boost::none);
 
   // create debug goal pose
@@ -185,7 +178,9 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   response->next_type = next_plan_type;
   response->prohibit_publish = prohibit_publish;
   */
-  response->next_type = request->CIRCULAR;
+  const auto result = planCircularRoute();
+  response->next_type = result.next_phase;
+  response->route = result.route;
   response->prohibit_publish = false;
   return true;
 }

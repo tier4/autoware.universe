@@ -73,7 +73,7 @@ struct SubscribedMessages
 struct PlanningResult
 {
   std::string next_phase;
-  HADMapRoute next_route;
+  HADMapRoute route;
 };
 
 struct CircularPlanCache
@@ -116,7 +116,7 @@ public:
 
   AutoParkingConfig config_;
   SubscribedMessages sub_msgs_;
-  ParkingMapInfo parking_map_info_;
+  boost::optional<ParkingMapInfo> parking_map_info_;
 
   std::string base_link_frame_;
   std::string map_frame_;
