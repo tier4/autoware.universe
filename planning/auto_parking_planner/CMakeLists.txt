@@ -19,19 +19,16 @@ ament_auto_add_library(auto_parking_planner_node SHARED
   src/circular_route_planning.cpp
 )
 
-# ament_auto_add_executable(auto_parking_planner_debug_node src/main.cpp)
-# target_link_libraries(auto_parking_planner_debug_node auto_parking_planner_node)
-#
-# rclcpp_components_register_node(auto_parking_planner_node
-#   PLUGIN "auto_parking_planner::ParkingRoutePlanner"
-#   EXECUTABLE auto_parking_planner
-# )
-#
-# if(BUILD_TESTING)
-#   find_package(ament_lint_auto REQUIRED)
-#   ament_lint_auto_find_test_dependencies()
-# endif()
-#
-# ament_auto_package(
-#   INSTALL_TO_SHARE
-# )
+rclcpp_components_register_node(auto_parking_planner_node
+    PLUGIN "auto_parking_planner::AutoParkingPlanner"
+  EXECUTABLE auto_parking_planner
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_auto_package(
+  INSTALL_TO_SHARE
+)

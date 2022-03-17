@@ -60,7 +60,7 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
     "~/input/trajectory", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::trajCallback, this, _1));
 
   srv_parking_mission_ = this->create_service<autoware_parking_srvs::srv::ParkingMissionPlan>(
-    "service/plan_parking_mission",
+    "/service/plan_parking_mission",
     std::bind(&AutoParkingPlanner::parkingMissionPlanCallback, this, _1, _2, _3),
     rmw_qos_profile_services_default, cb_group_);
 
@@ -137,7 +137,7 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   RCLCPP_INFO_STREAM(
     get_logger(), "reciedved ParkingMissionPlan srv request: type " << request->type);
 
-  if (!parking_map_info_.is_initialized()) {
+  if (parking_map_info_ == boost::none) {
     prepare();
   }
 

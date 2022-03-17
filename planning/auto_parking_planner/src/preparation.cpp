@@ -88,9 +88,8 @@ std::vector<Pose> get_possible_parking_poses(lanelet::LaneletMapPtr lanelet_map_
   return poses;
 }
 
-void build_parking_map_info(
-  lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region,
-  ParkingMapInfo & parking_map_info)
+ParkingMapInfo build_parking_map_info(
+  lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region)
 {
   lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
   traffic_rules_ptr = lanelet::traffic_rules::TrafficRulesFactory::create(
@@ -112,6 +111,7 @@ void build_parking_map_info(
   const auto parking_poses = get_possible_parking_poses(sub_lanelet_map_ptr);
   const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
 
+  ParkingMapInfo parking_map_info;
   parking_map_info.lanelet_map_ptr = sub_lanelet_map_ptr;
   parking_map_info.routing_graph_ptr = sub_routing_graph_ptr;
   parking_map_info.traffic_rules_ptr = traffic_rules_ptr;
@@ -119,17 +119,17 @@ void build_parking_map_info(
   parking_map_info.road_llts = road_llts;
   parking_map_info.parking_poses = parking_poses;
   parking_map_info.llt_types = llt_types;
+  return parking_map_info;
 }
 
 void AutoParkingPlanner::prepare()
 {
-  lanelet::LaneletMapPtr lanelet_map_ptr;
+  const auto lanelet_map_ptr = std::make_shared<lanelet::LaneletMap>();
   lanelet::utils::conversion::fromBinMsg(*sub_msgs_.map_ptr, lanelet_map_ptr);
 
   const auto all_parking_lots = lanelet::utils::query::getAllParkingLots(lanelet_map_ptr);
   const auto nearest_parking_lot = all_parking_lots[0];  // TODO(HiroIshida): temp
-
-  build_parking_map_info(lanelet_map_ptr, nearest_parking_lot, *parking_map_info_);
+  parking_map_info_ = build_parking_map_info(lanelet_map_ptr, nearest_parking_lot);
 }
 
 }  // namespace auto_parking_planner
