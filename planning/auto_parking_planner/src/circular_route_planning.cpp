@@ -233,6 +233,8 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   route_handler::RouteHandler route_handler(
     parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,
     parking_map_info_->routing_graph_ptr);
+  route_handler.setRouteLanelets(
+    circular_path);  // TODO(HiroIshida) redundant? maybe should modify route_handler
 
   // time stamp will be set outsode of this method as this class is not a "rclcpp::Node"
   HADMapRoute next_route;
