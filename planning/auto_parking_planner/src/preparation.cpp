@@ -27,14 +27,13 @@ std::map<size_t, ParkingLaneletType> build_llt_type_table(
 {
   auto table = std::map<size_t, ParkingLaneletType>();
 
-  for (size_t idx = 0; idx < road_llts.size(); ++idx) {
-    const auto & llt = road_llts[idx];
+  for (const auto & llt : road_llts) {
     if (routing_graph_ptr->following(llt).empty()) {
-      table[idx] = ParkingLaneletType::EXIT;
+      table[llt.id()] = ParkingLaneletType::EXIT;
     } else if (routing_graph_ptr->previous(llt).empty()) {
-      table[idx] = ParkingLaneletType::ENTRANCE;
+      table[llt.id()] = ParkingLaneletType::ENTRANCE;
     } else {
-      table[idx] = ParkingLaneletType::NORMAL;
+      table[llt.id()] = ParkingLaneletType::NORMAL;
     }
   }
   return table;
@@ -108,7 +107,7 @@ ParkingMapInfo build_parking_map_info(
   parking_map_info.focus_region = focus_region;
   parking_map_info.road_llts = road_llts;
   parking_map_info.parking_poses = parking_poses;
-  parking_map_info.llt_types = llt_types;
+  parking_map_info.llt_type_table = llt_types;
   return parking_map_info;
 }
 

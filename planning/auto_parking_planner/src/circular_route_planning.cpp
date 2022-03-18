@@ -59,15 +59,18 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
   lanelet::ConstLanelets entrance_llts;
   lanelet::ConstLanelets exit_llts;
 
-  for (const auto & llt_pair : parking_map_info.llt_types) {
-    const auto llt = parking_map_info.road_llts[llt_pair.first];
-    if (llt_pair.second == ParkingLaneletType::ENTRANCE) {
+  for (const auto & llt : parking_map_info.road_llts) {
+    const auto it = parking_map_info.llt_type_table.find(llt.id());
+    const auto llt_type = it->second;
+
+    if (llt_type == ParkingLaneletType::ENTRANCE) {
       entrance_llts.push_back(llt);
     }
-    if (llt_pair.second == ParkingLaneletType::EXIT) {
+    if (llt_type == ParkingLaneletType::EXIT) {
       exit_llts.push_back(llt);
     }
   }
+
   if (entrance_llts.size() != 1 || exit_llts.size() != 1) {
     throw std::runtime_error("current impl assumes only one entrance and exit");  // TODO
   }

@@ -98,7 +98,7 @@ struct ParkingMapInfo
   lanelet::routing::RoutingGraphPtr routing_graph_ptr;
   lanelet::ConstLanelets road_llts;
   std::vector<Pose> parking_poses;
-  std::map<size_t, ParkingLaneletType> llt_types;
+  std::map<size_t, ParkingLaneletType> llt_type_table;
 };
 
 class AutoParkingPlanner : public rclcpp::Node
