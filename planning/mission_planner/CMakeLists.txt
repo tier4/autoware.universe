@@ -13,6 +13,7 @@ ament_auto_add_library(mission_planner_node SHARED
 rclcpp_components_register_node(mission_planner_node
   PLUGIN "mission_planner::MissionPlannerLanelet2"
   EXECUTABLE mission_planner
+  EXECUTOR MultiThreadedExecutor
 )
 
 ament_auto_add_library(goal_pose_visualizer_node SHARED
