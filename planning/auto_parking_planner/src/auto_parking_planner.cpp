@@ -181,7 +181,7 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   const auto result = planCircularRoute();
   response->next_type = result.next_phase;
   response->route = result.route;
-  response->prohibit_publish = false;
+  response->success = result.success;
   return true;
 }
 
