@@ -94,7 +94,10 @@ ParkingMapInfo build_parking_map_info(
     lanelet::utils::createSubmap(llts_inside)->laneletMap();
   const lanelet::routing::RoutingGraphPtr sub_routing_graph_ptr =
     lanelet::routing::RoutingGraph::build(*sub_lanelet_map_ptr, *traffic_rules_ptr);
-  const auto road_llts = lanelet::utils::query::roadLanelets(all_lanelets);
+
+  lanelet::ConstLanelets all_lanelets_inside =
+    lanelet::utils::query::laneletLayer(sub_lanelet_map_ptr);
+  const auto road_llts = lanelet::utils::query::roadLanelets(all_lanelets_inside);
   const auto parking_poses = get_possible_parking_poses(sub_lanelet_map_ptr);
   const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
 
