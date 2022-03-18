@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "auto_parking_planner.hpp"
+#include "lanelet2_core/primitives/Lanelet.h"
 #include "route_handler/route_handler.hpp"
 
 #include <algorithm>
@@ -33,6 +34,27 @@ bool is_straight(const lanelet::ConstLanelet & llt)
   const double angle =
     std::acos(entrance_surface.dot(exit_surface) / entrance_surface.norm() / exit_surface.norm());
   return angle < 3.1415926 * 30 / 180.0;
+}
+
+bool isGoingToExit(const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
+{
+  auto llt_here = llt;
+  while (true) {
+    const auto it = parking_map_info.llt_type_table.find(llt.id());
+    const ParkingLaneletType llt_type = it->second;
+    if (llt_type == ParkingLaneletType::EXIT) {
+      return true;
+    }
+
+    const auto following_llts = parking_map_info.routing_graph_ptr->following(llt_here);
+    const bool is_deadend = (following_llts.size() == 0);
+    const bool is_forked = (following_llts.size() > 1);
+    if (is_forked || is_deadend) {
+      return false;
+    }
+
+    llt_here = following_llts.front();
+  }
 }
 
 Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
@@ -83,30 +105,13 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
   auto reachable_llts = parking_map_info.routing_graph_ptr->reachableSet(
     current_lanelet, std::numeric_limits<double>::infinity());
 
-  const auto is_leading_to_deadend = [&](const lanelet::ConstLanelet & llt) -> bool {
-    // TODO: this implementation is inefficient. Reasonably, we should save the intermiediate result
-    // in a cache. However, for small size parking lot, without caching is not necessarly.
-    auto llt_here = llt;
-    while (true) {
-      const auto is_deadend =
-        std::find_if(exit_llts.begin(), exit_llts.end(), [&llt_here](const auto & llt_) {
-          return llt_here.id() == llt_.id();
-        }) != exit_llts.end();
-      if (is_deadend) return true;
-
-      const auto & following_llts = parking_map_info.routing_graph_ptr->following(llt_here);
-      if (following_llts.size() > 1) return false;
-      llt_here = following_llts.front();
-    }
-  };
-
   // initialize table is visited
   std::unordered_map<size_t, bool> table_is_visited;
   for (const auto & llt : reachable_llts) {
     table_is_visited[llt.id()] = false;
   }
   for (const auto & llt : reachable_llts) {
-    if (is_leading_to_deadend(llt)) table_is_visited[llt.id()] = true;
+    if (isGoingToExit(llt, parking_map_info)) table_is_visited[llt.id()] = true;
   }
 
   const auto is_visited_all = [&]() {
@@ -129,7 +134,7 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
 
       lanelet::ConstLanelets candidate_next_llts;
       for (const auto & llt_follow : parking_map_info.routing_graph_ptr->following(llt_here)) {
-        if (!is_leading_to_deadend(llt_follow)) candidate_next_llts.push_back(llt_follow);
+        if (!isGoingToExit(llt_follow, parking_map_info)) candidate_next_llts.push_back(llt_follow);
       }
       if (candidate_next_llts.empty()) throw std::runtime_error("strange..");
 
@@ -148,40 +153,41 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
     }
   }
 
-  {
-    std::deque<lanelet::ConstLanelets> circling_path_seq;
-    lanelet::ConstLanelets path_partial;
-    for (const auto & llt : circling_path_whole) {
-      const auto is_next_loopy = [&](const lanelet::ConstLanelet & llt) -> bool {
-        const auto llts_follow = parking_map_info.routing_graph_ptr->following(llt);
-        for (const auto & llt : llts_follow) {
-          const auto it_same = std::find_if(
-            path_partial.begin(), path_partial.end(),
-            [&llt](const auto & llt_) { return llt.id() == llt_.id(); });
-          if (it_same != path_partial.end()) {
-            return true;
-          }
+  std::deque<lanelet::ConstLanelets> circling_path_seq;
+  lanelet::ConstLanelets path_partial;
+  for (const auto & llt : circling_path_whole) {
+    const auto is_next_loopy = [&](const lanelet::ConstLanelet & llt) -> bool {
+      const auto llts_follow = parking_map_info.routing_graph_ptr->following(llt);
+      for (const auto & llt : llts_follow) {
+        const auto it_same = std::find_if(
+          path_partial.begin(), path_partial.end(),
+          [&llt](const auto & llt_) { return llt.id() == llt_.id(); });
+        if (it_same != path_partial.end()) {
+          return true;
         }
-        return false;
-      };
-
-      if (is_next_loopy(llt)) {
-        auto path_patial_new = lanelet::ConstLanelets{path_partial.back()};
-        if (!is_straight(path_partial.back())) {
-          // TODO(HiroIshida) Must iterate until finding straight. But I this two curve lanelet
-          // don't exist.
-          path_partial.pop_back();
-          path_patial_new.insert(path_patial_new.begin(), path_partial.back());
-        }
-
-        circling_path_seq.push_back(path_partial);
-        path_partial = path_patial_new;
       }
-      path_partial.push_back(llt);
+      return false;
+    };
+
+    if (is_next_loopy(llt)) {
+      auto path_patial_new = lanelet::ConstLanelets{path_partial.back()};
+      if (!is_straight(path_partial.back())) {
+        // TODO(HiroIshida) Must iterate until finding straight. But I this two curve lanelet
+        // don't exist.
+        path_partial.pop_back();
+        path_patial_new.insert(path_patial_new.begin(), path_partial.back());
+      }
+
+      circling_path_seq.push_back(path_partial);
+      path_partial = path_patial_new;
     }
-    circling_path_seq.push_back(path_partial);
-    return circling_path_seq;
+    path_partial.push_back(llt);
   }
+  circling_path_seq.push_back(path_partial);
+
+  throw std::logic_error("heck!");
+
+  return circling_path_seq;
 }
 
 PlanningResult AutoParkingPlanner::planCircularRoute() const
