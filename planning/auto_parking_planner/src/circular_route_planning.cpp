@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "auto_parking_planner.hpp"
+#include "lanelet2_core/Forward.h"
 #include "lanelet2_core/primitives/Lanelet.h"
 #include "route_handler/route_handler.hpp"
 
@@ -75,35 +76,23 @@ Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
   return pose;
 }
 
-std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
-  const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet)
+std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
+  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
 {
-  lanelet::ConstLanelets entrance_llts;
-  lanelet::ConstLanelets exit_llts;
-
-  for (const auto & llt : parking_map_info.road_llts) {
-    const auto it = parking_map_info.llt_type_table.find(llt.id());
-    const auto llt_type = it->second;
-
-    if (llt_type == ParkingLaneletType::ENTRANCE) {
-      entrance_llts.push_back(llt);
-    }
-    if (llt_type == ParkingLaneletType::EXIT) {
-      exit_llts.push_back(llt);
-    }
+  lanelet::ConstLanelets llt_seqeunce{llt};
+  while (true) {
+    const auto && llts_following =
+      parking_map_info.routing_graph_ptr->following(llt_seqeunce.back());
+    llt_seqeunce.push_back(llts_following.front());
   }
+  return std::deque<lanelet::ConstLanelets>{llt_seqeunce};
+}
 
-  if (entrance_llts.size() != 1 || exit_llts.size() != 1) {
-    throw std::runtime_error("current impl assumes only one entrance and exit");  // TODO
-  }
-
-  if (!std::count(
-        parking_map_info.road_llts.begin(), parking_map_info.road_llts.end(), current_lanelet)) {
-    throw std::runtime_error("current impl assumes car is already inside");  // TODO
-  }
-
-  auto reachable_llts = parking_map_info.routing_graph_ptr->reachableSet(
-    current_lanelet, std::numeric_limits<double>::infinity());
+std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
+  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
+{
+  auto reachable_llts =
+    parking_map_info.routing_graph_ptr->reachableSet(llt, std::numeric_limits<double>::infinity());
 
   // initialize table is visited
   std::unordered_map<size_t, bool> table_is_visited;
@@ -123,7 +112,7 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
 
   lanelet::ConstLanelets circling_path_whole;
   {
-    lanelet::ConstLanelet llt_here = current_lanelet;
+    lanelet::ConstLanelet llt_here = llt;
     table_is_visited[llt_here.id()] = true;
     circling_path_whole.push_back(llt_here);
     while (!is_visited_all()) {
@@ -185,9 +174,35 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
   }
   circling_path_seq.push_back(path_partial);
 
-  throw std::logic_error("heck!");
-
   return circling_path_seq;
+}
+
+std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
+  const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet)
+{
+  lanelet::ConstLanelets entrance_llts;
+  lanelet::ConstLanelets exit_llts;
+
+  for (const auto & llt : parking_map_info.road_llts) {
+    const auto it = parking_map_info.llt_type_table.find(llt.id());
+    const auto llt_type = it->second;
+
+    if (llt_type == ParkingLaneletType::ENTRANCE) {
+      entrance_llts.push_back(llt);
+    }
+    if (llt_type == ParkingLaneletType::EXIT) {
+      exit_llts.push_back(llt);
+    }
+  }
+
+  if (entrance_llts.size() != 1 || exit_llts.size() != 1) {
+    throw std::runtime_error("current impl assumes only one entrance and exit");  // TODO
+  }
+
+  if (isGoingToExit(current_lanelet, parking_map_info)) {
+    return computeCircularPathSequenceIfNoLoop(current_lanelet, parking_map_info);
+  }
+  return computeCircularPathSequenceIfLoop(current_lanelet, parking_map_info);
 }
 
 PlanningResult AutoParkingPlanner::planCircularRoute() const
