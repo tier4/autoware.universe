@@ -336,7 +336,10 @@ bool MissionPlannerLanelet2::autoparkCallback(
       return plan_req->END;
     }
     const auto result = fut.get();
-    if (!result->prohibit_publish) this->publishRoute(result->route);
+    if (result->success) {
+      this->publishRoute(result->route);
+      RCLCPP_INFO_STREAM(get_logger(), "successfully published route");
+    }
     return result->next_type;
   };
 
