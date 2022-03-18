@@ -32,6 +32,7 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #include <deque>
 #include <map>
@@ -53,6 +54,9 @@ using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::PoseStamped;
 using geometry_msgs::msg::TwistStamped;
 
+// some util functions
+bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt);
+
 struct AutoParkingConfig
 {
   double lookahead_length;
@@ -72,8 +76,10 @@ struct SubscribedMessages
 
 struct PlanningResult
 {
+  bool success;
   std::string next_phase;
   HADMapRoute route;
+  std::string message;
 };
 
 struct CircularPlanCache

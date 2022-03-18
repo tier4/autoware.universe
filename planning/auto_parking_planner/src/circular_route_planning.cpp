@@ -15,6 +15,8 @@
 #include "auto_parking_planner.hpp"
 #include "route_handler/route_handler.hpp"
 
+#include <algorithm>
+
 namespace auto_parking_planner
 {
 
@@ -52,7 +54,7 @@ Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
 }
 
 std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
-  const ParkingMapInfo & parking_map_info, const PoseStamped & current_pose)
+  const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet)
 {
   lanelet::ConstLanelets entrance_llts;
   lanelet::ConstLanelets exit_llts;
@@ -70,9 +72,6 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
     throw std::runtime_error("current impl assumes only one entrance and exit");  // TODO
   }
 
-  lanelet::Lanelet current_lanelet;
-  lanelet::utils::query::getClosestLanelet(
-    parking_map_info.road_llts, current_pose.pose, &current_lanelet);
   if (!std::count(
         parking_map_info.road_llts.begin(), parking_map_info.road_llts.end(), current_lanelet)) {
     throw std::runtime_error("current impl assumes car is already inside");  // TODO
@@ -185,12 +184,23 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
 PlanningResult AutoParkingPlanner::planCircularRoute() const
 {
   const auto current_pose = getEgoVehiclePose();
+
+  lanelet::Lanelet current_lanelet;
+  lanelet::utils::query::getClosestLanelet(
+    parking_map_info_->road_llts, current_pose.pose, &current_lanelet);
+  if (!containLanelet(parking_map_info_->focus_region, current_lanelet)) {
+    const std::string message = "failed because current lanelet is not inside the parking lot";
+    RCLCPP_WARN_STREAM(get_logger(), message);
+    return PlanningResult{false, ParkingMissionPlan::Request::PREPARKING, HADMapRoute(), message};
+  }
+
   if (previous_mode_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
     circular_plan_cache_.path_seq.clear();
   }
 
   if (circular_plan_cache_.path_seq.empty()) {
-    circular_plan_cache_.path_seq = computeCircularPathSequence(*parking_map_info_, current_pose);
+    circular_plan_cache_.path_seq =
+      computeCircularPathSequence(*parking_map_info_, current_lanelet);
   }
   const auto circular_path = circular_plan_cache_.path_seq.front();
   circular_plan_cache_.path_seq.pop_front();
@@ -208,7 +218,7 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   next_route.goal_pose = computeLaneletCenterPose(circular_path.back());
   const auto next_phase = ParkingMissionPlan::Request::PREPARKING;
 
-  return PlanningResult{next_phase, next_route};
+  return PlanningResult{true, next_phase, next_route, ""};
 }
 
 }  // namespace auto_parking_planner

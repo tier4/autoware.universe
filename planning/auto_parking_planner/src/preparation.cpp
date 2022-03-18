@@ -22,31 +22,19 @@
 namespace auto_parking_planner
 {
 
-bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt)
-{
-  // if one of the vertexes of the lanlet is contained by the polygon
-  // this function returns true
-  const lanelet::CompoundPolygon3d llt_poly = llt.polygon3d();
-  for (const auto & pt : llt_poly) {
-    if (lanelet::geometry::within(pt, polygon.basicPolygon())) {
-      return true;
-    }
-  }
-  return false;
-}
-
 std::map<size_t, ParkingLaneletType> build_llt_type_table(
   lanelet::routing::RoutingGraphPtr routing_graph_ptr, const lanelet::ConstLanelets & road_llts)
 {
   auto table = std::map<size_t, ParkingLaneletType>();
 
-  for (const auto & llt : road_llts) {
+  for (size_t idx = 0; idx < road_llts.size(); ++idx) {
+    const auto & llt = road_llts[idx];
     if (routing_graph_ptr->following(llt).empty()) {
-      table[llt.id()] = ParkingLaneletType::EXIT;
+      table[idx] = ParkingLaneletType::EXIT;
     } else if (routing_graph_ptr->previous(llt).empty()) {
-      table[llt.id()] = ParkingLaneletType::ENTRANCE;
+      table[idx] = ParkingLaneletType::ENTRANCE;
     } else {
-      table[llt.id()] = ParkingLaneletType::NORMAL;
+      table[idx] = ParkingLaneletType::NORMAL;
     }
   }
   return table;
