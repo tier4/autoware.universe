@@ -210,6 +210,8 @@ FreespacePlannerNode::FreespacePlannerNode(const rclcpp::NodeOptions & node_opti
 : Node("freespace_planner", node_options)
 {
   using std::placeholders::_1;
+  using std::placeholders::_2;
+  using std::placeholders::_3;
 
   // NodeParam
   {
@@ -241,6 +243,9 @@ FreespacePlannerNode::FreespacePlannerNode(const rclcpp::NodeOptions & node_opti
       "~/input/scenario", 1, std::bind(&FreespacePlannerNode::onScenario, this, _1));
     odom_sub_ = create_subscription<Odometry>(
       "~/input/odometry", 100, std::bind(&FreespacePlannerNode::onOdometry, this, _1));
+    freespace_plan_srv_ = this->create_service<autoware_parking_srvs::srv::FreespacePlan>(
+      "~/service/freespace_plan", std::bind(
+        &FreespacePlannerNode::onFreespacePlan, this, _1, _2, _3)); // TODO Hiroishida QOS??
   }
 
   // Publishers
@@ -339,6 +344,65 @@ void FreespacePlannerNode::onOdometry(const Odometry::ConstSharedPtr msg)
 
     odom_buffer_.pop_front();
   }
+}
+
+bool FreespacePlannerNode::onFreespacePlan(
+  const std::shared_ptr<rmw_request_id_t> request_header,
+  const std::shared_ptr<autoware_parking_srvs::srv::FreespacePlan::Request> request,
+  std::shared_ptr<autoware_parking_srvs::srv::FreespacePlan::Response> response)
+{
+  RCLCPP_INFO_STREAM(get_logger(), "[ishida] service rec");
+  (void)request_header;
+
+  //TODO HiroIshida exception handling when array number is different
+  const int n_problems = request->start_poses.size();
+  response->successes.resize(n_problems);
+
+  if(!occupancy_grid_){
+    // TODO add message
+    std::fill(response->successes.begin(), response->successes.end(), false);
+    RCLCPP_INFO_STREAM(get_logger(), "[ishida] occupancy grid not found");
+    return false;
+  }
+
+  const rclcpp::Time start = get_clock()->now();
+
+  auto algo = AstarSearch(planner_common_param_, astar_param_);
+
+  freespace_planning_algorithms::VehicleShape extended_vehicle_shape =
+    planner_common_param_.vehicle_shape;
+  constexpr double margin = 1.0;
+  extended_vehicle_shape.length += margin;
+  extended_vehicle_shape.width += margin;
+  extended_vehicle_shape.base2back += margin / 2;
+
+  // Provide robot shape and map for the planner
+  algo.setVehicleShape(extended_vehicle_shape);
+  algo.setMap(*occupancy_grid_);
+
+  const auto isVacant = [&](const PoseStamped& goal_pose){
+    const auto goal_pose_in_costmap_frame = transformPose(
+      goal_pose_.pose, getTransform(occupancy_grid_->header.frame_id, goal_pose.header.frame_id));
+    PoseArray goal_poses;
+    goal_poses.poses.push_back(goal_pose_in_costmap_frame);
+    return !algo.hasObstacleOnTrajectory(goal_poses);
+  };
+
+  RCLCPP_INFO_STREAM(get_logger(), "[ishida] problem number: " << n_problems);
+  bool total_success = false;
+  for(int i=0; i<n_problems; i++){
+    const auto goal_pose = request->goal_poses[i];
+    const bool found = isVacant(goal_pose);
+
+    RCLCPP_INFO_STREAM(get_logger(), "[ishida] plan found? " << found);
+    response->successes[i] = found;
+    if(found){
+      total_success = true;
+    }
+  }
+
+  RCLCPP_INFO_STREAM(get_logger(), "[ishida] service return");
+  return total_success;
 }
 
 bool FreespacePlannerNode::isPlanRequired()
