@@ -18,6 +18,7 @@ ament_auto_add_library(auto_parking_planner_node SHARED
   src/utils.cpp
   src/preparation.cpp
   src/circular_route_planning.cpp
+  src/preparking_route_planning.cpp
 )
 
 rclcpp_components_register_node(auto_parking_planner_node

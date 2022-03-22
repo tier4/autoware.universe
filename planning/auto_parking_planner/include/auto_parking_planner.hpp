@@ -15,7 +15,6 @@
 #ifndef AUTO_PARKING_PLANNER_HPP_
 #define AUTO_PARKING_PLANNER_HPP_
 
-#include "autoware_parking_srvs/srv/detail/parking_mission_plan__struct.hpp"
 #include "autoware_parking_srvs/srv/freespace_plan.hpp"
 #include "autoware_parking_srvs/srv/parking_mission_plan.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -146,7 +145,8 @@ public:
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
   void prepare();
-  PlanningResult planCircularRoute() const;  // except circular_plan_cache_
+  PlanningResult planCircularRoute() const;    // except circular_plan_cache_
+  PlanningResult planPreparkingRoute() const;  // except TODO(HiroIshida): what is excepted
 };
 
 /*

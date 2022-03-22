@@ -15,7 +15,6 @@
 #include "auto_parking_planner.hpp"
 #include "lanelet2_core/Forward.h"
 #include "lanelet2_core/primitives/Lanelet.h"
-#include "route_handler/route_handler.hpp"
 
 #include <algorithm>
 
@@ -215,7 +214,7 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   if (!containLanelet(parking_map_info_->focus_region, current_lanelet)) {
     const std::string message = "failed because current lanelet is not inside the parking lot";
     RCLCPP_WARN_STREAM(get_logger(), message);
-    return PlanningResult{false, ParkingMissionPlan::Request::PREPARKING, HADMapRoute(), message};
+    return PlanningResult{false, ParkingMissionPlan::Request::END, HADMapRoute(), message};
   }
 
   if (previous_mode_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
@@ -236,8 +235,8 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   route_handler.setRouteLanelets(
     circular_path);  // TODO(HiroIshida) redundant? maybe should modify route_handler
 
-  // time stamp will be set outsode of this method as this class is not a "rclcpp::Node"
   HADMapRoute next_route;
+  next_route.header.stamp = this->now();
   next_route.header.frame_id = map_frame_;
   next_route.segments = route_handler.createMapSegments(circular_path);
   next_route.start_pose = current_pose.pose;

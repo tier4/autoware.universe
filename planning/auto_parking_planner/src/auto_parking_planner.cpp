@@ -141,44 +141,15 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
     prepare();
   }
 
-  /*
-  std::string next_plan_type;
+  PlanningResult result;
   if (request->type == request->CIRCULAR) {
-    if (previous_mode_ != request->PARKING) {
-      waitForPreviousRouteFinished();
-    }
-    next_plan_type = planCircularRoute(route);
+    result = planCircularRoute();
   } else if (request->type == request->PREPARKING) {
-    // Don't have to waitForPreviousRouteFinished
-    next_plan_type = planPreparkingRoute(route);
-  } else if (request->type == request->PARKING) {
-    waitForPreviousRouteFinished();
-    next_plan_type = planParkingRoute(route);
+    result = planPreparkingRoute();
   } else {
-    RCLCPP_WARN(get_logger(), "type field seemes to be invaid value.");
-    next_plan_type = request->END;
-  }
-  const bool prohibit_publish = (route == boost::none);
-
-  // create debug goal pose
-  if (!prohibit_publish) {
-    auto debug_pose = PoseStamped();
-    debug_pose.header.stamp = this->now();
-    debug_pose.header.frame_id = map_frame_;
-    debug_pose.pose = route.get().goal_pose;
-    debug_goal_pose_publisher_->publish(debug_pose);
+    throw std::logic_error("not implemented yet");
   }
 
-  previous_mode_ = request->type;
-  previous_route_ = route;
-  if (!prohibit_publish) {
-    response->route = route.get();
-  }
-
-  response->next_type = next_plan_type;
-  response->prohibit_publish = prohibit_publish;
-  */
-  const auto result = planCircularRoute();
   response->next_type = result.next_phase;
   response->route = result.route;
   response->success = result.success;
