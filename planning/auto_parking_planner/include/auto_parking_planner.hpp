@@ -55,6 +55,8 @@ using geometry_msgs::msg::TwistStamped;
 
 // some util functions
 bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt);
+bool containPolygon(
+  const lanelet::ConstPolygon3d & polygon, const lanelet::ConstPolygon3d & polygon2);
 
 struct AutoParkingConfig
 {

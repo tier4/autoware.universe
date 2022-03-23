@@ -30,4 +30,15 @@ bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::Cons
   return false;
 }
 
+bool containPolygon(
+  const lanelet::ConstPolygon3d & polygon, const lanelet::ConstPolygon3d & polygon2)
+{
+  for (const auto & pt : polygon2) {
+    if (lanelet::geometry::within(pt, polygon.basicPolygon())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace auto_parking_planner
