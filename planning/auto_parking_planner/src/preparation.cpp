@@ -39,14 +39,20 @@ std::map<size_t, ParkingLaneletType> build_llt_type_table(
   return table;
 }
 
-std::vector<Pose> get_possible_parking_poses(lanelet::LaneletMapPtr lanelet_map_ptr)
+std::vector<Pose> get_possible_parking_poses(
+  lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region)
 {
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "testing preparation");
   std::vector<Pose> poses;
   const lanelet::ConstLineStrings3d parking_spaces =
     lanelet::utils::query::getAllParkingSpaces(lanelet_map_ptr);
+
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "n? : " << parking_spaces.size());
   for (const auto & parking_space : parking_spaces) {
     lanelet::ConstPolygon3d polygon;
     lanelet::utils::lineStringWithWidthToPolygon(parking_space, &polygon);
+
+    if (!containPolygon(focus_region, polygon)) continue;
 
     Eigen::Vector3d p0 = polygon[0];
     Eigen::Vector3d p1 = polygon[1];
@@ -71,6 +77,9 @@ std::vector<Pose> get_possible_parking_poses(lanelet::LaneletMapPtr lanelet_map_
     tf2::convert(tier4_autoware_utils::createQuaternionFromRPY(0, 0, -yaw), pose_back.orientation);
     poses.push_back(pose);
   }
+  if (parking_spaces.size() == 0) {
+    throw std::logic_error("the heck!");
+  }
   return poses;
 }
 
@@ -84,6 +93,9 @@ ParkingMapInfo build_parking_map_info(
   lanelet::Lanelets llts_inside;
   lanelet::ConstLanelets all_lanelets = lanelet::utils::query::laneletLayer(lanelet_map_ptr);
   for (const lanelet::ConstLanelet & llt : all_lanelets) {
+    const std::string attr = llt.attributeOr(lanelet::AttributeName::Type, "none");
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "sub llt id : " << llt.id());
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "sub llt attr : " << attr);
     if (containLanelet(focus_region, llt)) {
       llts_inside.push_back(lanelet_map_ptr->laneletLayer.get(llt.id()));
     }
@@ -97,7 +109,9 @@ ParkingMapInfo build_parking_map_info(
   lanelet::ConstLanelets all_lanelets_inside =
     lanelet::utils::query::laneletLayer(sub_lanelet_map_ptr);
   const auto road_llts = lanelet::utils::query::roadLanelets(all_lanelets_inside);
-  const auto parking_poses = get_possible_parking_poses(sub_lanelet_map_ptr);
+
+  // NOTE: parking pose mustb be created from lanelet_map_ptr NOT sub_lanelet_map_ptr
+  const auto parking_poses = get_possible_parking_poses(lanelet_map_ptr, focus_region);
   const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
 
   ParkingMapInfo parking_map_info;

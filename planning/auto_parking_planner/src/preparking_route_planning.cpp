@@ -27,8 +27,10 @@ void getCloseGoalsAndCorrenspondingStarts(
   const Pose & current_pose, const ParkingMapInfo & parking_map_info, double threshold,
   std::vector<Pose> & goal_poses_out, std::vector<Pose> & start_poses_out)
 {
+  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "<<debugging .... >>");
   for (const auto & pose : parking_map_info.parking_poses) {
     const auto dist = tier4_autoware_utils::calcDistance2d(pose, current_pose);
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "dist: " << dist);
     if (dist < threshold) {
       goal_poses_out.push_back(pose);
     }
