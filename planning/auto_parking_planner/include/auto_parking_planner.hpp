@@ -47,6 +47,7 @@ using autoware_auto_mapping_msgs::msg::HADMapBin;
 using autoware_auto_mapping_msgs::msg::HADMapSegment;
 using autoware_auto_planning_msgs::msg::HADMapRoute;
 using autoware_auto_planning_msgs::msg::Trajectory;
+using autoware_auto_system_msgs::msg::AutowareState;
 using autoware_parking_srvs::srv::ParkingMissionPlan;
 
 using geometry_msgs::msg::Pose;
@@ -146,6 +147,8 @@ public:
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
+
+  bool waitUntilPreviousRouteFinished();
 
   void prepare();
   PlanningResult planCircularRoute() const;    // except circular_plan_cache_

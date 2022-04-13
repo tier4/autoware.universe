@@ -18,6 +18,7 @@
 
 #include <rclcpp/executors.hpp>
 
+#include <chrono>
 #include <future>
 #include <stdexcept>
 
@@ -141,6 +142,8 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
     prepare();
   }
 
+  waitUntilPreviousRouteFinished();
+
   PlanningResult result;
   if (request->type == request->CIRCULAR) {
     result = planCircularRoute();
@@ -157,6 +160,33 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   previous_phase_ = result.next_phase;
   previous_route_ = result.route;
   return true;
+}
+
+bool AutoParkingPlanner::waitUntilPreviousRouteFinished()
+{
+  RCLCPP_INFO_STREAM(get_logger(), "waiting for preivous route finished...");
+  if (!previous_route_) {
+    return true;
+  }
+
+  if (!sub_msgs_.state_ptr) {
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+    if (!sub_msgs_.state_ptr) {
+      return false;
+    }
+  }
+
+  while (true) {
+    const double dist_error =
+      tier4_autoware_utils::calcDistance2d(getEgoVehiclePose(), previous_route_->goal_pose);
+    rclcpp::sleep_for(std::chrono::milliseconds(300));
+    if (sub_msgs_.state_ptr->state == AutowareState::WAITING_FOR_ROUTE) {
+      if (dist_error < 1.5) {
+        RCLCPP_INFO_STREAM(get_logger(), "preivous route finished!");
+        return true;
+      }
+    }
+  }
 }
 
 }  // namespace auto_parking_planner
