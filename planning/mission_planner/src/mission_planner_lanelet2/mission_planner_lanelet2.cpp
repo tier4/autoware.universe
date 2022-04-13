@@ -330,7 +330,7 @@ bool MissionPlannerLanelet2::autoparkCallback(
     auto plan_req = std::make_shared<autoware_parking_srvs::srv::ParkingMissionPlan::Request>();
     plan_req->type = plan_type;
     const auto fut = parking_mission_plan_client_->async_send_request(plan_req);
-    const auto fut_status = fut.wait_for(std::chrono::seconds{20});
+    const auto fut_status = fut.wait_for(std::chrono::seconds{120});
     if (fut_status != std::future_status::ready) {
       RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "could not get response");
       return plan_req->END;
