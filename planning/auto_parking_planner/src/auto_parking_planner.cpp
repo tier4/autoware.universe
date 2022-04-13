@@ -63,7 +63,7 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
   srv_parking_mission_ = this->create_service<autoware_parking_srvs::srv::ParkingMissionPlan>(
     "/service/plan_parking_mission",
     std::bind(&AutoParkingPlanner::parkingMissionPlanCallback, this, _1, _2, _3),
-    rmw_qos_profile_services_default);
+    rmw_qos_profile_services_default, cb_group_);
 
   freespaceplane_client_ = this->create_client<autoware_parking_srvs::srv::FreespacePlan>(
     "/planning/scenario_planning/parking/freespace_planner/service/freespace_plan",
