@@ -14,55 +14,54 @@
 
 #include "auto_parking_planner.hpp"
 
+#include <interpolation/spline_interpolation_points_2d.hpp>
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 
+#include "autoware_auto_planning_msgs/msg/detail/trajectory__struct.hpp"
+
 #include <chrono>
+#include <functional>
 #include <iterator>
 #include <limits>
 
 namespace auto_parking_planner
 {
 
-void getCloseGoalsAndCorrenspondingStarts(
-  const Pose & current_pose, const ParkingMapInfo & parking_map_info, double threshold,
-  std::vector<Pose> & goal_poses_out, std::vector<Pose> & start_poses_out)
+Pose createTrajectoryBasedInterpolator(
+  const Pose & current_pose, const Trajectory & traj, double ahead_dist)
 {
-  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "<<debugging .... >>");
+  const auto & points = traj.points;
+  std::vector<TrajectoryPoint> points_extended;
+  for (const auto & p : points) {
+    points_extended.push_back(p);
+  }
+
+  SplineInterpolationPoints2d itp;
+  itp.calcSplineCoefficients(points_extended);
+  const auto idx = tier4_autoware_utils::findNearestIndex(points_extended, current_pose.position);
+
+  const auto pt = itp.getSplineInterpolatedPoint(idx, ahead_dist);
+  const auto yaw = itp.getSplineInterpolatedYaw(idx, ahead_dist);
+  auto pose = Pose();
+  pose.position.x = pt.x;
+  pose.position.y = pt.y;
+  pose.position.z = 0.0;
+  pose.orientation = tier4_autoware_utils::createQuaternionFromYaw(yaw);
+  return pose;
+}
+
+std::vector<Pose> getCandidateGoalPoses(
+  const Pose & start_pose, const ParkingMapInfo & parking_map_info, double threshold)
+{
+  std::vector<Pose> goal_poses;
   for (const auto & pose : parking_map_info.parking_poses) {
-    const auto dist = tier4_autoware_utils::calcDistance2d(pose, current_pose);
+    const auto dist = tier4_autoware_utils::calcDistance2d(pose, start_pose);
     RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "dist: " << dist);
     if (dist < threshold) {
-      goal_poses_out.push_back(pose);
+      goal_poses.push_back(pose);
     }
   }
-
-  for (const auto & goal_pose : goal_poses_out) {
-    lanelet::ConstLanelet llt_closest;
-    lanelet::utils::query::getClosestLanelet(parking_map_info.road_llts, goal_pose, &llt_closest);
-
-    const auto centerline = llt_closest.centerline();
-    double min_dist_from_goal = std::numeric_limits<double>::infinity();
-    Pose best_start_pose;
-    for (size_t i = 0; i < centerline.size() - 1; ++i) {
-      const Eigen::Vector3d p0 = centerline[i];
-      const Eigen::Vector3d g(goal_pose.position.x, goal_pose.position.y, goal_pose.position.z);
-
-      const double dist_from_goal = (g - p0).norm();
-      if (dist_from_goal < min_dist_from_goal) {
-        // set pos
-        best_start_pose.position.x = p0.x();
-        best_start_pose.position.y = p0.y();
-        best_start_pose.position.z = p0.z();
-
-        // set orientation
-        const Eigen::Vector3d p1 = centerline[i + 1];
-        const double yaw = std::atan2(p1.y() - p0.y(), p1.x() - p0.x());
-        tf2::convert(
-          tier4_autoware_utils::createQuaternionFromRPY(0, 0, yaw), best_start_pose.orientation);
-      }
-    }
-    start_poses_out.push_back(best_start_pose);
-  }
+  return goal_poses;
 }
 
 PlanningResult AutoParkingPlanner::planPreparkingRoute() const
@@ -79,33 +78,30 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     rclcpp::sleep_for(std::chrono::milliseconds(100));
 
     const auto current_pose = getEgoVehiclePose();
+    if (!sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
+      continue;
+    }
+    const auto start_pose = createTrajectoryBasedInterpolator(
+      current_pose.pose, *sub_msgs_.traj_ptr_, config_.lookahead_length);
 
     std::vector<Pose> goal_pose_filtered;
-    std::vector<Pose> start_pose_filtered;
-    getCloseGoalsAndCorrenspondingStarts(
-      current_pose.pose, *parking_map_info_, config_.euclid_threashold_length, goal_pose_filtered,
-      start_pose_filtered);
-
-    if (goal_pose_filtered.empty()) {
+    const auto cand_goal_poses =
+      getCandidateGoalPoses(start_pose, *parking_map_info_, config_.euclid_threashold_length);
+    if (cand_goal_poses.empty()) {
       RCLCPP_INFO_STREAM(get_logger(), "could not find parking space around here...");
       continue;
     }
 
-    auto freespace_plan_req =
-      std::make_shared<autoware_parking_srvs::srv::FreespacePlan::Request>();
-
-    const auto feasible_indices =
-      askFeasibleGoalIndex(start_pose_filtered.front(), goal_pose_filtered);
-    if (feasible_indices.empty()) {
+    const auto feasible_goal_poses = askFeasibleGoalIndex(start_pose, cand_goal_poses);
+    if (feasible_goal_poses.empty()) {
       continue;
     }
-
-    RCLCPP_WARN_STREAM(get_logger(), "found " << feasible_indices.size() << " feasible goals");
+    RCLCPP_WARN_STREAM(get_logger(), "found " << feasible_goal_poses.size() << " feasible goals");
 
     // cache
     feasible_parking_goal_poses_.clear();
-    for (size_t idx : feasible_indices) {
-      feasible_parking_goal_poses_.push_back(goal_pose_filtered.at(idx));
+    for (const auto & feasible_goal_pose : feasible_goal_poses) {
+      feasible_parking_goal_poses_.push_back(feasible_goal_pose);
     }
 
     route_handler::RouteHandler route_handler(
@@ -114,7 +110,7 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     lanelet::ConstLanelets preparking_path;
 
     route_handler.planPathLaneletsBetweenCheckpoints(
-      current_pose.pose, start_pose_filtered.front(), &preparking_path);
+      current_pose.pose, start_pose, &preparking_path);
     route_handler.setRouteLanelets(preparking_path);
 
     HADMapRoute next_route;
@@ -122,7 +118,7 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     next_route.header.frame_id = map_frame_;
     next_route.segments = route_handler.createMapSegments(preparking_path);
     next_route.start_pose = current_pose.pose;
-    next_route.goal_pose = start_pose_filtered.front();
+    next_route.goal_pose = start_pose;
     const auto next_phase = ParkingMissionPlan::Request::PARKING;
     return PlanningResult{true, next_phase, next_route, ""};
   }

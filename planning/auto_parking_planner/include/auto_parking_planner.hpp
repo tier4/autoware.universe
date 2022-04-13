@@ -47,6 +47,7 @@ using autoware_auto_mapping_msgs::msg::HADMapBin;
 using autoware_auto_mapping_msgs::msg::HADMapSegment;
 using autoware_auto_planning_msgs::msg::HADMapRoute;
 using autoware_auto_planning_msgs::msg::Trajectory;
+using autoware_auto_planning_msgs::msg::TrajectoryPoint;
 using autoware_auto_system_msgs::msg::AutowareState;
 using autoware_parking_srvs::srv::ParkingMissionPlan;
 
@@ -151,8 +152,9 @@ public:
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
   bool waitUntilPreviousRouteFinished() const;
-  std::vector<size_t> askFeasibleGoalIndex(Pose start, std::vector<Pose> & goals) const;
 
+  std::vector<Pose> askFeasibleGoalIndex(
+    const Pose & start, const std::vector<Pose> & goal_poses) const;
   void prepare();
   PlanningResult planCircularRoute() const;    // except circular_plan_cache_
   PlanningResult planPreparkingRoute() const;  // except TODO(HiroIshida): what is excepted

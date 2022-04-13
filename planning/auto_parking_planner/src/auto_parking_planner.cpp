@@ -194,12 +194,12 @@ bool AutoParkingPlanner::waitUntilPreviousRouteFinished() const
   }
 }
 
-std::vector<size_t> AutoParkingPlanner::askFeasibleGoalIndex(
-  Pose start, std::vector<Pose> & goals) const
+std::vector<Pose> AutoParkingPlanner::askFeasibleGoalIndex(
+  const Pose & start, const std::vector<Pose> & goal_poses) const
 {
   auto freespace_plan_req = std::make_shared<autoware_parking_srvs::srv::FreespacePlan::Request>();
 
-  for (const auto & goal : goals) {
+  for (const auto & goal : goal_poses) {
     PoseStamped start_pose;
     PoseStamped goal_pose;
 
@@ -220,13 +220,13 @@ std::vector<size_t> AutoParkingPlanner::askFeasibleGoalIndex(
   const auto & result = f.get();
   RCLCPP_INFO_STREAM(get_logger(), "Obtained fresult from the freespace planning server.");
 
-  std::vector<size_t> feasible_goal_indices;
+  std::vector<Pose> feasible_goal_poses;
   for (size_t idx = 0; idx < result->successes.size(); idx++) {
-    if (result->successes[idx]) {
-      feasible_goal_indices.push_back(idx);
+    if (result->successes.at(idx)) {
+      feasible_goal_poses.push_back(goal_poses.at(idx));
     }
   }
-  return feasible_goal_indices;
+  return feasible_goal_poses;
 }
 
 }  // namespace auto_parking_planner
