@@ -130,6 +130,8 @@ public:
   std::string map_frame_;
 
   mutable CircularPlanCache circular_plan_cache_;
+  mutable std::vector<Pose> feasible_parking_goal_poses_;
+
   boost::optional<std::string> previous_phase_;
   boost::optional<HADMapRoute> previous_route_;
 
@@ -148,11 +150,13 @@ public:
     const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
-  bool waitUntilPreviousRouteFinished();
+  bool waitUntilPreviousRouteFinished() const;
+  std::vector<size_t> askFeasibleGoalIndex(Pose start, std::vector<Pose> & goals) const;
 
   void prepare();
   PlanningResult planCircularRoute() const;    // except circular_plan_cache_
   PlanningResult planPreparkingRoute() const;  // except TODO(HiroIshida): what is excepted
+  PlanningResult planParkingRoute() const;     // except TODO(HiroIshida): what is excepted
 };
 
 }  // namespace auto_parking_planner

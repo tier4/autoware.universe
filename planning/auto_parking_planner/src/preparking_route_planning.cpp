@@ -94,58 +94,37 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     auto freespace_plan_req =
       std::make_shared<autoware_parking_srvs::srv::FreespacePlan::Request>();
 
-    for (size_t i = 0; i < start_pose_filtered.size(); ++i) {
-      PoseStamped start_pose;
-      PoseStamped goal_pose;
-
-      start_pose.header.frame_id = map_frame_;
-      start_pose.pose = start_pose_filtered.at(i);
-      goal_pose.header.frame_id = map_frame_;
-      goal_pose.pose = goal_pose_filtered.at(i);
-
-      freespace_plan_req->start_poses.push_back(start_pose);
-      freespace_plan_req->goal_poses.push_back(goal_pose);
-    }
-
-    const auto f = freespaceplane_client_->async_send_request(freespace_plan_req);
-    if (std::future_status::ready != f.wait_for(std::chrono::seconds(10))) {
-      RCLCPP_WARN_STREAM(get_logger(), "took to long time to obtain freespace planning result..");
+    const auto feasible_indices =
+      askFeasibleGoalIndex(start_pose_filtered.front(), goal_pose_filtered);
+    if (feasible_indices.empty()) {
       continue;
     }
 
-    const auto & result = f.get();
-    RCLCPP_INFO_STREAM(get_logger(), "Obtained fresult from the freespace planning server.");
+    RCLCPP_WARN_STREAM(get_logger(), "found " << feasible_indices.size() << " feasible goals");
 
-    bool at_least_one_success = false;
-    std::vector<Pose> feasible_goal_poses;
-    for (size_t idx = 0; idx < result->successes.size(); idx++) {
-      if (result->successes[idx]) {
-        at_least_one_success = true;
-        feasible_goal_poses.push_back(goal_pose_filtered.at(idx));
-      }
+    // cache
+    feasible_parking_goal_poses_.clear();
+    for (size_t idx : feasible_indices) {
+      feasible_parking_goal_poses_.push_back(goal_pose_filtered.at(idx));
     }
-    RCLCPP_WARN_STREAM(get_logger(), "ISHIDA: found feasible goals" << feasible_goal_poses.size());
-    // assuming goal poses are sorted...
-    if (at_least_one_success) {
-      route_handler::RouteHandler route_handler(
-        parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,
-        parking_map_info_->routing_graph_ptr);
-      lanelet::ConstLanelets preparking_path;
 
-      route_handler.planPathLaneletsBetweenCheckpoints(
-        current_pose.pose, start_pose_filtered.front(), &preparking_path);
-      route_handler.setRouteLanelets(preparking_path);
+    route_handler::RouteHandler route_handler(
+      parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,
+      parking_map_info_->routing_graph_ptr);
+    lanelet::ConstLanelets preparking_path;
 
-      HADMapRoute next_route;
-      next_route.header.stamp = this->now();
-      next_route.header.frame_id = map_frame_;
-      next_route.segments = route_handler.createMapSegments(preparking_path);
-      next_route.start_pose = current_pose.pose;
-      next_route.goal_pose = start_pose_filtered.front();
-      const auto next_phase = ParkingMissionPlan::Request::PARKING;
+    route_handler.planPathLaneletsBetweenCheckpoints(
+      current_pose.pose, start_pose_filtered.front(), &preparking_path);
+    route_handler.setRouteLanelets(preparking_path);
 
-      return PlanningResult{true, next_phase, next_route, ""};
-    }
+    HADMapRoute next_route;
+    next_route.header.stamp = this->now();
+    next_route.header.frame_id = map_frame_;
+    next_route.segments = route_handler.createMapSegments(preparking_path);
+    next_route.start_pose = current_pose.pose;
+    next_route.goal_pose = start_pose_filtered.front();
+    const auto next_phase = ParkingMissionPlan::Request::PARKING;
+    return PlanningResult{true, next_phase, next_route, ""};
   }
 }
 

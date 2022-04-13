@@ -149,6 +149,8 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
     result = planCircularRoute();
   } else if (request->type == request->PREPARKING) {
     result = planPreparkingRoute();
+  } else if (request->type == request->PARKING) {
+    result = planParkingRoute();
   } else {
     throw std::logic_error("not implemented yet");
   }
@@ -162,7 +164,7 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   return true;
 }
 
-bool AutoParkingPlanner::waitUntilPreviousRouteFinished()
+bool AutoParkingPlanner::waitUntilPreviousRouteFinished() const
 {
   RCLCPP_INFO_STREAM(get_logger(), "waiting for preivous route finished...");
   if (!previous_route_) {
@@ -187,6 +189,41 @@ bool AutoParkingPlanner::waitUntilPreviousRouteFinished()
       }
     }
   }
+}
+
+std::vector<size_t> AutoParkingPlanner::askFeasibleGoalIndex(
+  Pose start, std::vector<Pose> & goals) const
+{
+  auto freespace_plan_req = std::make_shared<autoware_parking_srvs::srv::FreespacePlan::Request>();
+
+  for (const auto & goal : goals) {
+    PoseStamped start_pose;
+    PoseStamped goal_pose;
+
+    start_pose.header.frame_id = map_frame_;
+    start_pose.pose = start;
+    goal_pose.header.frame_id = map_frame_;
+    goal_pose.pose = goal;
+
+    freespace_plan_req->start_poses.push_back(start_pose);
+    freespace_plan_req->goal_poses.push_back(goal_pose);
+  }
+
+  const auto f = freespaceplane_client_->async_send_request(freespace_plan_req);
+  if (std::future_status::ready != f.wait_for(std::chrono::seconds(10))) {
+    RCLCPP_FATAL_STREAM(get_logger(), "took to long time to obtain freespace planning result");
+  }
+
+  const auto & result = f.get();
+  RCLCPP_INFO_STREAM(get_logger(), "Obtained fresult from the freespace planning server.");
+
+  std::vector<size_t> feasible_goal_indices;
+  for (size_t idx = 0; idx < result->successes.size(); idx++) {
+    if (result->successes[idx]) {
+      feasible_goal_indices.push_back(idx);
+    }
+  }
+  return feasible_goal_indices;
 }
 
 }  // namespace auto_parking_planner
