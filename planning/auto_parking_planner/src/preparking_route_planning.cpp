@@ -143,6 +143,8 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
       next_route.start_pose = current_pose.pose;
       next_route.goal_pose = start_pose_filtered.front();
       const auto next_phase = ParkingMissionPlan::Request::PARKING;
+
+      return PlanningResult{true, next_phase, next_route, ""};
     }
   }
 }

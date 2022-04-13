@@ -24,6 +24,7 @@ ament_auto_add_library(auto_parking_planner_node SHARED
 rclcpp_components_register_node(auto_parking_planner_node
     PLUGIN "auto_parking_planner::AutoParkingPlanner"
   EXECUTABLE auto_parking_planner
+  EXECUTOR MultiThreadedExecutor
 )
 
 if(BUILD_TESTING)
