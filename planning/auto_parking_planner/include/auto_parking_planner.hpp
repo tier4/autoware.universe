@@ -129,7 +129,8 @@ public:
   std::string map_frame_;
 
   mutable CircularPlanCache circular_plan_cache_;
-  boost::optional<std::string> previous_mode_;
+  boost::optional<std::string> previous_phase_;
+  boost::optional<HADMapRoute> previous_route_;
 
   void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
   void stateCallback(const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg);

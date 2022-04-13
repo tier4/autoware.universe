@@ -28,7 +28,7 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
 : rclcpp::Node("auto_parking_planner_node", node_options),
   tf_buffer_(get_clock()),
   tf_listener_(tf_buffer_),
-  previous_mode_(boost::none)
+  previous_phase_(boost::none)
 {
   map_frame_ = declare_parameter("map_frame", "map");
   base_link_frame_ = declare_parameter("base_link_frame", "base_link");
@@ -153,6 +153,9 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
   response->next_type = result.next_phase;
   response->route = result.route;
   response->success = result.success;
+
+  previous_phase_ = result.next_phase;
+  previous_route_ = result.route;
   return true;
 }
 

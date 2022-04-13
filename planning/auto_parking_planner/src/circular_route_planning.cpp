@@ -217,7 +217,7 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
     return PlanningResult{false, ParkingMissionPlan::Request::END, HADMapRoute(), message};
   }
 
-  if (previous_mode_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
+  if (previous_phase_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
     circular_plan_cache_.path_seq.clear();
   }
 
