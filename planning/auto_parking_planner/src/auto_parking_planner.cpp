@@ -142,14 +142,14 @@ bool AutoParkingPlanner::parkingMissionPlanCallback(
     prepare();
   }
 
-  waitUntilPreviousRouteFinished();
-
   PlanningResult result;
   if (request->type == request->CIRCULAR) {
+    waitUntilPreviousRouteFinished();
     result = planCircularRoute();
   } else if (request->type == request->PREPARKING) {
     result = planPreparkingRoute();
   } else if (request->type == request->PARKING) {
+    waitUntilPreviousRouteFinished();
     result = planParkingRoute();
   } else {
     throw std::logic_error("not implemented yet");
@@ -179,8 +179,11 @@ bool AutoParkingPlanner::waitUntilPreviousRouteFinished() const
   }
 
   while (true) {
+    RCLCPP_INFO_STREAM(get_logger(), "waiting now...");
     const double dist_error =
       tier4_autoware_utils::calcDistance2d(getEgoVehiclePose(), previous_route_->goal_pose);
+    RCLCPP_INFO_STREAM(get_logger(), "dist error:" << dist_error);
+    RCLCPP_INFO_STREAM(get_logger(), "aw state:" << sub_msgs_.state_ptr->state);
     rclcpp::sleep_for(std::chrono::milliseconds(300));
     if (sub_msgs_.state_ptr->state == AutowareState::WAITING_FOR_ROUTE) {
       if (dist_error < 1.5) {
