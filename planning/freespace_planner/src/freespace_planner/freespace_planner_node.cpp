@@ -381,10 +381,10 @@ bool FreespacePlannerNode::onFreespacePlan(
   algo.setMap(*occupancy_grid_);
 
   const auto isVacant = [&](const PoseStamped& goal_pose){
-    const auto goal_pose_in_costmap_frame = transformPose(
-      goal_pose_.pose, getTransform(occupancy_grid_->header.frame_id, goal_pose.header.frame_id));
+    // TODO(Hiroishida) cehck if goal pose frame id 
+    // TODO(Hiroishida) Better to let astar planner have isVacant() message ?
     PoseArray goal_poses;
-    goal_poses.poses.push_back(goal_pose_in_costmap_frame);
+    goal_poses.poses.push_back(goal_pose.pose);
     return !algo.hasObstacleOnTrajectory(goal_poses);
   };
 
