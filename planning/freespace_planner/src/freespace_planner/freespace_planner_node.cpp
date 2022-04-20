@@ -355,7 +355,7 @@ bool FreespacePlannerNode::onFreespacePlan(
   (void)request_header;
 
   //TODO HiroIshida exception handling when array number is different
-  const int n_problems = request->start_poses.size();
+  const int n_problems = request->goal_poses.size();
   response->successes.resize(n_problems);
 
   if(!occupancy_grid_){
@@ -388,16 +388,38 @@ bool FreespacePlannerNode::onFreespacePlan(
     return !algo.hasObstacleOnTrajectory(goal_poses);
   };
 
+
   RCLCPP_INFO_STREAM(get_logger(), "[ishida] problem number: " << n_problems);
   bool total_success = false;
-  for(int i=0; i<n_problems; i++){
-    const auto goal_pose = request->goal_poses[i];
-    const bool found = isVacant(goal_pose);
+  if(request->start_poses.empty()) { 
+    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "checking only goal vacancy");
+    for(int i=0; i<n_problems; i++){
+      const auto goal_pose = request->goal_poses[i];
+      const bool found = isVacant(goal_pose);
 
-    RCLCPP_INFO_STREAM(get_logger(), "[ishida] plan found? " << found);
-    response->successes[i] = found;
-    if(found){
-      total_success = true;
+      RCLCPP_INFO_STREAM(get_logger(), "[ishida] plan found? " << found);
+      response->successes[i] = found;
+      if(found){
+        total_success = true;
+      }
+    }
+  } else {
+    for(int i=0; i<n_problems; i++){
+      RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida_debug"), "checking full path");
+      const auto start_pose = request->start_poses[i];
+      const auto goal_pose = request->goal_poses[i];
+
+      const auto start_pose_in_costmap_frame = transformPose(
+        start_pose.pose, getTransform(occupancy_grid_->header.frame_id, start_pose.header.frame_id));
+
+      const auto goal_pose_in_costmap_frame = transformPose(
+        goal_pose_.pose, getTransform(occupancy_grid_->header.frame_id, goal_pose.header.frame_id));
+
+      const bool feasible_path_found = algo.makePlan(start_pose_in_costmap_frame, goal_pose_in_costmap_frame);
+      response->successes[i] = feasible_path_found;
+      if (feasible_path_found)  { 
+        total_success = true;
+      }
     }
   }
 
