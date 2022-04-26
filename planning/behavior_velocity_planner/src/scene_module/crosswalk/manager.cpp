@@ -65,7 +65,7 @@ std::set<int64_t> getCrosswalkIdSetOnPath(
 }  // namespace
 
 CrosswalkModuleManager::CrosswalkModuleManager(rclcpp::Node & node)
-: SceneModuleManagerInterface(node, getModuleName())
+: SceneModuleManagerInterface(node, getModuleName()), rtc_interface_(node, "crosswalk")
 {
   const std::string ns(getModuleName());
 
@@ -105,6 +105,7 @@ void CrosswalkModuleManager::launchNewModules(
           module_id, crosswalk, walkway_planner_param_, logger_.get_child("walkway_module"),
           clock_));
       }
+      generateUUID(module_id);
     }
   }
 }
@@ -121,4 +122,23 @@ CrosswalkModuleManager::getModuleExpiredFunction(
     return crosswalk_id_set.count(scene_module->getModuleId()) == 0;
   };
 }
+
+bool CrosswalkModuleManager::getActivation(const UUID & uuid)
+{
+  return rtc_interface_.isActivated(uuid);
+}
+
+void CrosswalkModuleManager::updateRTCStatus(
+  const UUID & uuid, const bool safe, const double distance)
+{
+  rtc_interface_.updateCooperateStatus(uuid, safe, distance);
+}
+
+void CrosswalkModuleManager::removeRTCStatus(const UUID & uuid)
+{
+  rtc_interface_.removeCooperateStatus(uuid);
+}
+
+void CrosswalkModuleManager::publishRTCStatus() { rtc_interface_.publishCooperateStatus(); }
+
 }  // namespace behavior_velocity_planner
