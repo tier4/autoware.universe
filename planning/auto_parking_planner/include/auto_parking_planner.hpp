@@ -62,6 +62,7 @@ bool containPolygon(
 
 struct AutoParkingConfig
 {
+  bool check_goal_only;
   double lookahead_length;
   double reedsshepp_threashold_length;
   double euclid_threashold_length;

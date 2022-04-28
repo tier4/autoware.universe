@@ -35,6 +35,7 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
   base_link_frame_ = declare_parameter("base_link_frame", "base_link");
 
   {  // set node config
+    config_.check_goal_only = declare_parameter("check_only_goal", true);
     config_.lookahead_length = declare_parameter("lookahead_length", 4.0);
     config_.reedsshepp_threashold_length = declare_parameter("reedsshepp_threashold_length", 6.0);
     config_.euclid_threashold_length = declare_parameter("euclid_threashold_length", 2.0);
@@ -200,15 +201,16 @@ std::vector<Pose> AutoParkingPlanner::askFeasibleGoalIndex(
   auto freespace_plan_req = std::make_shared<autoware_parking_srvs::srv::FreespacePlan::Request>();
 
   for (const auto & goal : goal_poses) {
-    PoseStamped start_pose;
-    PoseStamped goal_pose;
+    if (!config_.check_goal_only) {
+      PoseStamped start_pose;
+      start_pose.header.frame_id = map_frame_;
+      start_pose.pose = start;
+      freespace_plan_req->start_poses.push_back(start_pose);
+    }
 
-    start_pose.header.frame_id = map_frame_;
-    start_pose.pose = start;
+    PoseStamped goal_pose;
     goal_pose.header.frame_id = map_frame_;
     goal_pose.pose = goal;
-
-    freespace_plan_req->start_poses.push_back(start_pose);
     freespace_plan_req->goal_poses.push_back(goal_pose);
   }
 
