@@ -39,6 +39,7 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
     config_.lookahead_length = declare_parameter("lookahead_length", 4.0);
     config_.lookahead_length_min = declare_parameter("lookahead_length_min", 2.0);
     config_.lookahead_length_max = declare_parameter("lookahead_length_max", 10.0);
+    config_.vehicle_length = declare_parameter("vehicle_length", 5.0);
     config_.reedsshepp_threashold_length = declare_parameter("reedsshepp_threashold_length", 6.0);
     config_.euclid_threashold_length = declare_parameter("euclid_threashold_length", 2.0);
     config_.reedsshepp_radius = declare_parameter("reedsshepp_radius", 5.0);
@@ -177,8 +178,8 @@ bool AutoParkingPlanner::previousRouteFinished() const
 {
   const double dist_error =
     tier4_autoware_utils::calcDistance2d(getEgoVehiclePose(), previous_route_->goal_pose);
-  RCLCPP_INFO_STREAM(get_logger(), "dist error:" << dist_error);
-  RCLCPP_INFO_STREAM(get_logger(), "aw state:" << sub_msgs_.state_ptr->state);
+  // RCLCPP_INFO_STREAM(get_logger(), "dist error:" << dist_error);
+  // RCLCPP_INFO_STREAM(get_logger(), "aw state:" << sub_msgs_.state_ptr->state);
   if (sub_msgs_.state_ptr->state == AutowareState::WAITING_FOR_ROUTE) {
     if (dist_error < 1.5) {
       RCLCPP_INFO_STREAM(get_logger(), "preivous route finished!");

@@ -13,6 +13,16 @@
 // limitations under the License.
 
 #include "auto_parking_planner.hpp"
+#include "lanelet2_core/Forward.h"
+#include "lanelet2_core/geometry/Polygon.h"
+#include "lanelet2_core/primitives/BoundingBox.h"
+#include "lanelet2_core/primitives/Lanelet.h"
+#include "lanelet2_core/primitives/Point.h"
+
+#include <boost/geometry/algorithms/detail/within/interface.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace auto_parking_planner
 {

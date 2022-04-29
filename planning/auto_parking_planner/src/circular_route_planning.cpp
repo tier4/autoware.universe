@@ -17,6 +17,8 @@
 #include "lanelet2_core/primitives/Lanelet.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <stdexcept>
 
 namespace auto_parking_planner
 {
@@ -60,7 +62,8 @@ bool isGoingToExit(const lanelet::ConstLanelet & llt, const ParkingMapInfo & par
 Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
 {
   const lanelet::ConstLineString3d center_line = lanelet.centerline();
-  const size_t middle_index = center_line.size() / 2;
+  // const size_t middle_index = center_line.size() / 2;
+  const size_t middle_index = center_line.size() - 1;
   const Eigen::Vector3d middle_point = center_line[middle_index];
   const double middle_yaw = std::atan2(
     center_line[middle_index].y() - center_line[middle_index - 1].y(),
@@ -73,6 +76,39 @@ Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
   pose.position.z = middle_point.z();
   tf2::convert(tier4_autoware_utils::createQuaternionFromRPY(0, 0, middle_yaw), pose.orientation);
   return pose;
+}
+
+boost::optional<Pose> getStraightCenterPose(
+  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info, double vehicle_length)
+{
+  // If straight pose does not exist inside the lanelet, return booost::none
+  const auto center_line = llt.centerline2d();
+
+  const auto llt_next = parking_map_info.routing_graph_ptr->following(llt);
+
+  // must start from 1 !
+  for (size_t idx = center_line.size() - 2; idx != (size_t)0; --idx) {
+    const auto p = center_line[idx].basicPoint2d();
+    const auto p_next = center_line[idx + 1].basicPoint2d();
+    const auto diff = p_next - p;
+    const auto center_ahead = p + diff.normalized() * vehicle_length * 2.0;
+    lanelet::BasicPoint2d pt(center_ahead.x(), center_ahead.y());
+
+    if (!boost::geometry::within(pt, llt.polygon2d())) continue;
+    const auto llt_nexts = parking_map_info.routing_graph_ptr->following(llt);
+    for (const auto & llt_next : llt_nexts) {
+      if (!boost::geometry::within(pt, llt_next.polygon2d())) continue;
+    }
+
+    const auto yaw = atan2(diff.y(), diff.x());
+    Pose pose_center;
+    pose_center.orientation = tier4_autoware_utils::createQuaternionFromYaw(yaw);
+    pose_center.position.x = p.x();
+    pose_center.position.y = p.y();
+    pose_center.position.z = 0.0;
+    return pose_center;
+  }
+  return boost::none;
 }
 
 std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
@@ -92,7 +128,8 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
 }
 
 std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
-  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
+  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info,
+  const AutoParkingConfig & config)
 {
   auto reachable_llts =
     parking_map_info.routing_graph_ptr->reachableSet(llt, std::numeric_limits<double>::infinity());
@@ -162,26 +199,45 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
     };
 
     if (is_next_loopy(llt)) {
-      auto path_patial_new = lanelet::ConstLanelets{path_partial.back()};
-      if (!is_straight(path_partial.back())) {
-        // TODO(HiroIshida) Must iterate until finding straight. But I this two curve lanelet
-        // don't exist.
+      // When next llt is the
+      auto path_partial_new = lanelet::ConstLanelets{path_partial.back()};
+
+      while (true) {
+        const auto llt_terminal = path_partial.back();
+        const auto pose =
+          getStraightCenterPose(llt_terminal, parking_map_info, config.vehicle_length);
+        if (pose != boost::none) break;
         path_partial.pop_back();
-        path_patial_new.insert(path_patial_new.begin(), path_partial.back());
+        path_partial_new.push_back(path_partial.back());
       }
 
+      std::reverse(path_partial_new.begin(), path_partial_new.end());
       circling_path_seq.push_back(path_partial);
-      path_partial = path_patial_new;
+      path_partial = path_partial_new;
     }
     path_partial.push_back(llt);
   }
-  circling_path_seq.push_back(path_partial);
+
+  {
+    // Add the final partial path
+    while (true) {
+      // modify the final partial path by pop_back()
+      // so that the last llt is ensured to be "straight"
+      const auto llt_terminal = path_partial.back();
+      const auto pose =
+        getStraightCenterPose(llt_terminal, parking_map_info, config.vehicle_length);
+      if (pose != boost::none) break;
+      path_partial.pop_back();
+    }
+    circling_path_seq.push_back(path_partial);
+  }
 
   return circling_path_seq;
 }
 
 std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
-  const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet)
+  const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet,
+  const AutoParkingConfig & config)
 {
   lanelet::ConstLanelets entrance_llts;
   lanelet::ConstLanelets exit_llts;
@@ -205,7 +261,7 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
   if (isGoingToExit(current_lanelet, parking_map_info)) {
     return computeCircularPathSequenceIfNoLoop(current_lanelet, parking_map_info);
   }
-  return computeCircularPathSequenceIfLoop(current_lanelet, parking_map_info);
+  return computeCircularPathSequenceIfLoop(current_lanelet, parking_map_info, config);
 }
 
 PlanningResult AutoParkingPlanner::planCircularRoute() const
@@ -226,7 +282,7 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   }
 
   if (circular_plan_cache_.path_seq.empty()) {
-    const auto path_seq = computeCircularPathSequence(*parking_map_info_, current_lanelet);
+    const auto path_seq = computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
 
     if (path_seq.empty()) {
       const std::string message = "No succeeding path exists";
@@ -235,7 +291,7 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
     }
 
     circular_plan_cache_.path_seq =
-      computeCircularPathSequence(*parking_map_info_, current_lanelet);
+      computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
   }
   const auto circular_path = circular_plan_cache_.path_seq.front();
   circular_plan_cache_.path_seq.pop_front();
@@ -247,12 +303,14 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   route_handler.setRouteLanelets(
     circular_path);  // TODO(HiroIshida) redundant? maybe should modify route_handler
 
+  const auto goal_pose =
+    getStraightCenterPose(circular_path.back(), *parking_map_info_, config_.vehicle_length);
   HADMapRoute next_route;
   next_route.header.stamp = this->now();
   next_route.header.frame_id = map_frame_;
   next_route.segments = route_handler.createMapSegments(circular_path);
   next_route.start_pose = current_pose.pose;
-  next_route.goal_pose = computeLaneletCenterPose(circular_path.back());
+  next_route.goal_pose = goal_pose.get();
   const auto next_phase = ParkingMissionPlan::Request::PREPARKING;
 
   return PlanningResult{true, next_phase, next_route, ""};

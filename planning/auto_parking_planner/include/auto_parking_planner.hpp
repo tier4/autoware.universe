@@ -56,6 +56,7 @@ using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::PoseStamped;
 
 // some util functions
+
 bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt);
 bool containPolygon(
   const lanelet::ConstPolygon3d & polygon, const lanelet::ConstPolygon3d & polygon2);
@@ -66,6 +67,7 @@ struct AutoParkingConfig
   double lookahead_length;
   double lookahead_length_min;
   double lookahead_length_max;
+  double vehicle_length;
   double reedsshepp_threashold_length;
   double euclid_threashold_length;
   double reedsshepp_radius;
