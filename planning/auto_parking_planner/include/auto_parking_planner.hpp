@@ -64,6 +64,8 @@ struct AutoParkingConfig
 {
   bool check_goal_only;
   double lookahead_length;
+  double lookahead_length_min;
+  double lookahead_length_max;
   double reedsshepp_threashold_length;
   double euclid_threashold_length;
   double reedsshepp_radius;
@@ -120,6 +122,7 @@ public:
   rclcpp::Subscription<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr traj_subscriber_;
   rclcpp::Service<autoware_parking_srvs::srv::ParkingMissionPlan>::SharedPtr srv_parking_mission_;
   rclcpp::Client<autoware_parking_srvs::srv::FreespacePlan>::SharedPtr freespaceplane_client_;
+  rclcpp::Publisher<PoseStamped>::SharedPtr lookahead_pose_publisher_;
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;

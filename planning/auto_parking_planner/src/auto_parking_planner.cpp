@@ -37,6 +37,8 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
   {  // set node config
     config_.check_goal_only = declare_parameter("check_only_goal", true);
     config_.lookahead_length = declare_parameter("lookahead_length", 4.0);
+    config_.lookahead_length_min = declare_parameter("lookahead_length_min", 2.0);
+    config_.lookahead_length_max = declare_parameter("lookahead_length_max", 10.0);
     config_.reedsshepp_threashold_length = declare_parameter("reedsshepp_threashold_length", 6.0);
     config_.euclid_threashold_length = declare_parameter("euclid_threashold_length", 2.0);
     config_.reedsshepp_radius = declare_parameter("reedsshepp_radius", 5.0);
@@ -69,6 +71,10 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
   freespaceplane_client_ = this->create_client<autoware_parking_srvs::srv::FreespacePlan>(
     "/planning/scenario_planning/parking/freespace_planner/service/freespace_plan",
     rmw_qos_profile_services_default, cb_group_nested_);
+
+  rclcpp::QoS durable_qos{1};
+  durable_qos.transient_local();
+  lookahead_pose_publisher_ = create_publisher<PoseStamped>("debug/lookahead_pose", durable_qos);
 }
 
 void AutoParkingPlanner::mapCallback(

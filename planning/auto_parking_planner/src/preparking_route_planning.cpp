@@ -64,6 +64,15 @@ std::vector<Pose> getCandidateGoalPoses(
   return goal_poses;
 }
 
+double compute_lookehead_length(
+  const geometry_msgs::msg::TwistStamped & twist, const AutoParkingConfig & config)
+{
+  constexpr double timeout = 1.0;
+  const double length_cand = twist.twist.linear.x * timeout + config.lookahead_length_min;
+  const double length = std::min(length_cand, config.lookahead_length_max);
+  return length;
+}
+
 PlanningResult AutoParkingPlanner::planPreparkingRoute() const
 {
   const bool connected = freespaceplane_client_->wait_for_service(std::chrono::seconds(10));
@@ -81,18 +90,20 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     if (!sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
       continue;
     }
-    const auto start_pose = createTrajectoryBasedInterpolator(
-      current_pose.pose, *sub_msgs_.traj_ptr_, config_.lookahead_length);
+    const auto lookahead_length = compute_lookehead_length(*sub_msgs_.twist_ptr);
+    RCLCPP_INFO_STREAM(get_logger(), "lookahead_length: " << lookahead_length << " [m]");
+    const auto lookahead_pose =
+      createTrajectoryBasedInterpolator(current_pose.pose, *sub_msgs_.traj_ptr_, lookahead_length);
 
     std::vector<Pose> goal_pose_filtered;
     const auto cand_goal_poses =
-      getCandidateGoalPoses(start_pose, *parking_map_info_, config_.euclid_threashold_length);
+      getCandidateGoalPoses(lookahead_pose, *parking_map_info_, config_.euclid_threashold_length);
     if (cand_goal_poses.empty()) {
       RCLCPP_INFO_STREAM(get_logger(), "could not find parking space around here...");
       continue;
     }
 
-    const auto feasible_goal_poses = askFeasibleGoalIndex(start_pose, cand_goal_poses);
+    const auto feasible_goal_poses = askFeasibleGoalIndex(lookahead_pose, cand_goal_poses);
     if (feasible_goal_poses.empty()) {
       continue;
     }
@@ -110,7 +121,7 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     lanelet::ConstLanelets preparking_path;
 
     route_handler.planPathLaneletsBetweenCheckpoints(
-      current_pose.pose, start_pose, &preparking_path);
+      current_pose.pose, lookahead_pose, &preparking_path);
     route_handler.setRouteLanelets(preparking_path);
 
     HADMapRoute next_route;
@@ -118,7 +129,7 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     next_route.header.frame_id = map_frame_;
     next_route.segments = route_handler.createMapSegments(preparking_path);
     next_route.start_pose = current_pose.pose;
-    next_route.goal_pose = start_pose;
+    next_route.goal_pose = lookahead_pose;
     const auto next_phase = ParkingMissionPlan::Request::PARKING;
     return PlanningResult{true, next_phase, next_route, ""};
   }
