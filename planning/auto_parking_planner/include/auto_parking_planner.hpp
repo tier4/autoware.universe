@@ -27,8 +27,9 @@
 #include "autoware_auto_planning_msgs/msg/had_map_route.hpp"
 #include "autoware_auto_planning_msgs/msg/trajectory.hpp"
 #include "autoware_auto_system_msgs/msg/autoware_state.hpp"
+#include "autoware_auto_vehicle_msgs/msg/detail/velocity_report__struct.hpp"
+#include "autoware_auto_vehicle_msgs/msg/velocity_report.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
-#include "geometry_msgs/msg/twist_stamped.hpp"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -53,7 +54,6 @@ using autoware_parking_srvs::srv::ParkingMissionPlan;
 
 using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::PoseStamped;
-using geometry_msgs::msg::TwistStamped;
 
 // some util functions
 bool containLanelet(const lanelet::ConstPolygon3d & polygon, const lanelet::ConstLanelet & llt);
@@ -76,8 +76,8 @@ struct SubscribedMessages
 {
   autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr map_ptr;
   autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr state_ptr;
-  geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_ptr_;
   autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr traj_ptr_;
+  autoware_auto_vehicle_msgs::msg::VelocityReport::ConstSharedPtr velocity_ptr_;
 };
 
 struct PlanningResult
@@ -117,9 +117,10 @@ public:
   rclcpp::CallbackGroup::SharedPtr cb_group_nested_;
 
   rclcpp::Subscription<autoware_auto_system_msgs::msg::AutowareState>::SharedPtr state_subscriber_;
-  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr twist_subscriber_;
   rclcpp::Subscription<autoware_auto_mapping_msgs::msg::HADMapBin>::SharedPtr map_subscriber_;
   rclcpp::Subscription<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr traj_subscriber_;
+  rclcpp::Subscription<autoware_auto_vehicle_msgs::msg::VelocityReport>::SharedPtr
+    velocity_subscriber_;
   rclcpp::Service<autoware_parking_srvs::srv::ParkingMissionPlan>::SharedPtr srv_parking_mission_;
   rclcpp::Client<autoware_parking_srvs::srv::FreespacePlan>::SharedPtr freespaceplane_client_;
   rclcpp::Publisher<PoseStamped>::SharedPtr lookahead_pose_publisher_;
@@ -142,8 +143,8 @@ public:
 
   void mapCallback(const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr msg);
   void stateCallback(const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg);
-  void twistCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr msg);
   void trajCallback(const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg);
+  void velocityCallback(const autoware_auto_vehicle_msgs::msg::VelocityReport::ConstSharedPtr msg);
 
   bool transformPose(
     const PoseStamped & input_pose, PoseStamped * output_pose,

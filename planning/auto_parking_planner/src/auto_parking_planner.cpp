@@ -57,8 +57,9 @@ AutoParkingPlanner::AutoParkingPlanner(const rclcpp::NodeOptions & node_options)
   state_subscriber_ = create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
     "~/input/state", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::stateCallback, this, _1));
 
-  twist_subscriber_ = create_subscription<geometry_msgs::msg::TwistStamped>(
-    "~/input/twist", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::twistCallback, this, _1));
+  velocity_subscriber_ = this->create_subscription<autoware_auto_vehicle_msgs::msg::VelocityReport>(
+    "~/input/velocity_report", 10,
+    std::bind(&AutoParkingPlanner::velocityCallback, this, std::placeholders::_1));
 
   traj_subscriber_ = create_subscription<Trajectory>(
     "~/input/trajectory", rclcpp::QoS{1}, std::bind(&AutoParkingPlanner::trajCallback, this, _1));
@@ -89,15 +90,16 @@ void AutoParkingPlanner::stateCallback(
   sub_msgs_.state_ptr = msg;
 }
 
-void AutoParkingPlanner::twistCallback(const geometry_msgs::msg::TwistStamped::ConstSharedPtr msg)
-{
-  sub_msgs_.twist_ptr_ = msg;
-}
-
 void AutoParkingPlanner::trajCallback(
   const autoware_auto_planning_msgs::msg::Trajectory::ConstSharedPtr msg)
 {
   sub_msgs_.traj_ptr_ = msg;
+}
+
+void AutoParkingPlanner::velocityCallback(
+  const autoware_auto_vehicle_msgs::msg::VelocityReport::ConstSharedPtr msg)
+{
+  sub_msgs_.velocity_ptr_ = msg;
 }
 
 bool AutoParkingPlanner::transformPose(

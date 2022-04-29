@@ -65,10 +65,11 @@ std::vector<Pose> getCandidateGoalPoses(
 }
 
 double compute_lookehead_length(
-  const geometry_msgs::msg::TwistStamped & twist, const AutoParkingConfig & config)
+  const autoware_auto_vehicle_msgs::msg::VelocityReport & velocity,
+  const AutoParkingConfig & config)
 {
   constexpr double timeout = 1.0;
-  const double length_cand = twist.twist.linear.x * timeout + config.lookahead_length_min;
+  const double length_cand = velocity.longitudinal_velocity * timeout + config.lookahead_length_min;
   const double length = std::min(length_cand, config.lookahead_length_max);
   return length;
 }
@@ -87,10 +88,10 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     rclcpp::sleep_for(std::chrono::milliseconds(100));
 
     const auto current_pose = getEgoVehiclePose();
-    if (!sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
+    if (!sub_msgs_.velocity_ptr_ || !sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
       continue;
     }
-    const auto lookahead_length = compute_lookehead_length(*sub_msgs_.twist_ptr);
+    const auto lookahead_length = compute_lookehead_length(*sub_msgs_.velocity_ptr_, config_);
     RCLCPP_INFO_STREAM(get_logger(), "lookahead_length: " << lookahead_length << " [m]");
     const auto lookahead_pose =
       createTrajectoryBasedInterpolator(current_pose.pose, *sub_msgs_.traj_ptr_, lookahead_length);
