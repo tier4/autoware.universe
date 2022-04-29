@@ -84,6 +84,10 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
       parking_map_info.routing_graph_ptr->following(llt_seqeunce.back());
     llt_seqeunce.push_back(llts_following.front());
   }
+
+  if (llt_seqeunce.empty()) {
+    return std::deque<lanelet::ConstLanelets>{};
+  }
   return std::deque<lanelet::ConstLanelets>{llt_seqeunce};
 }
 
@@ -222,6 +226,14 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   }
 
   if (circular_plan_cache_.path_seq.empty()) {
+    const auto path_seq = computeCircularPathSequence(*parking_map_info_, current_lanelet);
+
+    if (path_seq.empty()) {
+      const std::string message = "No succeeding path exists";
+      RCLCPP_INFO_STREAM(get_logger(), message);
+      return PlanningResult{true, ParkingMissionPlan::Request::END, HADMapRoute(), message};
+    }
+
     circular_plan_cache_.path_seq =
       computeCircularPathSequence(*parking_map_info_, current_lanelet);
   }
