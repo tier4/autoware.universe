@@ -156,6 +156,7 @@ public:
     const std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Request> request,
     std::shared_ptr<autoware_parking_srvs::srv::ParkingMissionPlan::Response> response);
 
+  bool previousRouteFinished() const;
   bool waitUntilPreviousRouteFinished() const;
 
   std::vector<Pose> askFeasibleGoalIndex(

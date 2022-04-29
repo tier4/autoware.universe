@@ -87,6 +87,12 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
   while (true) {
     rclcpp::sleep_for(std::chrono::milliseconds(100));
 
+    if (this->previousRouteFinished()) {
+      const std::string message = "Reached the terminal of a circular trajectory";
+      RCLCPP_INFO_STREAM(get_logger(), message);
+      return PlanningResult{true, ParkingMissionPlan::Request::CIRCULAR, HADMapRoute(), message};
+    }
+
     const auto current_pose = getEgoVehiclePose();
     if (!sub_msgs_.velocity_ptr_ || !sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
       continue;
