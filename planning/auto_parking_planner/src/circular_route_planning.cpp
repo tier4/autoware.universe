@@ -78,7 +78,7 @@ Pose computeLaneletCenterPose(const lanelet::ConstLanelet & lanelet)
   return pose;
 }
 
-boost::optional<Pose> getStraightCenterPose(
+boost::optional<Pose> getPoseInLaneletWithEnoughForwardMargin(
   const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info, double vehicle_length)
 {
   // If straight pose does not exist inside the lanelet, return booost::none
@@ -204,8 +204,8 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
 
       while (true) {
         const auto llt_terminal = path_partial.back();
-        const auto pose =
-          getStraightCenterPose(llt_terminal, parking_map_info, config.vehicle_length);
+        const auto pose = getPoseInLaneletWithEnoughForwardMargin(
+          llt_terminal, parking_map_info, config.vehicle_length);
         if (pose != boost::none) break;
         path_partial.pop_back();
         path_partial_new.push_back(path_partial.back());
@@ -224,8 +224,8 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
       // modify the final partial path by pop_back()
       // so that the last llt is ensured to be "straight"
       const auto llt_terminal = path_partial.back();
-      const auto pose =
-        getStraightCenterPose(llt_terminal, parking_map_info, config.vehicle_length);
+      const auto pose = getPoseInLaneletWithEnoughForwardMargin(
+        llt_terminal, parking_map_info, config.vehicle_length);
       if (pose != boost::none) break;
       path_partial.pop_back();
     }
@@ -303,8 +303,8 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   route_handler.setRouteLanelets(
     circular_path);  // TODO(HiroIshida) redundant? maybe should modify route_handler
 
-  const auto goal_pose =
-    getStraightCenterPose(circular_path.back(), *parking_map_info_, config_.vehicle_length);
+  const auto goal_pose = getPoseInLaneletWithEnoughForwardMargin(
+    circular_path.back(), *parking_map_info_, config_.vehicle_length);
   HADMapRoute next_route;
   next_route.header.stamp = this->now();
   next_route.header.frame_id = map_frame_;
