@@ -42,12 +42,10 @@ std::map<size_t, ParkingLaneletType> build_llt_type_table(
 std::vector<Pose> get_possible_parking_poses(
   lanelet::LaneletMapPtr lanelet_map_ptr, const lanelet::ConstPolygon3d & focus_region)
 {
-  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "testing preparation");
   std::vector<Pose> poses;
   const lanelet::ConstLineStrings3d parking_spaces =
     lanelet::utils::query::getAllParkingSpaces(lanelet_map_ptr);
 
-  RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "n? : " << parking_spaces.size());
   for (const auto & parking_space : parking_spaces) {
     lanelet::ConstPolygon3d polygon;
     lanelet::utils::lineStringWithWidthToPolygon(parking_space, &polygon);
@@ -94,8 +92,6 @@ ParkingMapInfo build_parking_map_info(
   lanelet::ConstLanelets all_lanelets = lanelet::utils::query::laneletLayer(lanelet_map_ptr);
   for (const lanelet::ConstLanelet & llt : all_lanelets) {
     const std::string attr = llt.attributeOr(lanelet::AttributeName::Type, "none");
-    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "sub llt id : " << llt.id());
-    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "sub llt attr : " << attr);
     if (containLanelet(focus_region, llt)) {
       llts_inside.push_back(lanelet_map_ptr->laneletLayer.get(llt.id()));
     }

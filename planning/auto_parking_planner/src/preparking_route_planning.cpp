@@ -56,7 +56,6 @@ std::vector<Pose> getCandidateGoalPoses(
   std::vector<Pose> goal_poses;
   for (const auto & pose : parking_map_info.parking_poses) {
     const auto dist = tier4_autoware_utils::calcDistance2d(pose, start_pose);
-    RCLCPP_INFO_STREAM(rclcpp::get_logger("ishida"), "dist: " << dist);
     if (dist < threshold) {
       goal_poses.push_back(pose);
     }
