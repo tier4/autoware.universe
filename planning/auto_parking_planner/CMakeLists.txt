@@ -31,6 +31,10 @@ rclcpp_components_register_node(auto_parking_planner_node
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(circular_graph-test test/src/test_circular_graph.cpp)
+  target_include_directories(circular_graph-test PRIVATE include)
 endif()
 
 ament_auto_package(
