@@ -111,7 +111,7 @@ boost::optional<Pose> getPoseInLaneletWithEnoughForwardMargin(
   return boost::none;
 }
 
-std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
+std::stack<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
   const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
 {
   lanelet::ConstLanelets llt_seqeunce{llt};
@@ -121,10 +121,11 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
     llt_seqeunce.push_back(llts_following.front());
   }
 
-  if (llt_seqeunce.empty()) {
-    return std::deque<lanelet::ConstLanelets>{};
+  std::stack<lanelet::ConstLanelets> s;
+  if (!llt_seqeunce.empty()) {
+    s.push(llt_seqeunce);
   }
-  return std::deque<lanelet::ConstLanelets>{llt_seqeunce};
+  return s;
 }
 
 lanelet::ConstLanelets computeEntireCircularPathContainingLoop(
@@ -183,11 +184,11 @@ lanelet::ConstLanelets computeEntireCircularPathContainingLoop(
   return circling_path_whole;
 }
 
-std::deque<lanelet::ConstLanelets> splitPathContainingLoop(
+std::vector<lanelet::ConstLanelets> splitPathContainingLoop(
   const lanelet::ConstLanelets & path_llts, const ParkingMapInfo & parking_map_info,
   const AutoParkingConfig & config)
 {
-  std::deque<lanelet::ConstLanelets> circling_path_seq;
+  std::vector<lanelet::ConstLanelets> circling_path_seq;
   lanelet::ConstLanelets path_partial;
   for (const auto & llt : path_llts) {
     const auto is_next_loopy = [&](const lanelet::ConstLanelet & llt) -> bool {
@@ -239,7 +240,7 @@ std::deque<lanelet::ConstLanelets> splitPathContainingLoop(
   return circling_path_seq;
 }
 
-std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
+std::stack<lanelet::ConstLanelets> computeCircularPathSequence(
   const ParkingMapInfo & parking_map_info, const lanelet::ConstLanelet & current_lanelet,
   const AutoParkingConfig & config)
 {
@@ -268,7 +269,13 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
 
   const auto entier_path =
     computeEntireCircularPathContainingLoop(current_lanelet, parking_map_info);
-  return splitPathContainingLoop(entier_path, parking_map_info, config);
+  const auto circular_path_seq = splitPathContainingLoop(entier_path, parking_map_info, config);
+  std::stack<lanelet::ConstLanelets> circular_path_stack;
+  for (auto reverse_it = circular_path_seq.rbegin(); reverse_it != circular_path_seq.rend();
+       reverse_it++) {
+    circular_path_stack.push(*reverse_it);
+  }
+  return circular_path_stack;
 }
 
 PlanningResult AutoParkingPlanner::planCircularRoute() const
@@ -285,23 +292,22 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   }
 
   if (previous_phase_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
-    circular_path_queue_.clear();
+    circular_path_stack_ = std::stack<lanelet::ConstLanelets>();
   }
 
-  if (circular_path_queue_.empty()) {
-    const auto path_seq = computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
+  if (circular_path_stack_.empty()) {
+    const auto circular_path_stack =
+      computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
 
-    if (path_seq.empty()) {
+    if (circular_path_stack.empty()) {
       const std::string message = "No succeeding path exists";
       RCLCPP_INFO_STREAM(get_logger(), message);
       return PlanningResult{true, ParkingMissionPlan::Request::END, HADMapRoute(), message};
     }
-
-    circular_path_queue_ =
-      computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
+    circular_path_stack_ = circular_path_stack;
   }
-  const auto circular_path = circular_path_queue_.front();
-  circular_path_queue_.pop_front();
+  const auto circular_path = circular_path_stack_.top();
+  circular_path_stack_.pop();
 
   route_handler::RouteHandler route_handler(
     parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,

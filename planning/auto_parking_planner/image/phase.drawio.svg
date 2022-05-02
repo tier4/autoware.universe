@@ -53,7 +53,7 @@
                     <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 420px; margin-left: 271px;">
                         <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                pop deque to get
+                                pop stack to get
                                 <br/>
                                 next circular path
                             </div>
@@ -61,7 +61,7 @@
                     </div>
                 </foreignObject>
                 <text x="330" y="424" fill="rgb(0, 0, 0)" font-family="Helvetica" font-size="12px" text-anchor="middle">
-                    pop deque to get...
+                    pop stack to get...
                 </text>
             </switch>
         </g>
@@ -76,7 +76,7 @@
                             <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
                                 split entier path
                                 <br/>
-                                and save as a deque
+                                and save as a stack
                             </div>
                         </div>
                     </div>
@@ -236,13 +236,13 @@
                     <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 170px; height: 1px; padding-top: 198px; margin-left: 75px;">
                         <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                deque empty?
+                                stack empty?
                             </div>
                         </div>
                     </div>
                 </foreignObject>
                 <text x="160" y="202" fill="rgb(0, 0, 0)" font-family="Helvetica" font-size="12px" text-anchor="middle">
-                    deque empty?
+                    stack empty?
                 </text>
             </switch>
         </g>
@@ -688,7 +688,7 @@
                     <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 123px; height: 1px; padding-top: 200px; margin-left: 416px;">
                         <div data-drawio-colors="color: rgb(0, 0, 0); " style="box-sizing: border-box; font-size: 0px; text-align: center;">
                             <div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: rgb(0, 0, 0); line-height: 1.2; pointer-events: all; white-space: normal; overflow-wrap: normal;">
-                                plan path and save deque (1 element)
+                                plan path and save stack (1 element)
                             </div>
                         </div>
                     </div>

@@ -34,9 +34,9 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-#include <deque>
 #include <map>
 #include <memory>
+#include <stack>
 #include <string>
 #include <utility>
 #include <vector>
@@ -131,7 +131,7 @@ public:
   std::string base_link_frame_;
   std::string map_frame_;
 
-  mutable std::deque<lanelet::ConstLanelets> circular_path_queue_;
+  mutable std::stack<lanelet::ConstLanelets> circular_path_stack_;
   mutable std::vector<Pose> feasible_parking_goal_poses_;
 
   boost::optional<std::string> previous_phase_;
