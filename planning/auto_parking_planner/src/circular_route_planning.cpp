@@ -285,10 +285,10 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
   }
 
   if (previous_phase_ == autoware_parking_srvs::srv::ParkingMissionPlan::Request::PARKING) {
-    circular_plan_cache_.path_seq.clear();
+    circular_path_queue_.clear();
   }
 
-  if (circular_plan_cache_.path_seq.empty()) {
+  if (circular_path_queue_.empty()) {
     const auto path_seq = computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
 
     if (path_seq.empty()) {
@@ -297,12 +297,11 @@ PlanningResult AutoParkingPlanner::planCircularRoute() const
       return PlanningResult{true, ParkingMissionPlan::Request::END, HADMapRoute(), message};
     }
 
-    circular_plan_cache_.path_seq =
+    circular_path_queue_ =
       computeCircularPathSequence(*parking_map_info_, current_lanelet, config_);
   }
-  const auto circular_path = circular_plan_cache_.path_seq.front();
-  circular_plan_cache_.path_seq.pop_front();
-  circular_plan_cache_.current_path = circular_path;
+  const auto circular_path = circular_path_queue_.front();
+  circular_path_queue_.pop_front();
 
   route_handler::RouteHandler route_handler(
     parking_map_info_->lanelet_map_ptr, parking_map_info_->traffic_rules_ptr,

@@ -90,12 +90,6 @@ struct PlanningResult
   std::string message;
 };
 
-struct CircularPlanCache
-{
-  std::deque<lanelet::ConstLanelets> path_seq;
-  lanelet::ConstLanelets current_path;
-};
-
 enum class ParkingLaneletType : int { ENTRANCE, EXIT, NORMAL };
 
 struct ParkingMapInfo
@@ -137,7 +131,7 @@ public:
   std::string base_link_frame_;
   std::string map_frame_;
 
-  mutable CircularPlanCache circular_plan_cache_;
+  mutable std::deque<lanelet::ConstLanelets> circular_path_queue_;
   mutable std::vector<Pose> feasible_parking_goal_poses_;
 
   boost::optional<std::string> previous_phase_;
