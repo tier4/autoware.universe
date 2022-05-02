@@ -78,7 +78,7 @@ std::vector<Pose> get_possible_parking_poses(
     poses.push_back(pose);
   }
   if (parking_spaces.size() == 0) {
-    throw std::logic_error("the heck!");
+    throw std::logic_error("parking lot must includes at least one parking space.");
   }
   return poses;
 }
@@ -112,7 +112,18 @@ ParkingMapInfo build_parking_map_info(
 
   // NOTE: parking pose mustb be created from lanelet_map_ptr NOT sub_lanelet_map_ptr
   const auto parking_poses = get_possible_parking_poses(lanelet_map_ptr, focus_region);
-  const auto llt_types = build_llt_type_table(sub_routing_graph_ptr, road_llts);
+  const auto llt_type_table = build_llt_type_table(sub_routing_graph_ptr, road_llts);
+
+  // TODO(Somebody) eliminate the following asumption.
+  {
+    size_t num_exit = 0;
+    for (const auto & p : llt_type_table) {
+      if (p.second == ParkingLaneletType::EXIT) num_exit++;
+    }
+    if (num_exit > 1) {
+      throw std::logic_error("Current implementation assumes the parking lot has only one exit");
+    }
+  }
 
   ParkingMapInfo parking_map_info;
   parking_map_info.lanelet_map_ptr = sub_lanelet_map_ptr;
@@ -121,7 +132,7 @@ ParkingMapInfo build_parking_map_info(
   parking_map_info.focus_region = focus_region;
   parking_map_info.road_llts = road_llts;
   parking_map_info.parking_poses = parking_poses;
-  parking_map_info.llt_type_table = llt_types;
+  parking_map_info.llt_type_table = llt_type_table;
   return parking_map_info;
 }
 
