@@ -127,9 +127,8 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfNoLoop(
   return std::deque<lanelet::ConstLanelets>{llt_seqeunce};
 }
 
-std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
-  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info,
-  const AutoParkingConfig & config)
+lanelet::ConstLanelets computeEntireCircularPathContainingLoop(
+  const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
 {
   auto reachable_llts =
     parking_map_info.routing_graph_ptr->reachableSet(llt, std::numeric_limits<double>::infinity());
@@ -181,10 +180,16 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
       table_is_visited[llt_here.id()] = true;
     }
   }
+  return circling_path_whole;
+}
 
+std::deque<lanelet::ConstLanelets> splitPathContainingLoop(
+  const lanelet::ConstLanelets & path_llts, const ParkingMapInfo & parking_map_info,
+  const AutoParkingConfig & config)
+{
   std::deque<lanelet::ConstLanelets> circling_path_seq;
   lanelet::ConstLanelets path_partial;
-  for (const auto & llt : circling_path_whole) {
+  for (const auto & llt : path_llts) {
     const auto is_next_loopy = [&](const lanelet::ConstLanelet & llt) -> bool {
       const auto llts_follow = parking_map_info.routing_graph_ptr->following(llt);
       for (const auto & llt : llts_follow) {
@@ -199,7 +204,6 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequenceIfLoop(
     };
 
     if (is_next_loopy(llt)) {
-      // When next llt is the
       auto path_partial_new = lanelet::ConstLanelets{path_partial.back()};
 
       while (true) {
@@ -261,7 +265,10 @@ std::deque<lanelet::ConstLanelets> computeCircularPathSequence(
   if (isGoingToExit(current_lanelet, parking_map_info)) {
     return computeCircularPathSequenceIfNoLoop(current_lanelet, parking_map_info);
   }
-  return computeCircularPathSequenceIfLoop(current_lanelet, parking_map_info, config);
+
+  const auto entier_path =
+    computeEntireCircularPathContainingLoop(current_lanelet, parking_map_info);
+  return splitPathContainingLoop(entier_path, parking_map_info, config);
 }
 
 PlanningResult AutoParkingPlanner::planCircularRoute() const
