@@ -38,6 +38,29 @@ bool is_straight(const lanelet::ConstLanelet & llt)
   return angle < 3.1415926 * 30 / 180.0;
 }
 
+bool hasLoop(const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
+{
+  std::unordered_set<size_t> set_is_visisted;
+  std::stack<lanelet::ConstLanelet> llt_stack;
+  llt_stack.push(llt);
+  while (!llt_stack.empty()) {
+    const auto llt_here = llt_stack.top();
+    llt_stack.pop();
+
+    const bool is_visisted = (set_is_visisted.find(llt_here.id()) != set_is_visisted.end());
+    if (is_visisted) {
+      return true;
+    }
+
+    set_is_visisted.insert(llt_here.id());  // mark visited
+    const auto llt_childs = parking_map_info.routing_graph_ptr->following(llt_here);
+    for (const auto & llt_child : llt_childs) {
+      llt_stack.push(llt_child);
+    }
+  }
+  return false;
+}
+
 bool isGoingToExit(const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info)
 {
   auto llt_here = llt;
@@ -263,10 +286,11 @@ std::stack<lanelet::ConstLanelets> computeCircularPathSequence(
     throw std::runtime_error("current impl assumes only one entrance and exit");  // TODO
   }
 
-  if (isGoingToExit(current_lanelet, parking_map_info)) {
+  if (!hasLoop(current_lanelet, parking_map_info)) {
     return computeCircularPathSequenceIfNoLoop(current_lanelet, parking_map_info);
   }
 
+  // if has loop
   const auto entier_path =
     computeEntireCircularPathContainingLoop(current_lanelet, parking_map_info);
   const auto circular_path_seq = splitPathContainingLoop(entier_path, parking_map_info, config);
