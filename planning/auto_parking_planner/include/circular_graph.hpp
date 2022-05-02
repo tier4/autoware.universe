@@ -51,7 +51,7 @@ public:
       const bool is_visisted = isInside(getID(elem_here), visit_set);
       if (is_visisted) return true;
 
-      visit_set.insert(elem_here.id);
+      visit_set.insert(getID(elem_here));
       const auto elmes_following = getFollowings(elem_here);
       for (const auto elem : elmes_following) {
         s.push(elem);
@@ -86,6 +86,7 @@ public:
     std::unordered_set<size_t> outside_of_loop_set;
     std::unordered_map<size_t, size_t> visit_counts;
     std::vector<ElementT> circular_path;
+    const size_t n_reachable = getReachables(element).size();
 
     // lambda
     const auto isOutOfLoop = [&](const ElementT & elem) -> bool {
@@ -121,8 +122,8 @@ public:
         if (p.second > 0) c++;
       }
       const auto n_total_mark = c + outside_of_loop_set.size();
-      if (n_total_mark > getElementNum()) throw std::logic_error("strange");
-      return (n_total_mark == getElementNum());
+      if (n_total_mark > n_reachable) throw std::logic_error("strange");
+      return (n_total_mark == n_reachable);
     };
 
     // main

@@ -175,13 +175,20 @@ TEST(CircularGraph, LoopCase)
 {
   const auto graph = build_graph_with_loop<SimpleGraph>();
 
-  const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(0));
-  EXPECT_TRUE(partial_path_seq.size() == 2);
   {
+    const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(0));
+    EXPECT_TRUE(partial_path_seq.size() == 2);
     std::vector<size_t> idseq_expected1{0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11};
     std::vector<size_t> idseq_expected2{11, 2, 3, 8};
     expect_consistent_nodes_and_ids(partial_path_seq.at(0), idseq_expected1);
     expect_consistent_nodes_and_ids(partial_path_seq.at(1), idseq_expected2);
+  }
+
+  {
+    const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(8));
+    EXPECT_TRUE(partial_path_seq.size() == 1);
+    std::vector<size_t> idseq_expected1{8, 7, 9, 10, 11, 2, 3, 4, 5, 6};
+    expect_consistent_nodes_and_ids(partial_path_seq.at(0), idseq_expected1);
   }
 }
 
