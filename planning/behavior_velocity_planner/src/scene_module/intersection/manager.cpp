@@ -60,7 +60,7 @@ std::set<int64_t> getLaneIdSetOnPath(const autoware_auto_planning_msgs::msg::Pat
 }  // namespace
 
 IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
-: SceneModuleManagerInterface(node, getModuleName())
+: SceneModuleManagerInterface(node, getModuleName()), rtc_interface_(node, "intersection")
 {
   const std::string ns(getModuleName());
   auto & ip = intersection_param_;
@@ -120,6 +120,7 @@ void IntersectionModuleManager::launchNewModules(
     registerModule(std::make_shared<IntersectionModule>(
       module_id, lane_id, planner_data_, intersection_param_,
       logger_.get_child("intersection_module"), clock_));
+    generateUUID(module_id);
   }
 }
 
@@ -178,4 +179,23 @@ MergeFromPrivateModuleManager::getModuleExpiredFunction(
     return lane_id_set.count(scene_module->getModuleId()) == 0;
   };
 }
+
+bool IntersectionModuleManager::getActivation(const UUID & uuid)
+{
+  return rtc_interface_.isActivated(uuid);
+}
+
+void IntersectionModuleManager::updateRTCStatus(
+  const UUID & uuid, const bool safe, const double distance)
+{
+  rtc_interface_.updateCooperateStatus(uuid, safe, distance);
+}
+
+void IntersectionModuleManager::removeRTCStatus(const UUID & uuid)
+{
+  rtc_interface_.removeCooperateStatus(uuid);
+}
+
+void IntersectionModuleManager::publishRTCStatus() { rtc_interface_.publishCooperateStatus(); }
+
 }  // namespace behavior_velocity_planner
