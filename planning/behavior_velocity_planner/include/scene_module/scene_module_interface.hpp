@@ -17,6 +17,8 @@
 
 #include "behavior_velocity_planner/planner_data.hpp"
 
+#include <builtin_interfaces/msg/time.hpp>
+
 #include <autoware_auto_planning_msgs/msg/path.hpp>
 #include <autoware_auto_planning_msgs/msg/path_with_lane_id.hpp>
 #include <tier4_planning_msgs/msg/stop_reason.hpp>
@@ -38,6 +40,7 @@
 
 namespace behavior_velocity_planner
 {
+using builtin_interfaces::msg::Time;
 using unique_identifier_msgs::msg::UUID;
 class SceneModuleInterface
 {
@@ -147,7 +150,6 @@ public:
       const UUID uuid = getUUID(scene_module->getModuleId());
 
       scene_module->setActivation(getActivation(uuid));
-
       tier4_planning_msgs::msg::StopReason stop_reason;
       scene_module->setPlannerData(planner_data_);
       scene_module->modifyPathVelocity(path, &stop_reason);
@@ -156,7 +158,8 @@ public:
         stop_reason_array.stop_reasons.emplace_back(stop_reason);
       }
 
-      updateRTCStatus(uuid, scene_module->isSafe(), scene_module->getDistance());
+      updateRTCStatus(
+        uuid, scene_module->isSafe(), scene_module->getDistance(), path->header.stamp);
 
       if (const auto command = scene_module->getInfrastructureCommand()) {
         infrastructure_command_array.commands.push_back(*command);
@@ -181,7 +184,7 @@ public:
     pub_infrastructure_commands_->publish(infrastructure_command_array);
     pub_debug_->publish(debug_marker_array);
     pub_virtual_wall_->publish(virtual_wall_marker_array);
-    publishRTCStatus();
+    publishRTCStatus(path->header.stamp);
   }
 
 protected:
@@ -194,14 +197,14 @@ protected:
 
   virtual void updateRTCStatus(
     [[maybe_unused]] const UUID & uuid, [[maybe_unused]] const bool safe,
-    [[maybe_unused]] const double distance)
+    [[maybe_unused]] const double distance, [[maybe_unused]] const Time & stamp)
   {
     return;
   }
 
   virtual void removeRTCStatus([[maybe_unused]] const UUID & uuid) { return; }
 
-  virtual void publishRTCStatus() { return; }
+  virtual void publishRTCStatus([[maybe_unused]] const Time & stamp) { return; }
 
   void deleteExpiredModules(const autoware_auto_planning_msgs::msg::PathWithLaneId & path)
   {
