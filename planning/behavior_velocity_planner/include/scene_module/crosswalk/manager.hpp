@@ -23,11 +23,9 @@
 
 #include <autoware_auto_planning_msgs/msg/path_with_lane_id.hpp>
 #include <tier4_api_msgs/msg/crosswalk_status.hpp>
-#include <tier4_rtc_msgs/msg/module.hpp>
 
 #include <functional>
 #include <memory>
-#include <unordered_map>
 
 namespace behavior_velocity_planner
 {
