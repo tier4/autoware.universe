@@ -114,6 +114,12 @@ std::vector<ElementT> CircularGraphBase<ElementT>::computeEntireCircularPathWith
     elem_next = elems_cand.front();  // TODO: case there are more than 1 deadends
     no_loop_path.push_back(elem_next);
   }
+
+  // rewind if terminal of the partial path is not stoppable
+  while (true) {
+    if (f_is_stoppable_(no_loop_path.back())) break;
+    no_loop_path.pop_back();
+  }
   return no_loop_path;
 }
 
