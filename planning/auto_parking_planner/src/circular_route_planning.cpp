@@ -15,10 +15,13 @@
 #include "auto_parking_planner.hpp"
 #include "circular_graph.hpp"
 #include "lanelet2_core/Forward.h"
+#include "lanelet2_core/geometry/Lanelet.h"
 #include "lanelet2_core/primitives/Lanelet.h"
+#include "lanelet2_core/primitives/Point.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <stack>
 #include <stdexcept>
 
 namespace auto_parking_planner
@@ -27,23 +30,32 @@ namespace auto_parking_planner
 boost::optional<Pose> getPoseInLaneletWithEnoughForwardMargin(
   const lanelet::ConstLanelet & llt, const ParkingMapInfo & parking_map_info, double vehicle_length)
 {
-  // If straight pose does not exist inside the lanelet, return booost::none
+  // Check if the at least one point in llt's center point has enough forward margin.
+  const double forward_margin = vehicle_length * 2.0;
+
+  const auto reachable_llts =
+    parking_map_info.routing_graph_ptr->reachableSet(llt, forward_margin * 2);
+  const auto within_reachable_llts = [&](const lanelet::BasicPoint2d & pt) {
+    for (const auto & llt : reachable_llts) {
+      if (!boost::geometry::within(pt, llt.polygon2d())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check if at least a single ahaed point from a center point of center line is
+  // included in reachable llts
   const auto center_line = llt.centerline2d();
-
-  const auto llt_next = parking_map_info.routing_graph_ptr->following(llt);
-
-  // must start from 1 !
   for (size_t idx = center_line.size() - 2; idx != (size_t)0; --idx) {
     const auto p = center_line[idx].basicPoint2d();
     const auto p_next = center_line[idx + 1].basicPoint2d();
     const auto diff = p_next - p;
-    const auto center_ahead = p + diff.normalized() * vehicle_length * 2.0;
+    const auto center_ahead = p + diff.normalized() * forward_margin;
     lanelet::BasicPoint2d pt(center_ahead.x(), center_ahead.y());
 
-    if (!boost::geometry::within(pt, llt.polygon2d())) continue;
-    const auto llt_nexts = parking_map_info.routing_graph_ptr->following(llt);
-    for (const auto & llt_next : llt_nexts) {
-      if (!boost::geometry::within(pt, llt_next.polygon2d())) continue;
+    if (!within_reachable_llts(pt)) {
+      continue;
     }
 
     const auto yaw = atan2(diff.y(), diff.x());
