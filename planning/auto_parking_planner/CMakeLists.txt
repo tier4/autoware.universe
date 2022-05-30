@@ -24,10 +24,8 @@ ament_auto_add_library(auto_parking_planner_node SHARED
 
 
 # workaround to allow deprecated header to build on both galactic and rolling
-if(${tf2_geometry_msgs_VERSION} VERSION_LESS 0.18.0)
-  target_compile_definitions(auto_parking_planner_node PUBLIC
-    USE_TF2_GEOMETRY_MSGS_DEPRECATED_HEADER
-  )
+if($ENV{ROS_DISTRO} MATCHES "galactic")
+  add_definitions(-DROS_DISTRO_GALACTIC)
 endif()
 
 rclcpp_components_register_node(auto_parking_planner_node
