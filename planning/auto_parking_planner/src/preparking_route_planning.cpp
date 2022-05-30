@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "auto_parking_planner.hpp"
+#include "rclcpp/logging.hpp"
 
 #include <interpolation/spline_interpolation_points_2d.hpp>
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
@@ -82,6 +83,7 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     RCLCPP_WARN_STREAM(get_logger(), message);
     return PlanningResult{false, ParkingMissionPlan::Request::END, HADMapRoute(), message};
   }
+  RCLCPP_INFO_STREAM(get_logger(), "connection with freespace planner server is established");
 
   while (true) {
     rclcpp::sleep_for(std::chrono::milliseconds(100));
@@ -93,9 +95,19 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     }
 
     const auto current_pose = getEgoVehiclePose();
-    if (!sub_msgs_.velocity_ptr_ || !sub_msgs_.traj_ptr_ || sub_msgs_.traj_ptr_->points.empty()) {
+    if (!sub_msgs_.velocity_ptr_) {
+      RCLCPP_WARN_STREAM(get_logger(), "velocity is not subscribed yet");
       continue;
     }
+    if (!sub_msgs_.traj_ptr_) {
+      RCLCPP_WARN_STREAM(get_logger(), "trajectory is not subscribed yet");
+      continue;
+    }
+    if (sub_msgs_.traj_ptr_->points.empty()) {
+      RCLCPP_WARN_STREAM(get_logger(), "obtained trajectory has no point");
+      continue;
+    }
+
     const auto lookahead_length = compute_lookehead_length(*sub_msgs_.velocity_ptr_, config_);
     RCLCPP_INFO_STREAM(get_logger(), "lookahead_length: " << lookahead_length << " [m]");
     const auto lookahead_pose =
