@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <iostream>
 
 struct Node
@@ -28,19 +29,17 @@ struct Node
 class SimpleGraph : public auto_parking_planner::CircularGraphBase<Node>
 {
 public:
-  explicit SimpleGraph(const std::vector<Node> & nodes) : nodes_(nodes) {}
+  explicit SimpleGraph(
+    const std::vector<Node> & nodes, std::function<bool(const Node &)> f_is_stoppable)
+  : auto_parking_planner::CircularGraphBase<Node>(f_is_stoppable), nodes_(nodes)
+  {
+  }
 
   size_t getID(const Node & node) const override { return node.id; }
 
   size_t getElementNum() const override { return nodes_.size(); }
 
   Node get_node(size_t id) const { return nodes_.at(id); }
-
-  bool is_stoppable(const Node & node) const override
-  {
-    (void)node;
-    return true;
-  }
 
   std::vector<Node> getFollowings(const Node & node) const override
   {
@@ -75,19 +74,7 @@ public:
   std::vector<Node> nodes_;
 };
 
-class SimpleGraphWithStopRestriction : public SimpleGraph
-{
-  using SimpleGraph::SimpleGraph;
-  bool is_stoppable(const Node & node) const override
-  {
-    if (node.id == 11) return false;
-    if (node.id == 8) return false;
-    return true;
-  }
-};
-
-template <typename T>
-T build_graph_with_loop()
+SimpleGraph build_graph_with_loop(const std::function<bool(const Node &)> & f_is_stoppable)
 {
   std::vector<Node> nodes;
   for (size_t i = 0; i < 14; i++) {
@@ -108,7 +95,7 @@ T build_graph_with_loop()
   nodes[11].add_child(2);
   nodes[11].add_child(12);
   nodes[12].add_child(13);
-  return T(nodes);
+  return SimpleGraph(nodes, f_is_stoppable);
 }
 
 void expect_consistent_nodes_and_ids(const std::vector<Node> & nodes, const std::vector<size_t> ids)
@@ -130,12 +117,12 @@ SimpleGraph build_graph_without_loop()
   for (size_t i = 0; i < n_node - 1; i++) {
     nodes[i].add_child(i + 1);
   }
-  return SimpleGraph(nodes);
+  return SimpleGraph(nodes, [](const Node &) { return true; });
 }
 
 TEST(SimpleGraphTestSuite, OverrideMethods)
 {
-  const auto graph = build_graph_with_loop<SimpleGraph>();
+  const auto graph = build_graph_with_loop([](const Node &) { return true; });
 
   // test SimpleGraph
   for (size_t i = 0; i < 14; ++i) {
@@ -173,7 +160,7 @@ TEST(SimpleGraphTestSuite, OverrideMethods)
 
 TEST(CircularGraph, LoopCase)
 {
-  const auto graph = build_graph_with_loop<SimpleGraph>();
+  const auto graph = build_graph_with_loop([](const Node &) { return true; });
 
   {
     const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(0));
@@ -194,7 +181,12 @@ TEST(CircularGraph, LoopCase)
 
 TEST(CircularGraph, LoopCaseWithStoppableCondition)
 {
-  const auto graph = build_graph_with_loop<SimpleGraphWithStopRestriction>();
+  const auto is_stoppable = [](const Node & node) {
+    if (node.id == 11) return false;
+    if (node.id == 8) return false;
+    return true;
+  };
+  const auto graph = build_graph_with_loop(is_stoppable);
   const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(0));
   EXPECT_TRUE(partial_path_seq.size() == 2);
   {
