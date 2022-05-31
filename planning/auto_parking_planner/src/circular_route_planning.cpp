@@ -76,11 +76,28 @@ public:
   : info_(info), config_(config)
   {
     const auto f_is_stoppable = [this](const std::vector<lanelet::ConstLanelet> & llt_seq) {
-      const auto & llt = llt_seq.back();
+      const auto & llt_terminal = llt_seq.back();
+
+      // condition 1: have enough ahead margin
       const boost::optional<Pose> pose =
-        getPoseInLaneletWithEnoughForwardMargin(llt, info_, config_.vehicle_length);
+        getPoseInLaneletWithEnoughForwardMargin(llt_terminal, info_, config_.vehicle_length);
       const bool is_pose_found = (pose != boost::none);
-      return is_pose_found;
+      if (!is_pose_found) {
+        return false;
+      }
+
+      // condition 2: no overwrap with lanelets so far in the seq
+      // without this condition, the path becomes loopy in geometrical sense
+      // although it is not loopy in terms of graph structure
+      for (size_t i = 0; i < llt_seq.size() - 2; ++i) {
+        // -2 means that ignore self and previous llt"
+        if (lanelet::geometry::intersects2d(llt_terminal, llt_seq.at(i))) {
+          return false;
+        }
+      }
+
+      // ok
+      return true;
     };
     f_is_stoppable_trajectory_ = f_is_stoppable;
   }
