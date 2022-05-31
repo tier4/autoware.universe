@@ -18,16 +18,32 @@ https://drive.google.com/file/d/12vGfLPoGXqsztcAAJToqDEV1wgXsJtBH/view?usp=shari
 | `~/input/trajectory`      | autoware_auto_planning_msgs::Trajectory    | trajectory which will be used to determine lookahead point |
 
 ## Service requesting from this node
+`start_poses` と `goal_poses`と`successes`は全て同じ長さである必要があります.
 
-(To be filled)
-| Name | Type | Description |
-| -------------------- | --------------------------------------- | ------------------------------------------ |
+autoware_parking_srvs/FreespacePlan.srv
+```
+geometry_msgs/PoseStamped[] start_poses # sequence of start poses of each planning problem
+geometry_msgs/PoseStamped[] goal_poses # corresponding goal poses to each element of start pose
+float64 timeout  # planning timeout (currently timeout is not implemented yet in freespace planning server side yet)
+---
+bool[] successes  # return each planning problem was solved
+```
 
 ## Service response from this node
 
-(To be filled)
-| Name | Type | Description |
-| -------------------- | --------------------------------------- | ------------------------------------------ |
+autoware_parking_srvs/parkingMissionPlan.srv
+```
+string CIRCULAR=circular
+string PREPARKING=preparking
+string PARKING=parking
+string END=end
+
+string type  # one of {CIRCULAR, PREPARKING, PARKING, END}
+---
+autoware_auto_planning_msgs/HADMapRoute route
+string next_type
+bool success
+```
 
 ## Node diagram and definition of service
 
@@ -113,7 +129,9 @@ no loop caseと同じように動かす (サービスコールして, engageをp
 https://user-images.githubusercontent.com/38597814/171085401-dc9ecdd0-611e-45a5-8331-cdffb3ee02d8.mp4
 
 
-
-
-
-
+### Circular Planningのコアアルゴリズムのユニットテスト
+circular planningの中のコアなアルゴリズムは, 可読性と単体テストのために, 駐車関連の実装とは切り離して`include/circular_graph.hpp`内の`CircularGraphBase`に置いてあります. このアルゴリズムのunit testは以下で実行できます. (テストPass確認済み)
+```
+colcon test --packages-select auto_parking_planner
+```
+(unit test)[test/src/test_circular_graph.cpp]のテストケースのうち`CircularGraph::LoopCase`は上の`Case With Loop`と題されたポンチ絵のグラフに対応しており, `CircularGraph::WithoutLoopCase`は`Case without loop`ｔと題されたポンチ絵のグラフに対応してることを踏まえてテストコードを読むと, `CircularGraphBase`のそれぞれのメソッドの入出力がわかりやすいと思います.
