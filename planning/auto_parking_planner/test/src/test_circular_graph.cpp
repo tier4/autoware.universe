@@ -64,9 +64,7 @@ public:
       visited_set.insert(node_here.id);
       s.pop();
       for (const auto & node_child : getFollowings(node_here)) {
-        if (auto_parking_planner::isInside(node_child.id, visited_set)) {
-          continue;
-        }
+        if (visited_set.find(node_child.id) != visited_set.end()) continue;
         s.push(node_child);
       }
     }

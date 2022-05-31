@@ -29,11 +29,6 @@
 namespace auto_parking_planner
 {
 
-bool isInside(size_t elem, std::unordered_set<size_t> elemset)
-{
-  return elemset.find(elem) != elemset.end();
-}
-
 template <typename T>
 using VecVec = std::vector<std::vector<T>>;
 
@@ -74,7 +69,7 @@ bool CircularGraphBase<ElementT>::hasLoop(const ElementT & element) const
   while (!s.empty()) {
     const auto elem_here = s.top();
     s.pop();
-    const bool is_visisted = isInside(getID(elem_here), visit_set);
+    const bool is_visisted = visit_set.find(getID(elem_here)) != visit_set.end();
     if (is_visisted) return true;
 
     visit_set.insert(getID(elem_here));
@@ -135,7 +130,7 @@ std::vector<ElementT> CircularGraphBase<ElementT>::computeEntireCircularPathWith
 
   // lambda
   const auto isOutOfLoop = [&](const ElementT & elem) -> bool {
-    if (isInside(getID(elem), outside_of_loop_set)) return true;
+    if (outside_of_loop_set.find(getID(elem)) != outside_of_loop_set.end()) return true;
     if (hasLoop(elem)) return false;
 
     for (const auto & elem_descendants : getReachables(elem)) {
@@ -213,14 +208,21 @@ VecVec<ElementT> CircularGraphBase<ElementT>::splitPathContainingLoop(
   std::vector<std::vector<ElementT>> partial_path_seq;
 
   std::vector<ElementT> partial_path;
-  std::unordered_set<size_t> partial_visit_set;
+
+  const auto will_form_loop = [this, &partial_path](const ElementT & elem_here) {
+    const size_t id_here = getID(elem_here);
+    for (const auto & elem : partial_path) {
+      if (getID(elem) == id_here) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   for (const auto & elem : elem_path) {
-    const auto is_tie = isInside(getID(elem), partial_visit_set);
+    if (will_form_loop(elem)) {  // split the loop!
 
-    if (is_tie) {  // split the loop!
-
-      // Initialize partial_path and partial_visit_set
+      // Initialize partial_path
       auto partial_path_new = std::vector<ElementT>{partial_path.back()};  // Later will be reversed
 
       // rewind if terminal of the partial path is not stoppable
@@ -229,19 +231,11 @@ VecVec<ElementT> CircularGraphBase<ElementT>::splitPathContainingLoop(
         partial_path.pop_back();
         partial_path_new.push_back(partial_path.back());
       }
-
       partial_path_seq.push_back(partial_path);
       std::reverse(partial_path_new.begin(), partial_path_new.end());
-
       partial_path = partial_path_new;
-      partial_visit_set.clear();
-      for (const auto & elem : partial_path) {
-        partial_visit_set.insert(getID(elem));
-      }
     }
-
     partial_path.push_back(elem);
-    partial_visit_set.insert(getID(elem));
   }
 
   while (true) {
