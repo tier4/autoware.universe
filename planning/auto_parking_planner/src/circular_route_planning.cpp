@@ -75,13 +75,14 @@ public:
   explicit LaneletCircularGraph(const ParkingMapInfo & info, const AutoParkingConfig & config)
   : info_(info), config_(config)
   {
-    const auto f_is_stoppable = [this](const lanelet::ConstLanelet & llt) {
+    const auto f_is_stoppable = [this](const std::vector<lanelet::ConstLanelet> & llt_seq) {
+      const auto & llt = llt_seq.back();
       const boost::optional<Pose> pose =
         getPoseInLaneletWithEnoughForwardMargin(llt, info_, config_.vehicle_length);
       const bool is_pose_found = (pose != boost::none);
       return is_pose_found;
     };
-    f_is_stoppable_ = f_is_stoppable;
+    f_is_stoppable_trajectory_ = f_is_stoppable;
   }
 
   std::vector<lanelet::ConstLanelet> getFollowings(const lanelet::ConstLanelet & llt) const override

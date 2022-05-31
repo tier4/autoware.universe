@@ -26,11 +26,13 @@ struct Node
   void add_child(size_t id) { child_ids.push_back(id); }
 };
 
+const auto is_stoppable_trajectory_default = [](const std::vector<Node> &) { return true; };
+
 class SimpleGraph : public auto_parking_planner::CircularGraphBase<Node>
 {
 public:
   explicit SimpleGraph(
-    const std::vector<Node> & nodes, std::function<bool(const Node &)> f_is_stoppable)
+    const std::vector<Node> & nodes, std::function<bool(const std::vector<Node> &)> f_is_stoppable)
   : auto_parking_planner::CircularGraphBase<Node>(f_is_stoppable), nodes_(nodes)
   {
   }
@@ -74,7 +76,8 @@ public:
   std::vector<Node> nodes_;
 };
 
-SimpleGraph build_graph_with_loop(const std::function<bool(const Node &)> & f_is_stoppable)
+SimpleGraph build_graph_with_loop(
+  const std::function<bool(const std::vector<Node> &)> & f_is_stoppable)
 {
   std::vector<Node> nodes;
   for (size_t i = 0; i < 14; i++) {
@@ -117,12 +120,12 @@ SimpleGraph build_graph_without_loop()
   for (size_t i = 0; i < n_node - 1; i++) {
     nodes[i].add_child(i + 1);
   }
-  return SimpleGraph(nodes, [](const Node &) { return true; });
+  return SimpleGraph(nodes, [](const std::vector<Node> &) { return true; });
 }
 
 TEST(SimpleGraphTestSuite, OverrideMethods)
 {
-  const auto graph = build_graph_with_loop([](const Node &) { return true; });
+  const auto graph = build_graph_with_loop(is_stoppable_trajectory_default);
 
   // test SimpleGraph
   for (size_t i = 0; i < 14; ++i) {
@@ -160,7 +163,7 @@ TEST(SimpleGraphTestSuite, OverrideMethods)
 
 TEST(CircularGraph, LoopCase)
 {
-  const auto graph = build_graph_with_loop([](const Node &) { return true; });
+  const auto graph = build_graph_with_loop(is_stoppable_trajectory_default);
 
   {
     const auto partial_path_seq = graph.planCircularPathSequence(graph.get_node(0));
@@ -181,7 +184,8 @@ TEST(CircularGraph, LoopCase)
 
 TEST(CircularGraph, LoopCaseWithStoppableCondition)
 {
-  const auto is_stoppable = [](const Node & node) {
+  const auto is_stoppable = [](const std::vector<Node> & node_seq) {
+    const auto & node = node_seq.back();
     if (node.id == 11) return false;
     if (node.id == 8) return false;
     return true;

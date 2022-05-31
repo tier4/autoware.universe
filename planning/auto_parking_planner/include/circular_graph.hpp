@@ -41,9 +41,10 @@ template <typename ElementT>
 class CircularGraphBase
 {
 public:
-  CircularGraphBase() : CircularGraphBase([](const ElementT &) { return true; }) {}
-  explicit CircularGraphBase(const std::function<bool(const ElementT &)> & f_is_stoppable)
-  : f_is_stoppable_(f_is_stoppable)
+  CircularGraphBase() : CircularGraphBase([](const std::vector<ElementT> &) { return true; }) {}
+  explicit CircularGraphBase(
+    const std::function<bool(const std::vector<ElementT> &)> & f_is_stoppable)
+  : f_is_stoppable_trajectory_(f_is_stoppable)
   {
   }
   bool hasLoop(const ElementT & element) const;
@@ -52,7 +53,7 @@ public:
   virtual ~CircularGraphBase() = default;
 
 protected:
-  std::function<bool(const ElementT &)> f_is_stoppable_;
+  std::function<bool(const std::vector<ElementT> &)> f_is_stoppable_trajectory_;
 
 private:
   std::vector<ElementT> computeEntireCircularPathWithoutLoop(const ElementT & element) const;
@@ -117,7 +118,7 @@ std::vector<ElementT> CircularGraphBase<ElementT>::computeEntireCircularPathWith
 
   // rewind if terminal of the partial path is not stoppable
   while (true) {
-    if (f_is_stoppable_(no_loop_path.back())) break;
+    if (f_is_stoppable_trajectory_(no_loop_path)) break;
     no_loop_path.pop_back();
   }
   return no_loop_path;
@@ -224,7 +225,7 @@ VecVec<ElementT> CircularGraphBase<ElementT>::splitPathContainingLoop(
 
       // rewind if terminal of the partial path is not stoppable
       while (true) {
-        if (f_is_stoppable_(partial_path.back())) break;
+        if (f_is_stoppable_trajectory_(partial_path)) break;
         partial_path.pop_back();
         partial_path_new.push_back(partial_path.back());
       }
@@ -245,7 +246,7 @@ VecVec<ElementT> CircularGraphBase<ElementT>::splitPathContainingLoop(
 
   while (true) {
     // rewind if terminal of the partial path is not stoppable
-    if (f_is_stoppable_(partial_path.back())) break;
+    if (f_is_stoppable_trajectory_(partial_path)) break;
     partial_path.pop_back();
   }
   partial_path_seq.push_back(partial_path);
