@@ -202,7 +202,7 @@ bool AutoParkingPlanner::waitUntilPreviousRouteFinished() const
   }
 
   RCLCPP_INFO_STREAM(get_logger(), "waiting for preivous route finished...");
-  while (previousRouteFinished()) {
+  while (!previousRouteFinished()) {
     RCLCPP_INFO_STREAM(get_logger(), "waiting now...");
     rclcpp::sleep_for(std::chrono::milliseconds(300));
   }
