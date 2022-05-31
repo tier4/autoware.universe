@@ -84,7 +84,7 @@ git checkout feature/autoparking
 
 あとは, pilot-auto/feature/autoparking の`README.md`を参照してください. (map 等のダウンロードもここで行われます.)
 
-### running (no loop case)
+### 駐車所のレーンにループがない場合のデモ (psimのデフォルト地図)
 
 - plannin simulater をたちあげる.
   ros2 launch autoware_launch planning_simulator.launch.xml map_path:=/home/h-ishida/Downloads/sample_map vehicle_model:=lexus sensor_model:=aip_xx1
@@ -103,8 +103,17 @@ ros2 service call /planning/mission_planning/service/autopark std_srvs/srv/Trigg
 ros2 topic pub --once /autoware/engage autoware_auto_vehicle_msgs/msg/Engage "engage: true"
 ```
 
-### running (loop case)
+### 駐車場のレーンにループがある場合のデモ  
+以下からosmマップをダウンロードして, 適当なmapファイルに置く. 点群はなくてもosmさえあればsimulatorは起動できる. 
+https://drive.google.com/file/d/1O87YxNXF8apw6qwTZvWGNBx7PiI6AhFv/view?usp=sharing
 
-tutorial の planning simulator の駐車場のルートはループが無い. ループがある環境でテストするためには, osm マップを以下からダウンロードし使用する.
-<https://drive.google.com/file/d/1O87YxNXF8apw6qwTZvWGNBx7PiI6AhFv/view?usp=sharing>
-このマップは松本さんが作られた tier4 の office2 階のロージー向けの osm マップを, レクサスでも使えるように修正(拡大等)したものである.
+no loop caseと同じように動かす (サービスコールして, engageをpublishする). 以下のデモ動画では, pakring space (osmファイルの編集方法がわからずかなり小さくなってしまい見えない)が一つあるが, circularを繰り返す挙動を確かめるために, parking spaceの位置にpedestrianを置いている. circular -> preparking -> circular -> ... を正常に繰り返していることがわかる. 
+デモ動画: 
+
+https://user-images.githubusercontent.com/38597814/171085401-dc9ecdd0-611e-45a5-8331-cdffb3ee02d8.mp4
+
+
+
+
+
+
