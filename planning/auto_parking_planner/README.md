@@ -1,5 +1,13 @@
 # Auto parking planner
 
+A demo video of the auto parking in planning simulater:
+for full instruction, plase see the document below.
+
+https://user-images.githubusercontent.com/38597814/171078936-418b7ace-40e4-4e52-9148-b3ca19096c10.mp4
+
+The original video can be found here (tier4 internal):
+https://drive.google.com/file/d/12vGfLPoGXqsztcAAJToqDEV1wgXsJtBH/view?usp=sharing
+
 ## Input topics
 
 | Name                      | Type                                       | Description                                                |
