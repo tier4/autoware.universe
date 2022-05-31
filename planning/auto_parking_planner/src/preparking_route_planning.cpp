@@ -68,9 +68,14 @@ double compute_lookehead_length(
   const autoware_auto_vehicle_msgs::msg::VelocityReport & velocity,
   const AutoParkingConfig & config)
 {
-  constexpr double timeout = 1.0;
-  const double length_cand = velocity.longitudinal_velocity * timeout + config.lookahead_length_min;
-  const double length = std::min(length_cand, config.lookahead_length_max);
+  constexpr double time_for_freespace_plan =
+    2.0;  // TODO(HiroIshida) send this to freespace_planner server; must be rosparam
+  constexpr double dist_until_stop =
+    5.0;  // TODO(HiroIhsida) https://job-con.jp/special/driver/guide/faq93
+  const double length_cand =
+    velocity.longitudinal_velocity * time_for_freespace_plan + dist_until_stop;
+  const double length =
+    std::max(std::min(length_cand, config.lookahead_length_max), config.lookahead_length_min);
   return length;
 }
 
