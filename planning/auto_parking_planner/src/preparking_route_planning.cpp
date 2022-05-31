@@ -96,7 +96,11 @@ PlanningResult AutoParkingPlanner::planPreparkingRoute() const
     if (this->previousRouteFinished()) {
       const std::string message = "Reached the terminal of a circular trajectory";
       RCLCPP_INFO_STREAM(get_logger(), message);
-      return PlanningResult{true, ParkingMissionPlan::Request::CIRCULAR, HADMapRoute(), message};
+
+      // because previous_route__could not finished yet in this phase, we want to finish this route
+      // in the next phase
+      const auto route_next = *previous_route_;
+      return PlanningResult{true, ParkingMissionPlan::Request::CIRCULAR, route_next, message};
     }
 
     const auto current_pose = getEgoVehiclePose();

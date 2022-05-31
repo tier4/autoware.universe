@@ -177,9 +177,8 @@ bool AutoParkingPlanner::previousRouteFinished() const
 {
   const double dist_error =
     tier4_autoware_utils::calcDistance2d(getEgoVehiclePose(), previous_route_->goal_pose);
-  // RCLCPP_INFO_STREAM(get_logger(), "dist error:" << dist_error);
-  // RCLCPP_INFO_STREAM(get_logger(), "aw state:" << sub_msgs_.state_ptr->state);
   if (sub_msgs_.state_ptr->state == AutowareState::WAITING_FOR_ROUTE) {
+    RCLCPP_INFO_STREAM(get_logger(), "current distance error is " << dist_error);
     if (dist_error < 1.5) {
       RCLCPP_INFO_STREAM(get_logger(), "preivous route finished!");
       return true;
@@ -201,9 +200,8 @@ bool AutoParkingPlanner::waitUntilPreviousRouteFinished() const
     }
   }
 
-  RCLCPP_INFO_STREAM(get_logger(), "waiting for preivous route finished...");
   while (!previousRouteFinished()) {
-    RCLCPP_INFO_STREAM(get_logger(), "waiting now...");
+    RCLCPP_INFO_STREAM(get_logger(), "waiting for preivous route finished...");
     rclcpp::sleep_for(std::chrono::milliseconds(300));
   }
   RCLCPP_INFO_STREAM(get_logger(), "completed preivous route!");
