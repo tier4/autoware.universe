@@ -56,7 +56,7 @@ std::set<int64_t> getLaneIdSetOnPath(const autoware_auto_planning_msgs::msg::Pat
 }  // namespace
 
 BlindSpotModuleManager::BlindSpotModuleManager(rclcpp::Node & node)
-: SceneModuleManagerInterface(node, getModuleName()), rtc_interface_(node, "blind_spot")
+: SceneModuleManagerInterfaceWithRTC(node, getModuleName())
 {
   const std::string ns(getModuleName());
   planner_param_.use_pass_judge_line = node.declare_parameter(ns + ".use_pass_judge_line", false);
@@ -102,27 +102,6 @@ BlindSpotModuleManager::getModuleExpiredFunction(
   return [lane_id_set](const std::shared_ptr<SceneModuleInterface> & scene_module) {
     return lane_id_set.count(scene_module->getModuleId()) == 0;
   };
-}
-
-bool BlindSpotModuleManager::getActivation(const UUID & uuid)
-{
-  return rtc_interface_.isActivated(uuid);
-}
-
-void BlindSpotModuleManager::updateRTCStatus(
-  const UUID & uuid, const bool safe, const double distance, const Time & stamp)
-{
-  rtc_interface_.updateCooperateStatus(uuid, safe, distance, stamp);
-}
-
-void BlindSpotModuleManager::removeRTCStatus(const UUID & uuid)
-{
-  rtc_interface_.removeCooperateStatus(uuid);
-}
-
-void BlindSpotModuleManager::publishRTCStatus(const Time & stamp)
-{
-  rtc_interface_.publishCooperateStatus(stamp);
 }
 
 }  // namespace behavior_velocity_planner
