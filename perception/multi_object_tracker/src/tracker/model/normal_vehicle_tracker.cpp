@@ -76,6 +76,7 @@ NormalVehicleTracker::NormalVehicleTracker(
   X(IDX::Y) = object.kinematics.pose_with_covariance.pose.position.y;
   X(IDX::YAW) = tf2::getYaw(object.kinematics.pose_with_covariance.pose.orientation);
   if (object.kinematics.has_twist) {
+    std::cerr << "Radar Data Is Included" << std::endl;
     X(IDX::VX) = object.kinematics.twist_with_covariance.twist.linear.x;
     X(IDX::WZ) = object.kinematics.twist_with_covariance.twist.angular.z;
   } else {
