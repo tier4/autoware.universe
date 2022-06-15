@@ -91,28 +91,32 @@ bool isInLane(
   using lanelet::BasicPoint2d;
   using lanelet::BoundingBox2d;
 
-  const lanelet::Point3d search_point(
-    lanelet::InvalId, current_pos.x, current_pos.y, current_pos.z);
+  const lanelet::Point2d search_point(lanelet::InvalId, current_pos.x, current_pos.y);
 
-  const double search_width = 5;  // [m]
+  const double search_width = 20;  // [m]
   const auto search_box = BoundingBox2d(
     BasicPoint2d(current_pos.x - search_width, current_pos.y - search_width),
     BasicPoint2d(current_pos.x + search_width, current_pos.y + search_width));
-  const lanelet::Lanelets llts_near =
-    lanelet_map_ptr->laneletLayer.search(search_box);  // NOTE not ConstLanelets
 
-  // NOTE that checking nearest lanelet is insufficient. so..
-  for (const lanelet::Lanelet & llt : llts_near) {
-    if (llt.hasAttribute(lanelet::AttributeName::Subtype)) {
-      lanelet::Attribute attr = llt.attribute(lanelet::AttributeName::Subtype);
-      if (attr.value() == lanelet::AttributeValueString::Road) {
-        if (lanelet::geometry::within(search_point, llt.polygon3d())) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
+  const auto load_contains_search_point =
+    [&search_point](const BoundingBox2d & llt_box, const lanelet::Lanelet & llt) -> bool {
+    // filter only road lanelets
+    if (!llt.hasAttribute(lanelet::AttributeName::Subtype)) return false;
+    const lanelet::Attribute & attr = llt.attribute(lanelet::AttributeName::Subtype);
+    if (attr.value() != lanelet::AttributeValueString::Road) return false;
+
+    // pre-screening out if outside of the bounding box
+    const bool is_inside_bbox = lanelet::geometry::within(search_point, llt_box);
+    if (!is_inside_bbox) return false;
+
+    // main predicate
+    const bool is_inside = lanelet::geometry::within(search_point, llt.polygon2d());
+    return is_inside;
+  };
+
+  const auto resutl =
+    lanelet_map_ptr->laneletLayer.searchUntil(search_box, load_contains_search_point);
+  return (resutl != boost::none);
 }
 
 bool isInParkingLot(
