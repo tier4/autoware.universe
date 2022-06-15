@@ -87,8 +87,6 @@ bool isInLane(
   const std::shared_ptr<lanelet::LaneletMap> & lanelet_map_ptr,
   const geometry_msgs::msg::Point & current_pos)
 {
-  using lanelet::BasicPoint2d;
-  using lanelet::BoundingBox2d;
 
   const lanelet::Point2d search_point(lanelet::InvalId, current_pos.x, current_pos.y);
 
