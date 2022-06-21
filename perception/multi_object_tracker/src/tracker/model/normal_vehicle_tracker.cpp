@@ -49,7 +49,7 @@ NormalVehicleTracker::NormalVehicleTracker(
   float r_stddev_x = 1.0;                                     // object coordinate [m]
   float r_stddev_y = 0.3;                                     // object coordinate [m]
   float r_stddev_yaw = tier4_autoware_utils::deg2rad(30);     // map coordinate [rad]
-  float r_stddev_vx = 1.0;                                    // object coordinate [m/s]
+  float r_stddev_vx = 0.5;                                    // object coordinate [m/s]
   float p0_stddev_x = 1.0;                                    // object coordinate [m/s]
   float p0_stddev_y = 0.3;                                    // object coordinate [m/s]
   float p0_stddev_yaw = tier4_autoware_utils::deg2rad(30);    // map coordinate [rad]
@@ -288,6 +288,7 @@ bool NormalVehicleTracker::measureWithPose(
   }
 
   if (object.kinematics.has_twist) {
+    std::cerr << "Has Twist from Radar" << std::endl;
     Y(IDX::VX, 0) = object.kinematics.twist_with_covariance.twist.linear.x;
     C(3, IDX::VX) = 1.0;  // for vx
 
