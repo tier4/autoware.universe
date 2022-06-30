@@ -3,10 +3,10 @@
 A demo video of the auto parking in planning simulater:
 for full instruction, plase see the document below.
 
-https://user-images.githubusercontent.com/38597814/171078936-418b7ace-40e4-4e52-9148-b3ca19096c10.mp4
+<https://user-images.githubusercontent.com/38597814/171078936-418b7ace-40e4-4e52-9148-b3ca19096c10.mp4>
 
 The original video can be found here (tier4 internal):
-https://drive.google.com/file/d/12vGfLPoGXqsztcAAJToqDEV1wgXsJtBH/view?usp=sharing
+<https://drive.google.com/file/d/12vGfLPoGXqsztcAAJToqDEV1wgXsJtBH/view?usp=sharing>
 
 ## Input topics
 
@@ -18,9 +18,11 @@ https://drive.google.com/file/d/12vGfLPoGXqsztcAAJToqDEV1wgXsJtBH/view?usp=shari
 | `~/input/trajectory`      | autoware_auto_planning_msgs::Trajectory    | trajectory which will be used to determine lookahead point |
 
 ## Service requesting from this node
+
 `start_poses` と `goal_poses`と`successes`は全て同じ長さである必要があります.
 
 autoware_parking_srvs/FreespacePlan.srv
+
 ```
 geometry_msgs/PoseStamped[] start_poses # sequence of start poses of each planning problem
 geometry_msgs/PoseStamped[] goal_poses # corresponding goal poses to each element of start pose
@@ -32,6 +34,7 @@ bool[] successes  # return each planning problem was solved
 ## Service response from this node
 
 autoware_parking_srvs/parkingMissionPlan.srv
+
 ```
 string CIRCULAR=circular
 string PREPARKING=preparking
@@ -100,7 +103,7 @@ git checkout feature/autoparking
 
 あとは, pilot-auto/feature/autoparking の`README.md`を参照してください. (map 等のダウンロードもここで行われます.)
 
-### 駐車所のレーンにループがない場合のデモ (psimのデフォルト地図)
+### 駐車所のレーンにループがない場合のデモ (psim のデフォルト地図)
 
 - plannin simulater をたちあげる.
   ros2 launch autoware_launch planning_simulator.launch.xml map_path:=/home/h-ishida/Downloads/sample_map vehicle_model:=lexus sensor_model:=aip_xx1
@@ -119,19 +122,22 @@ ros2 service call /planning/mission_planning/service/autopark std_srvs/srv/Trigg
 ros2 topic pub --once /autoware/engage autoware_auto_vehicle_msgs/msg/Engage "engage: true"
 ```
 
-### 駐車場のレーンにループがある場合のデモ  
-以下からosmマップをダウンロードして, 適当なmapファイルに置く. 点群はなくてもosmさえあればsimulatorは起動できる. 
-https://drive.google.com/file/d/1O87YxNXF8apw6qwTZvWGNBx7PiI6AhFv/view?usp=sharing
+### 駐車場のレーンにループがある場合のデモ
 
-no loop caseと同じように動かす (サービスコールして, engageをpublishする). 以下のデモ動画では, pakring space (osmファイルの編集方法がわからずかなり小さくなってしまい見えない)が一つあるが, circularを繰り返す挙動を確かめるために, parking spaceの位置にpedestrianを置いている. circular -> preparking -> circular -> ... を正常に繰り返していることがわかる. 
-デモ動画: 
+以下の osmmap を使う: `auto_parking_planner/osmmap/office2f_rescaled.osm` 点群はなくても osm さえあれば simulator は起動できる.
+<https://drive.google.com/file/d/1O87YxNXF8apw6qwTZvWGNBx7PiI6AhFv/view?usp=sharing>
 
-https://user-images.githubusercontent.com/38597814/171085401-dc9ecdd0-611e-45a5-8331-cdffb3ee02d8.mp4
+no loop case と同じように動かす (サービスコールして, engage を publish する). 以下のデモ動画では, pakring space (osm ファイルの編集方法がわからずかなり小さくなってしまい見えない)が一つあるが, circular を繰り返す挙動を確かめるために, parking space の位置に pedestrian を置いている. circular -> preparking -> circular -> ... を正常に繰り返していることがわかる.
+デモ動画:
 
+<https://user-images.githubusercontent.com/38597814/171085401-dc9ecdd0-611e-45a5-8331-cdffb3ee02d8.mp4>
 
-### Circular Planningのコアアルゴリズムのユニットテスト
-circular planningの中のコアなアルゴリズムは, 可読性と単体テストのために, 駐車関連の実装とは切り離して`include/circular_graph.hpp`内の`CircularGraphBase`に置いてあります. このアルゴリズムのunit testは以下で実行できます. (テストPass確認済み)
+### Circular Planning のコアアルゴリズムのユニットテスト
+
+circular planning の中のコアなアルゴリズムは, 可読性と単体テストのために, 駐車関連の実装とは切り離して`include/circular_graph.hpp`内の`CircularGraphBase`に置いてあります. このアルゴリズムの unit test は以下で実行できます. (テスト Pass 確認済み)
+
 ```
 colcon test --packages-select auto_parking_planner
 ```
-(unit test)[test/src/test_circular_graph.cpp]のテストケースのうち`CircularGraph::LoopCase`は上の`Case With Loop`と題されたポンチ絵のグラフに対応しており, `CircularGraph::WithoutLoopCase`は`Case without loop`ｔと題されたポンチ絵のグラフに対応してることを踏まえてテストコードを読むと, `CircularGraphBase`のそれぞれのメソッドの入出力がわかりやすいと思います.
+
+[unit test](test/src/test_circular_graph.cpp)のテストケースのうち`CircularGraph::LoopCase`は上の`Case With Loop`と題されたポンチ絵のグラフに対応しており, `CircularGraph::WithoutLoopCase`は`Case without loop`ｔと題されたポンチ絵のグラフに対応してることを踏まえてテストコードを読むと, `CircularGraphBase`のそれぞれのメソッドの入出力がわかりやすいと思います.
