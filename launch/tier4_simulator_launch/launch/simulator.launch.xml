@@ -42,6 +42,11 @@
     <!-- object recognition -->
     <group if="$(var perception/enable_object_recognition)">
       <push-ros-namespace namespace="object_recognition"/>
+      <!-- DetectionByTracker -->
+      <group>
+        <push-ros-namespace namespace="detection_by_tracker"/>
+        <include file="$(find-pkg-share detection_by_tracker)/launch/detection_by_tracker.launch.xml"/>
+      </group>
       <!-- tracking module -->
       <group>
         <push-ros-namespace namespace="tracking"/>
