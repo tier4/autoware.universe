@@ -199,8 +199,8 @@ void AutowareScreenCapturePanel::update()
 void AutowareScreenCapturePanel::save(rviz_common::Config config) const
 {
   Panel::save(config);
-  config.mapSetValue("width", &width_);
-  config.mapSetValue("height", &height_);
+  config.mapSetValue("width", width_);
+  config.mapSetValue("height", height_);
 }
 
 void AutowareScreenCapturePanel::load(const rviz_common::Config & config)
