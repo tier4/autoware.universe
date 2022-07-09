@@ -168,14 +168,14 @@ double calcLateralError(
   return lat_err;
 }
 
-Eigen::Vector2d getState(
+Eigen::Vector3d getState(
   const geometry_msgs::msg::Pose & target_pose, const geometry_msgs::msg::Pose & ref_pose)
 {
   const double lat_error = calcLateralError(target_pose.position, ref_pose);
   const double yaw_error = tier4_autoware_utils::normalizeRadian(
     tf2::getYaw(target_pose.orientation) - tf2::getYaw(ref_pose.orientation));
-  Eigen::VectorXd kinematics = Eigen::VectorXd::Zero(2);
-  kinematics << lat_error, yaw_error;
+  Eigen::VectorXd kinematics = Eigen::VectorXd::Zero(3);
+  kinematics << lat_error, yaw_error, 0.0;
   return kinematics;
 }
 
@@ -200,8 +200,8 @@ MPTOptimizer::MPTOptimizer(
   traj_param_(traj_param),
   vehicle_param_(vehicle_param),
   mpt_param_(mpt_param),
-  vehicle_model_ptr_(
-    std::make_unique<KinematicsBicycleModel>(vehicle_param_.wheelbase, mpt_param_.max_steer_rad)),
+  // vehicle_model_ptr_(
+  //   std::make_unique<KinematicsBicycleModel>(vehicle_param_.wheelbase, mpt_param_.max_steer_rad)),
   osqp_solver_ptr_(std::make_unique<autoware::common::osqp::OSQPInterface>(osqp_epsilon_))
 {
 }
@@ -555,8 +555,8 @@ MPTOptimizer::MPTMatrix MPTOptimizer::generateMPTMatrix(
   // vehicle_model_ptr_->updateCenterOffset(0.0);
 
   const size_t N_ref = ref_points.size();
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; // vehicle_model_ptr_->getDimU();
   const size_t D_v = D_x + D_u * (N_ref - 1);
 
   Eigen::MatrixXd Bex = Eigen::MatrixXd::Zero(D_x * N_ref, D_v);
@@ -587,8 +587,12 @@ MPTOptimizer::MPTMatrix MPTOptimizer::generateMPTMatrix(
 
     // get discrete kinematics matrix A, B, W
     const double ref_k = ref_points.at(std::max(0, static_cast<int>(i) - 1)).k;
-    vehicle_model_ptr_->setCurvature(ref_k);
-    vehicle_model_ptr_->calculateStateEquationMatrix(Ad, Bd, Wd, ds);
+    // vehicle_model_ptr_->setCurvature(ref_k);
+    // vehicle_model_ptr_->calculateStateEquationMatrix(Ad, Bd, Wd, ds);
+    Ad << 1, ds, std::pow(ds, 2) / 2.0,
+      0, 1, ds,
+      0, 0, 1;
+    Bd << std::pow(ds, 3) / 6.0, std::pow(ds, 2) / 2.0, ds;
 
     Bex.block(idx_x_i, 0, D_x, D_x) = Ad * Bex.block(idx_x_i_prev, 0, D_x, D_x);
     Bex.block(idx_x_i, D_x + idx_u_i_prev, D_x, D_u) = Bd;
@@ -622,8 +626,8 @@ MPTOptimizer::ValueMatrix MPTOptimizer::generateValueMatrix(
 
   stop_watch_.tic(__func__);
 
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; // vehicle_model_ptr_->getDimU();
   const size_t N_ref = ref_points.size();
 
   const size_t D_v = D_x + (N_ref - 1) * D_u;
@@ -672,6 +676,8 @@ MPTOptimizer::ValueMatrix MPTOptimizer::generateValueMatrix(
     Qex_triplet_vec.push_back(Eigen::Triplet<double>(i * D_x, i * D_x, adaptive_lat_error_weight));
     Qex_triplet_vec.push_back(
       Eigen::Triplet<double>(i * D_x + 1, i * D_x + 1, adaptive_yaw_error_weight));
+    Qex_triplet_vec.push_back(
+      Eigen::Triplet<double>(i * D_x + 2, i * D_x + 2, mpt_param_.steer_input_weight));
   }
   Qex_sparse_mat.setFromTriplets(Qex_triplet_vec.begin(), Qex_triplet_vec.end());
 
@@ -679,13 +685,14 @@ MPTOptimizer::ValueMatrix MPTOptimizer::generateValueMatrix(
   Eigen::SparseMatrix<double> Rex_sparse_mat(D_v, D_v);
   std::vector<Eigen::Triplet<double>> Rex_triplet_vec;
   for (size_t i = 0; i < N_ref - 1; ++i) {
-    const double adaptive_steer_weight = ref_points.at(i).near_objects
-                                           ? mpt_param_.obstacle_avoid_steer_input_weight
-                                           : mpt_param_.steer_input_weight;
+    // const double adaptive_steer_weight = ref_points.at(i).near_objects
+    //                                        ? mpt_param_.obstacle_avoid_steer_input_weight
+    //                                        : mpt_param_.steer_input_weight;
+    const double adaptive_steer_weight = mpt_param_.steer_rate_weight;
     Rex_triplet_vec.push_back(
       Eigen::Triplet<double>(D_x + D_u * i, D_x + D_u * i, adaptive_steer_weight));
   }
-  addSteerWeightR(Rex_triplet_vec, ref_points);
+  // addSteerWeightR(Rex_triplet_vec, ref_points);
 
   Rex_sparse_mat.setFromTriplets(Rex_triplet_vec.begin(), Rex_triplet_vec.end());
 
@@ -720,7 +727,7 @@ boost::optional<Eigen::VectorXd> MPTOptimizer::executeOptimization(
   Eigen::VectorXd u0 = Eigen::VectorXd::Zero(obj_m.gradient.size());
 
   if (mpt_param_.enable_manual_warm_start) {
-    const size_t D_x = vehicle_model_ptr_->getDimX();
+    const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
 
     if (prev_trajs && prev_trajs->mpt_ref_points.size() > 1) {
       const size_t seg_idx =
@@ -813,8 +820,8 @@ boost::optional<Eigen::VectorXd> MPTOptimizer::executeOptimization(
   // get result
   std::vector<double> result_vec = std::get<0>(result);
 
-  const size_t DIM_U = vehicle_model_ptr_->getDimU();
-  const size_t DIM_X = vehicle_model_ptr_->getDimX();
+  const size_t DIM_U = 1; //vehicle_model_ptr_->getDimU();
+  const size_t DIM_X = 3; //vehicle_model_ptr_->getDimX();
   const Eigen::VectorXd optimized_control_variables =
     Eigen::Map<Eigen::VectorXd>(&result_vec[0], DIM_X + (N_ref - 1) * DIM_U);
 
@@ -835,8 +842,8 @@ MPTOptimizer::ObjectiveMatrix MPTOptimizer::getObjectiveMatrix(
 {
   stop_watch_.tic(__func__);
 
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; // vehicle_model_ptr_->getDimU();
   const size_t N_ref = ref_points.size();
 
   const size_t D_xn = D_x * N_ref;
@@ -933,8 +940,8 @@ MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
 
   // NOTE: currently, add additional length to soft bounds approximately
   //       for soft second and hard bounds
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; // vehicle_model_ptr_->getDimU();
   const size_t N_ref = ref_points.size();
 
   const size_t N_u = (N_ref - 1) * D_u;
@@ -1126,8 +1133,8 @@ std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> MPTOptimizer::get
   std::vector<ReferencePoint> & non_fixed_ref_points, const Eigen::VectorXd & Uex,
   const MPTMatrix & mpt_mat, std::shared_ptr<DebugData> debug_data_ptr)
 {
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; //vehicle_model_ptr_->getDimU();
   const size_t N_ref = static_cast<size_t>(Uex.rows() - D_x) + 1;
 
   stop_watch_.tic(__func__);
@@ -1141,7 +1148,7 @@ std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> MPTOptimizer::get
     yaw_error_vec.push_back(ref_point.fix_kinematic_state.get()(1));
   }
 
-  const size_t N_kinematic_state = vehicle_model_ptr_->getDimX();
+  const size_t N_kinematic_state = 3; //vehicle_model_ptr_->getDimX();
   const Eigen::VectorXd Xex = mpt_mat.Bex * Uex + mpt_mat.Wex;
 
   for (size_t i = 0; i < non_fixed_ref_points.size(); ++i) {
@@ -1165,7 +1172,7 @@ std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> MPTOptimizer::get
     debug_data_ptr->mpt_ref_poses.push_back(ref_pose);
     debug_data_ptr->lateral_errors.push_back(lat_error);
 
-    ref_point.optimized_kinematic_state << lat_error_vec.at(i), yaw_error_vec.at(i);
+    ref_point.optimized_kinematic_state << lat_error_vec.at(i), yaw_error_vec.at(i), 0.0;
     if (i >= fixed_ref_points.size()) {
       const size_t j = i - fixed_ref_points.size();
       if (j == N_ref - 1) {
@@ -1335,8 +1342,8 @@ void MPTOptimizer::addSteerWeightR(
   std::vector<Eigen::Triplet<double>> & Rex_triplet_vec,
   const std::vector<ReferencePoint> & ref_points) const
 {
-  const size_t D_x = vehicle_model_ptr_->getDimX();
-  const size_t D_u = vehicle_model_ptr_->getDimU();
+  const size_t D_x = 3; // vehicle_model_ptr_->getDimX();
+  const size_t D_u = 1; // vehicle_model_ptr_->getDimU();
   const size_t N_ref = ref_points.size();
   const size_t N_u = (N_ref - 1) * D_u;
   const size_t D_v = D_x + N_u;

@@ -126,9 +126,9 @@ struct ReferencePoint
   // NOTE: fix_kinematic_state is used for two purposes
   //       one is fixing points around ego for stability
   //       second is fixing current ego pose when no velocity for planning from ego pose
-  boost::optional<Eigen::Vector2d> fix_kinematic_state = boost::none;
+  boost::optional<Eigen::Vector3d> fix_kinematic_state = boost::none;
   bool plan_from_ego = false;
-  Eigen::Vector2d optimized_kinematic_state;
+  Eigen::Vector3d optimized_kinematic_state;
   double optimized_input;
 
   //
@@ -186,7 +186,7 @@ private:
   TrajectoryParam traj_param_;
   VehicleParam vehicle_param_;
   MPTParam mpt_param_;
-  std::unique_ptr<VehicleModelInterface> vehicle_model_ptr_;
+  // std::unique_ptr<VehicleModelInterface> vehicle_model_ptr_;
   std::unique_ptr<autoware::common::osqp::OSQPInterface> osqp_solver_ptr_;
 
   geometry_msgs::msg::Pose current_ego_pose_;
