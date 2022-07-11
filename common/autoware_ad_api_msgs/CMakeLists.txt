@@ -6,6 +6,9 @@ autoware_package()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   srv/InterfaceVersion.srv
+  common/msg/ResponseStatus.msg
+  system/srv/MRMOperation.srv
+  system/msg/MRMStatus.msg
   DEPENDENCIES
     builtin_interfaces
     std_msgs
