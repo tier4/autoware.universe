@@ -9,6 +9,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   common/msg/ResponseStatus.msg
   system/srv/MRMOperation.srv
   system/msg/MRMStatus.msg
+  system/msg/MRMBehaviorStatus.msg
   DEPENDENCIES
     builtin_interfaces
     std_msgs
