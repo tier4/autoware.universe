@@ -522,11 +522,9 @@ AckermannControlCommand VehicleCmdGate::createEmergencyStopControlCmd() const
   return cmd;
 }
 
-void VehicleCmdGate::onEmergencyState(EmergencyState::ConstSharedPtr msg)
+void VehicleCmdGate::onEmergencyState(EmergencyState::ConstSharedPtr  /*msg*/)
 {
-  is_system_emergency_ = (msg->state == EmergencyState::MRM_OPERATING) ||
-                         (msg->state == EmergencyState::MRM_SUCCEEDED) ||
-                         (msg->state == EmergencyState::MRM_FAILED);
+  is_system_emergency_ = false;
   emergency_state_heartbeat_received_time_ = std::make_shared<rclcpp::Time>(this->now());
 }
 
