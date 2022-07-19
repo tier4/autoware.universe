@@ -279,8 +279,7 @@ void VehicleCmdGate::onTimer()
 
   // Check system emergency heartbeat
   if (use_emergency_handling_) {
-    is_emergency_state_heartbeat_timeout_ = isHeartbeatTimeout(
-      emergency_state_heartbeat_received_time_, system_emergency_heartbeat_timeout_);
+    is_emergency_state_heartbeat_timeout_ = false;
 
     if (is_emergency_state_heartbeat_timeout_) {
       RCLCPP_WARN_THROTTLE(
@@ -522,9 +521,11 @@ AckermannControlCommand VehicleCmdGate::createEmergencyStopControlCmd() const
   return cmd;
 }
 
-void VehicleCmdGate::onEmergencyState(EmergencyState::ConstSharedPtr  /*msg*/)
+void VehicleCmdGate::onEmergencyState(EmergencyState::ConstSharedPtr msg)
 {
-  is_system_emergency_ = false;
+  is_system_emergency_ = (msg->state == EmergencyState::MRM_OPERATING) ||
+                         (msg->state == EmergencyState::MRM_SUCCEEDED) ||
+                         (msg->state == EmergencyState::MRM_FAILED);
   emergency_state_heartbeat_received_time_ = std::make_shared<rclcpp::Time>(this->now());
 }
 

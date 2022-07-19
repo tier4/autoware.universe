@@ -166,7 +166,7 @@ void EmergencyHandler::publishControlCommands()
     msg.stamp = stamp;
     msg.lateral.stamp = stamp;
     msg.longitudinal.stamp = stamp;
-    pub_control_command_->publish(msg);
+    // pub_control_command_->publish(msg);
   }
 
   // Publish hazard command
