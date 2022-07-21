@@ -47,6 +47,7 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
       deg2rad(declare_parameter("vertical_grid_resolution_angle_", 0.5));
     vertical_grid_resolution_distance_ =
       static_cast<float>(declare_parameter("vertical_grid_resolution_distance", 0.1));
+    num_gnd_grids_reference_ = static_cast<int>(declare_parameter("num_gnd_grids_reference",10));
     base_frame_ = declare_parameter("base_frame", "base_link");
     global_slope_max_angle_rad_ = deg2rad(declare_parameter("global_slope_max_angle_deg", 8.0));
     local_slope_max_angle_rad_ = deg2rad(declare_parameter("local_slope_max_angle_deg", 6.0));
@@ -98,6 +99,7 @@ void ScanGroundFilterComponent::convertPointcloud(
 {
   out_radial_ordered_points.resize(radial_dividers_num_);
   PointRef current_point;
+  float vitual_lidar_height = 2.5f;
 
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
     auto radius{static_cast<float>(std::hypot(in_cloud->points[i].x, in_cloud->points[i].y))};
@@ -105,6 +107,11 @@ void ScanGroundFilterComponent::convertPointcloud(
     auto radial_div{static_cast<size_t>(std::floor(theta / radial_divider_angle_rad_))};
     uint16_t grid_id = static_cast<uint16_t>(radius / vertical_grid_resolution_distance_);
     float grid_radius = static_cast<float>((grid_id - 2) * vertical_grid_resolution_distance_);
+
+    // divide by angle 
+    // auto gama{normalizeRadian(std::atan2(radius,vitual_lidar_height),0.0f)};
+    // uint16_t grid_id = static_cast<uint16_t>(std::floor(gama / vertical_grid_resolution_angle_rad_));
+    // float grid_radius = static_cast<float>(std::atan((grid_id - 2)*vertical_grid_resolution_angle_rad_));
 
     current_point.grid_id = grid_id;
     current_point.grid_radius = grid_radius;
@@ -154,8 +161,6 @@ void ScanGroundFilterComponent::classifyPointCloud(
     non_ground_cluster.initialize();
     std::vector<float> prev_gnd_grid_height;
     std::vector<float> prev_gnd_grid_radius;
-    prev_gnd_grid_height.push_back(0.0f);
-    prev_gnd_grid_radius.push_back(0.0f);
 
     // check empty ray:
     if (in_radial_ordered_clouds[i].size() == 0) {
@@ -171,6 +176,10 @@ void ScanGroundFilterComponent::classifyPointCloud(
     float global_slope_rad;  // angle between current point and initial gnd point compared with
                              // horizontal plane
     global_slope_rad = std::atan2(p->orig_point->z, p->radius);
+    for (int j = 0; j < static_cast<int>(p->grid_radius / vertical_grid_resolution_distance_); j++){
+      prev_gnd_grid_height.push_back(0.0f);
+      prev_gnd_grid_radius.push_back(0.0f);
+    }
     float local_gap_height;  // related height between current point and prev ground level
     local_gap_height = p->orig_point->z - prev_gnd_grid_height.back();
 
@@ -208,10 +217,12 @@ void ScanGroundFilterComponent::classifyPointCloud(
             prev_p->grid_radius);  // use the origin of grid for radius refererence
           ground_cluster.initialize();
 
-          float prev_gnd_gap_height =
-            prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2);
-          float prev_gnd_gap_radius =
-            prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2);
+          float prev_gnd_gap_height = 0;
+          float prev_gnd_gap_radius = 0;
+          for (int prev_grid_id = 0; prev_grid_id < num_gnd_grids_reference_; prev_grid_id++){
+            prev_gnd_gap_height += prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2 - prev_grid_id);
+            prev_gnd_gap_radius += prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2 - prev_grid_id);
+          }
           prev_local_slope_rad = std::atan2(prev_gnd_gap_height, prev_gnd_gap_radius);
         }
       }

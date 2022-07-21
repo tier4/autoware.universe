@@ -126,6 +126,7 @@ private:
   float min_height_detection_range_;
   float vertical_grid_resolution_angle_rad_;
   float vertical_grid_resolution_distance_;
+  int num_gnd_grids_reference_ = 10;
 
   double global_slope_max_angle_rad_;       // radians
   double local_slope_max_angle_rad_;        // radians
