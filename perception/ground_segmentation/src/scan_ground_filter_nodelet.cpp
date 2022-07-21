@@ -37,6 +37,16 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
 {
   // set initial parameters
   {
+    non_ground_height_threshold_ =
+      static_cast<float>(declare_parameter("non_ground_height_threshold", 0.15));
+    max_height_detection_range_ =
+      static_cast<float>(declare_parameter("max_height_detection_range", 2.5));
+    min_height_detection_range_ =
+      static_cast<float>(declare_parameter("min_height_detection_range", 0.0));
+    vertical_grid_resolution_angle_rad_ =
+      deg2rad(declare_parameter("vertical_grid_resolution_angle_", 0.5));
+    vertical_grid_resolution_distance_ =
+      static_cast<float>(declare_parameter("vertical_grid_resolution_distance", 0.1));
     base_frame_ = declare_parameter("base_frame", "base_link");
     global_slope_max_angle_rad_ = deg2rad(declare_parameter("global_slope_max_angle_deg", 8.0));
     local_slope_max_angle_rad_ = deg2rad(declare_parameter("local_slope_max_angle_deg", 6.0));
@@ -47,7 +57,12 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     radial_dividers_num_ = std::ceil(2.0 * M_PI / radial_divider_angle_rad_);
     vehicle_info_ = VehicleInfoUtil(*this).getVehicleInfo();
   }
-
+  ground_pcl_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
+    "debug/ground_pointcloud", rclcpp::SensorDataQoS());
+  unknown_pcl_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
+    "debug/unknown_pointcloud", rclcpp::SensorDataQoS());
+  under_ground_pcl_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
+    "debug/underground_pointcloud", rclcpp::SensorDataQoS());
   using std::placeholders::_1;
   set_param_res_ = this->add_on_set_parameters_callback(
     std::bind(&ScanGroundFilterComponent::onParameter, this, _1));
@@ -88,7 +103,11 @@ void ScanGroundFilterComponent::convertPointcloud(
     auto radius{static_cast<float>(std::hypot(in_cloud->points[i].x, in_cloud->points[i].y))};
     auto theta{normalizeRadian(std::atan2(in_cloud->points[i].x, in_cloud->points[i].y), 0.0)};
     auto radial_div{static_cast<size_t>(std::floor(theta / radial_divider_angle_rad_))};
+    uint16_t grid_id = static_cast<uint16_t>(radius / vertical_grid_resolution_distance_);
+    float grid_radius = static_cast<float>((grid_id - 2) * vertical_grid_resolution_distance_);
 
+    current_point.grid_id = grid_id;
+    current_point.grid_radius = grid_radius;
     current_point.radius = radius;
     current_point.theta = theta;
     current_point.radial_div = radial_div;
@@ -113,6 +132,146 @@ void ScanGroundFilterComponent::calcVirtualGroundOrigin(pcl::PointXYZ & point)
   point.x = vehicle_info_.wheel_base_m;
   point.y = 0;
   point.z = 0;
+}
+void ScanGroundFilterComponent::classifyPointCloud(
+  std::vector<PointCloudRefVector> & in_radial_ordered_clouds,
+  pcl::PointIndices & out_no_ground_indices, pcl::PointIndices & out_ground_indices,
+  pcl::PointIndices & out_unknown_indices, pcl::PointIndices & out_underground_indices)
+{
+  out_no_ground_indices.indices.clear();
+  out_ground_indices.indices.clear();
+  out_unknown_indices.indices.clear();
+  out_underground_indices.indices.clear();
+
+  for (size_t i = 0; i < in_radial_ordered_clouds.size(); i++) {
+    // initialize the gnd_point(0,0,0)
+    float prev_gnd_height = 0.0f;
+    float prev_gn_grid_radius = 0.0f;  // origin of previous gnd point cloud
+    float prev_local_slope_rad = 0.0f;
+    uint16_t prev_gnd_grid_id = 0;
+    PointsCentroid ground_cluster, non_ground_cluster;
+    ground_cluster.initialize();
+    non_ground_cluster.initialize();
+    std::vector<float> prev_gnd_grid_height;
+    std::vector<float> prev_gnd_grid_radius;
+    prev_gnd_grid_height.push_back(0.0f);
+    prev_gnd_grid_radius.push_back(0.0f);
+
+    // check empty ray:
+    if (in_radial_ordered_clouds[i].size() == 0) {
+      continue;
+    }
+
+    // check the first point in ray
+    auto * p = &in_radial_ordered_clouds[i][0];  // in_radial_ordered_clouds[i].front();
+    PointRef * prev_p;
+    prev_p = &in_radial_ordered_clouds[i][0];  // for checking the distance to prev point
+    // float distance_to_prev = calcDistance3d(p->orig_point,prev_p->orig_point);
+
+    float global_slope_rad;  // angle between current point and initial gnd point compared with
+                             // horizontal plane
+    global_slope_rad = std::atan2(p->orig_point->z, p->radius);
+    float local_gap_height;  // related height between current point and prev ground level
+    local_gap_height = p->orig_point->z - prev_gnd_grid_height.back();
+
+    float local_gap_radius;  // distance between current point and previous ground pcl center in xy
+                             // plane
+    local_gap_radius = p->radius - prev_gnd_grid_radius.back();
+
+    float local_slope_rad;  // angle between current point and previous ground pcl center compared
+                            // with horizontal plane
+    local_slope_rad = std::atan2(local_gap_height, local_gap_radius);
+
+    // Assume only GROUND and NON-GROUND classes for the first point of the ray, no underground
+    // point
+    if (
+      (local_slope_rad < global_slope_max_angle_rad_) ||
+      (local_gap_height < non_ground_height_threshold_)) {
+      ground_cluster.addPoint(p->radius, p->orig_point->z);
+      p->point_state = PointLabel::GROUND;
+      out_ground_indices.indices.push_back(p->orig_index);
+    } else {
+      non_ground_cluster.addPoint(p->radius, p->orig_point->z);
+      p->point_state = PointLabel::NON_GROUND;
+      out_no_ground_indices.indices.push_back(p->orig_index);
+    }
+
+    // loop from the second point in the ray
+    for (size_t j = 1; j < in_radial_ordered_clouds[i].size(); j++) {
+      auto * p = &in_radial_ordered_clouds[i][j];
+      // check if point in a new grid then update ground_cluster and prev_gnd_xx
+      if (p->grid_id > prev_p->grid_id) {
+        // check if prev grid had ground point:
+        if (ground_cluster.getAverageRadius() > 0.0) {
+          prev_gnd_grid_height.push_back(ground_cluster.getAverageHeight());
+          prev_gnd_grid_radius.push_back(
+            prev_p->grid_radius);  // use the origin of grid for radius refererence
+          ground_cluster.initialize();
+
+          float prev_gnd_gap_height =
+            prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2);
+          float prev_gnd_gap_radius =
+            prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2);
+          prev_local_slope_rad = std::atan2(prev_gnd_gap_height, prev_gnd_gap_radius);
+        }
+      }
+
+      local_gap_height = p->orig_point->z - prev_gnd_grid_height.back();
+      local_gap_radius = p->radius - prev_gnd_grid_radius.back();
+      local_slope_rad = std::atan2(local_gap_height, local_gap_radius);
+
+      global_slope_rad = std::atan2(p->orig_point->z, p->radius);
+      float adap_non_ground_height_thresh = non_ground_height_threshold_;
+      if (p->orig_point->x < 0) {
+        adap_non_ground_height_thresh = p->radius < 20.0
+                                          ? non_ground_height_threshold_
+                                          : non_ground_height_threshold_ * p->radius / 2.0;
+        adap_non_ground_height_thresh =
+          adap_non_ground_height_thresh < 0.3 ? adap_non_ground_height_thresh : 0.3;
+      }
+
+      // check point class
+      if (local_gap_height > max_height_detection_range_) {
+        // out of range, do not update prev_p
+        p->point_state = PointLabel::OUT_OF_RANGE;
+      } else if (
+        (local_gap_height < -adap_non_ground_height_thresh) &&
+        ((local_slope_rad < -global_slope_max_angle_rad_) &&
+         ((local_slope_rad - prev_local_slope_rad) < -global_slope_max_angle_rad_))) {
+        // under ground point, skip update prev_p
+        p->point_state = PointLabel::OUT_OF_RANGE;
+        out_underground_indices.indices.push_back(p->orig_index);
+      } else if (global_slope_rad > global_slope_max_angle_rad_) {
+        p->point_state = PointLabel::NON_GROUND;
+        out_no_ground_indices.indices.push_back(p->orig_index);
+        non_ground_cluster.addPoint(p->radius, p->orig_point->z);
+        prev_p = p;
+      } else if (
+        (std::abs(local_gap_height) < adap_non_ground_height_thresh) ||
+        (std::abs(local_slope_rad) < global_slope_max_angle_rad_) ||
+        (std::abs(local_slope_rad - prev_local_slope_rad) < global_slope_max_angle_rad_)) {
+        // ground point
+        p->point_state = PointLabel::GROUND;
+        out_ground_indices.indices.push_back(p->orig_index);
+        ground_cluster.addPoint(p->radius, p->orig_point->z);
+        prev_p = p;
+      } else if (
+        (local_gap_height > adap_non_ground_height_thresh) &&
+        (local_slope_rad > global_slope_max_angle_rad_) &&
+        (local_slope_rad - prev_local_slope_rad > global_slope_max_angle_rad_)) {
+        // non ground point
+        p->point_state = PointLabel::NON_GROUND;
+        out_no_ground_indices.indices.push_back(p->orig_index);
+        non_ground_cluster.addPoint(p->radius, p->orig_point->z);
+        prev_p = p;
+      } else {
+        p->point_state = PointLabel::UNKNOWN;
+        out_unknown_indices.indices.push_back(p->orig_index);
+        prev_p = p;
+      }
+      // TODO: check distance to previous point or ground center, non ground center
+    }
+  }
 }
 
 void ScanGroundFilterComponent::classifyPointCloud(
@@ -264,9 +423,42 @@ void ScanGroundFilterComponent::filter(
   pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
   no_ground_cloud_ptr->points.reserve(current_sensor_cloud_ptr->points.size());
 
-  classifyPointCloud(radial_ordered_points, no_ground_indices);
+  pcl::PointIndices ground_pcl_indices;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  ground_cloud_ptr->points.reserve(current_sensor_cloud_ptr->points.size());
+
+  pcl::PointIndices unknown_indices;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr unknown_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  unknown_cloud_ptr->points.reserve(current_sensor_cloud_ptr->points.size());
+
+  pcl::PointIndices underground_indices;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr underground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  underground_cloud_ptr->points.reserve(current_sensor_cloud_ptr->points.size());
+
+  // classifyPointCloud(radial_ordered_points, no_ground_indices);
+  classifyPointCloud(
+    radial_ordered_points, no_ground_indices, ground_pcl_indices, unknown_indices,
+    underground_indices);
 
   extractObjectPoints(current_sensor_cloud_ptr, no_ground_indices, no_ground_cloud_ptr);
+  extractObjectPoints(current_sensor_cloud_ptr, ground_pcl_indices, ground_cloud_ptr);
+  extractObjectPoints(current_sensor_cloud_ptr, unknown_indices, unknown_cloud_ptr);
+  extractObjectPoints(current_sensor_cloud_ptr, underground_indices, underground_cloud_ptr);
+
+  sensor_msgs::msg::PointCloud2 ground_pcl_msg;
+  pcl::toROSMsg(*ground_cloud_ptr, ground_pcl_msg);
+  ground_pcl_msg.header = input->header;
+  ground_pcl_pub_->publish(ground_pcl_msg);
+
+  sensor_msgs::msg::PointCloud2 unknown_pcl_msg;
+  pcl::toROSMsg(*unknown_cloud_ptr, unknown_pcl_msg);
+  unknown_pcl_msg.header = input->header;
+  unknown_pcl_pub_->publish(unknown_pcl_msg);
+
+  sensor_msgs::msg::PointCloud2 underground_msg;
+  pcl::toROSMsg(*underground_cloud_ptr, underground_msg);
+  underground_msg.header = input->header;
+  under_ground_pcl_pub_->publish(underground_msg);
 
   auto no_ground_cloud_msg_ptr = std::make_shared<PointCloud2>();
   pcl::toROSMsg(*no_ground_cloud_ptr, *no_ground_cloud_msg_ptr);
