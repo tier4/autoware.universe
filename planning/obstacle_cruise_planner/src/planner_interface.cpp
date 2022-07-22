@@ -180,3 +180,27 @@ Trajectory PlannerInterface::generateStopTrajectory(
 
   return output_traj;
 }
+
+double PlannerInterface::calcDistanceToObstaclePoint(
+  const ObstacleCruisePlannerData & planner_data, const geometry_msgs::msg::Point & obs_point)
+{
+  const auto ego_segment_idx_candidate = motion_utils::findNearestSegmentIndex(
+    planner_data.traj.points, planner_data.current_pose, nearest_dist_deviation_threshold_,
+    nearest_yaw_deviation_threshold_);
+  const auto ego_segment_idx = ego_segment_idx_candidate
+                                 ? ego_segment_idx_candidate.get()
+                                 : motion_utils::findNearestIndex(
+                                     planner_data.traj.points, planner_data.current_pose.position);
+
+  const double segment_offset = std::max(
+    0.0, motion_utils::calcLongitudinalOffsetToSegment(
+           planner_data.traj.points, ego_segment_idx, planner_data.current_pose.position));
+  const double abs_ego_offset = planner_data.is_driving_forward
+                                  ? std::abs(vehicle_info_.max_longitudinal_offset_m)
+                                  : std::abs(vehicle_info_.min_longitudinal_offset_m);
+
+  const double offset = abs_ego_offset + segment_offset;
+
+  return motion_utils::calcSignedArcLength(planner_data.traj.points, ego_segment_idx, obs_point) -
+         offset;
+}

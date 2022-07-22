@@ -124,6 +124,9 @@ protected:
       std::pow(obj_vel, 2) * 0.5 / std::abs(i.min_object_accel_for_rss) + margin;
     return rss_dist_with_margin;
   }
+
+  double calcDistanceToObstaclePoint(
+    const ObstacleCruisePlannerData & planner_data, const geometry_msgs::msg::Point & obs_point);
 };
 
 #endif  // OBSTACLE_CRUISE_PLANNER__PLANNER_INTERFACE_HPP_

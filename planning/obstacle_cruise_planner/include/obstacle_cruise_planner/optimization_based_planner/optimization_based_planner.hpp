@@ -93,9 +93,8 @@ private:
     const std::vector<double> & time_vec);
 
   boost::optional<SBoundaries> getSBoundaries(
-    const rclcpp::Time & current_time, const TrajectoryData & ego_traj_data,
-    const TargetObstacle & object, const rclcpp::Time & obj_base_time,
-    const std::vector<double> & time_vec);
+    const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
+    const TargetObstacle & object, const std::vector<double> & time_vec);
 
   boost::optional<SBoundaries> getSBoundaries(
     const TrajectoryData & ego_traj_data, const std::vector<double> & time_vec,
@@ -103,10 +102,9 @@ private:
     const double dist_to_collision_point);
 
   boost::optional<SBoundaries> getSBoundaries(
-    const rclcpp::Time & current_time, const TrajectoryData & ego_traj_data,
+    const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
     const std::vector<double> & time_vec, const double safety_distance,
-    const TargetObstacle & object, const rclcpp::Time & obj_base_time,
-    const PredictedPath & predicted_path);
+    const TargetObstacle & object, const PredictedPath & predicted_path);
 
   boost::optional<PredictedPath> resamplePredictedPath(
     const TargetObstacle & object, const rclcpp::Time & obj_base_time,
@@ -114,7 +112,8 @@ private:
     const double horizon);
 
   boost::optional<double> getDistanceToCollisionPoint(
-    const TrajectoryData & ego_traj_data, const ObjectData & obj_data);
+    const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
+    const TargetObstacle & obstacle);
 
   boost::optional<size_t> getCollisionIdx(
     const TrajectoryData & ego_traj, const Box2d & obj_box, const size_t start_idx,

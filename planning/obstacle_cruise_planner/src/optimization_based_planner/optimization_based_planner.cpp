@@ -663,15 +663,14 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
   boost::optional<size_t> min_slow_down_idx = {};
   for (size_t o_idx = 0; o_idx < planner_data.target_obstacles.size(); ++o_idx) {
     const auto & obj = planner_data.target_obstacles.at(o_idx);
-    const auto obj_base_time = planner_data.target_obstacles.at(o_idx).time_stamp;
+    const auto obj_base_time = obj.time_stamp;
     // Only see cruise obstacles
     if (obj.has_stopped) {
       continue;
     }
 
     // Step1 Get S boundary from the obstacle
-    const auto obj_s_boundaries =
-      getSBoundaries(planner_data.current_time, ego_traj_data, obj, obj_base_time, time_vec);
+    const auto obj_s_boundaries = getSBoundaries(planner_data, ego_traj_data, obj, time_vec);
     if (!obj_s_boundaries) {
       continue;
     }
@@ -718,15 +717,9 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
     if (marker_pose) {
       visualization_msgs::msg::MarkerArray wall_msg;
 
-      if (obj.has_stopped) {
-        const auto markers = motion_utils::createStopVirtualWallMarker(
-          marker_pose.get(), "obstacle to follow", current_time, 0);
-        tier4_autoware_utils::appendMarkerArray(markers, &wall_msg);
-      } else {
-        const auto markers = motion_utils::createSlowDownVirtualWallMarker(
-          marker_pose.get(), "obstacle to follow", current_time, 0);
-        tier4_autoware_utils::appendMarkerArray(markers, &wall_msg);
-      }
+      const auto markers = motion_utils::createSlowDownVirtualWallMarker(
+        marker_pose.get(), "obstacle to follow", current_time, 0);
+      tier4_autoware_utils::appendMarkerArray(markers, &wall_msg);
 
       // publish rviz marker
       debug_wall_marker_pub_->publish(wall_msg);
@@ -737,14 +730,13 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
 }
 
 boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
-  const rclcpp::Time & current_time, const TrajectoryData & ego_traj_data,
-  const TargetObstacle & object, const rclcpp::Time & obj_base_time,
-  const std::vector<double> & time_vec)
+  const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
+  const TargetObstacle & object, const std::vector<double> & time_vec)
 {
   // Get the predicted path, which has the most high confidence
   const double max_horizon = time_vec.back();
-  const auto predicted_path =
-    resamplePredictedPath(object, obj_base_time, current_time, time_vec, max_horizon);
+  const auto predicted_path = resamplePredictedPath(
+    object, object.time_stamp, planner_data.current_time, time_vec, max_horizon);
   if (!predicted_path) {
     RCLCPP_DEBUG(
       rclcpp::get_logger("ObstacleCruisePlanner::OptimizationBasedPlanner"),
@@ -754,7 +746,7 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
 
   // Get current pose from object's predicted path
   const auto current_object_pose = obstacle_cruise_utils::getCurrentObjectPoseFromPredictedPath(
-    *predicted_path, obj_base_time, current_time);
+    *predicted_path, object.time_stamp, planner_data.current_time);
   if (!current_object_pose) {
     RCLCPP_DEBUG(
       rclcpp::get_logger("ObstacleCruisePlanner::OptimizationBasedPlanner"),
@@ -763,18 +755,13 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
   }
 
   // Check current object.kinematics
-  ObjectData obj_data;
-  obj_data.pose = current_object_pose.get();
-  obj_data.length = object.shape.dimensions.x;
-  obj_data.width = object.shape.dimensions.y;
-  obj_data.time = std::max((obj_base_time - current_time).seconds(), 0.0);
-  const auto current_collision_dist = getDistanceToCollisionPoint(ego_traj_data, obj_data);
+  const auto current_collision_dist =
+    getDistanceToCollisionPoint(planner_data, ego_traj_data, object);
 
   // Calculate Safety Distance
   const auto & safe_distance_margin = longitudinal_info_.safe_distance_margin;
-  const double ego_vehicle_offset = vehicle_info_.wheel_base_m + vehicle_info_.front_overhang_m;
-  const double object_offset = obj_data.length / 2.0;
-  const double safety_distance = ego_vehicle_offset + object_offset + safe_distance_margin;
+  const double object_offset = object.shape.dimensions.x / 2.0;
+  const double safety_distance = object_offset + safe_distance_margin;
 
   // If the object is on the current ego trajectory,
   // we assume the object travels along ego trajectory
@@ -789,7 +776,7 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
 
   // Ignore low velocity objects that are not on the trajectory
   return getSBoundaries(
-    current_time, ego_traj_data, time_vec, safety_distance, object, obj_base_time, *predicted_path);
+    planner_data, ego_traj_data, time_vec, safety_distance, object, *predicted_path);
 }
 
 boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
@@ -804,19 +791,17 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
   }
 
   const double v_obj = std::abs(object.velocity);
-
   double current_s_obj = std::max(dist_to_collision_point - safety_distance, 0.0);
-  const double current_v_obj = object.has_stopped ? 0.0 : v_obj;
   const double initial_s_upper_bound =
-    current_s_obj + (current_v_obj * current_v_obj) / (2 * std::fabs(min_object_accel_for_rss));
+    current_s_obj + (v_obj * v_obj) / (2 * std::fabs(min_object_accel_for_rss));
   s_boundaries.front().max_s = std::clamp(initial_s_upper_bound, 0.0, s_boundaries.front().max_s);
   s_boundaries.front().is_object = true;
   for (size_t i = 1; i < time_vec.size(); ++i) {
     const double dt = time_vec.at(i) - time_vec.at(i - 1);
-    current_s_obj = current_s_obj + current_v_obj * dt;
+    current_s_obj = current_s_obj + v_obj * dt;
 
     const double s_upper_bound =
-      current_s_obj + (current_v_obj * current_v_obj) / (2 * std::fabs(min_object_accel_for_rss));
+      current_s_obj + (v_obj * v_obj) / (2 * std::fabs(min_object_accel_for_rss));
     s_boundaries.at(i).max_s = std::clamp(s_upper_bound, 0.0, s_boundaries.at(i).max_s);
     s_boundaries.at(i).is_object = true;
   }
@@ -825,14 +810,13 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
 }
 
 boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
-  const rclcpp::Time & current_time, const TrajectoryData & ego_traj_data,
+  const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
   const std::vector<double> & time_vec, const double safety_distance, const TargetObstacle & object,
-  const rclcpp::Time & obj_base_time, const PredictedPath & predicted_path)
+  const PredictedPath & predicted_path)
 {
   const double & min_object_accel_for_rss = longitudinal_info_.min_object_accel_for_rss;
 
-  const double abs_obj_vel = std::abs(object.velocity);
-  const double v_obj = object.has_stopped ? 0.0 : abs_obj_vel;
+  const double v_obj = std::abs(object.velocity);
 
   SBoundaries s_boundaries(time_vec.size());
   for (size_t i = 0; i < s_boundaries.size(); ++i) {
@@ -842,19 +826,16 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
   for (size_t predicted_path_id = 0; predicted_path_id < predicted_path.path.size();
        ++predicted_path_id) {
     const auto predicted_pose = predicted_path.path.at(predicted_path_id);
-    const double object_time = (obj_base_time - current_time).seconds();
+    const double object_time = (object.time_stamp - planner_data.current_time).seconds();
     if (object_time < 0) {
       // Ignore Past Positions
       continue;
     }
 
-    ObjectData obj_data;
-    obj_data.pose = predicted_pose;
-    obj_data.length = object.shape.dimensions.x;
-    obj_data.width = object.shape.dimensions.y;
-    obj_data.time = object_time;
-
-    const auto dist_to_collision_point = getDistanceToCollisionPoint(ego_traj_data, obj_data);
+    TargetObstacle future_object = object;
+    future_object.pose = predicted_pose;
+    const auto dist_to_collision_point =
+      getDistanceToCollisionPoint(planner_data, ego_traj_data, future_object);
     if (!dist_to_collision_point) {
       continue;
     }
@@ -874,11 +855,12 @@ boost::optional<SBoundaries> OptimizationBasedPlanner::getSBoundaries(
 }
 
 boost::optional<double> OptimizationBasedPlanner::getDistanceToCollisionPoint(
-  const TrajectoryData & ego_traj_data, const ObjectData & obj_data)
+  const ObstacleCruisePlannerData & planner_data, const TrajectoryData & ego_traj_data,
+  const TargetObstacle & obstacle)
 {
-  const auto obj_pose = obj_data.pose;
-  const auto obj_length = obj_data.length;
-  const auto obj_width = obj_data.width;
+  const auto obj_pose = obstacle.pose;
+  const auto obj_length = obstacle.shape.dimensions.x;
+  const auto obj_width = obstacle.shape.dimensions.y;
   const auto object_box = Box2d(obj_pose, obj_length, obj_width);
   const auto object_points = object_box.getAllCorners();
 
@@ -916,9 +898,7 @@ boost::optional<double> OptimizationBasedPlanner::getDistanceToCollisionPoint(
 
   if (collision_idx) {
     // TODO(shimizu) Consider the time difference between ego vehicle and objects
-    return motion_utils::calcSignedArcLength(
-      ego_traj_data.traj.points, ego_traj_data.traj.points.front().pose.position,
-      obj_pose.position);
+    return calcDistanceToObstaclePoint(planner_data, obj_pose.position);
   }
 
   return boost::none;
