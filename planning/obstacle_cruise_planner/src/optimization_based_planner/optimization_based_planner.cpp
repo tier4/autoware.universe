@@ -16,6 +16,7 @@
 
 #include "interpolation/linear_interpolation.hpp"
 #include "interpolation/spline_interpolation.hpp"
+#include "interpolation/zero_order_hold.hpp"
 #include "obstacle_cruise_planner/optimization_based_planner/resample.hpp"
 #include "obstacle_cruise_planner/utils.hpp"
 #include "tier4_autoware_utils/tier4_autoware_utils.hpp"
@@ -620,9 +621,9 @@ Trajectory OptimizationBasedPlanner::resampleTrajectory(
     pz_p = interpolation::lerp(base_index, pz, query_index);
     pyaw_p = interpolation::lerp(base_index, pyaw, query_index);
   }
-  const auto tlx_p = interpolation::lerp(base_index, tlx, query_index);
-  const auto taz_p = interpolation::lerp(base_index, taz, query_index);
-  const auto alx_p = interpolation::lerp(base_index, alx, query_index);
+  const auto tlx_p = interpolation::zero_order_hold(base_index, tlx, query_index);
+  const auto taz_p = interpolation::zero_order_hold(base_index, taz, query_index);
+  const auto alx_p = interpolation::zero_order_hold(base_index, alx, query_index);
 
   Trajectory resampled_trajectory;
   resampled_trajectory.header = base_trajectory.header;
