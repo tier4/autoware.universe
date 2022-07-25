@@ -39,6 +39,8 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
   {
     non_ground_height_threshold_ =
       static_cast<float>(declare_parameter("non_ground_height_threshold", 0.15));
+    division_mode_distance_threshold_ =
+      static_cast<float>(declare_parameter("division_mode_distance_threshold", 5.0));
     max_height_detection_range_ =
       static_cast<float>(declare_parameter("max_height_detection_range", 2.5));
     min_height_detection_range_ =
@@ -99,19 +101,35 @@ void ScanGroundFilterComponent::convertPointcloud(
 {
   out_radial_ordered_points.resize(radial_dividers_num_);
   PointRef current_point;
-  float vitual_lidar_height = 2.5f;
+  float virtual_lidar_height = 2.5f;
+  uint16_t back_steps_num = 2;
+  float division_mode_grid_id_threshold  = division_mode_distance_threshold_ / vertical_grid_resolution_distance_; // changing the mode of grid division
+  float division_mode_angle_rad_threshold = std::atan2(division_mode_distance_threshold_, virtual_lidar_height);
 
+  vertical_grid_resolution_angle_rad_ = normalizeRadian(std::atan2(division_mode_distance_threshold_ + vertical_grid_resolution_distance_, virtual_lidar_height)) - 
+                                        normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
     auto radius{static_cast<float>(std::hypot(in_cloud->points[i].x, in_cloud->points[i].y))};
     auto theta{normalizeRadian(std::atan2(in_cloud->points[i].x, in_cloud->points[i].y), 0.0)};
-    auto radial_div{static_cast<size_t>(std::floor(theta / radial_divider_angle_rad_))};
-    uint16_t grid_id = static_cast<uint16_t>(radius / vertical_grid_resolution_distance_);
-    float grid_radius = static_cast<float>((grid_id - 2) * vertical_grid_resolution_distance_);
 
     // divide by angle 
-    // auto gama{normalizeRadian(std::atan2(radius,vitual_lidar_height),0.0f)};
-    // uint16_t grid_id = static_cast<uint16_t>(std::floor(gama / vertical_grid_resolution_angle_rad_));
-    // float grid_radius = static_cast<float>(std::atan((grid_id - 2)*vertical_grid_resolution_angle_rad_));
+    auto gama{normalizeRadian(std::atan2(radius,virtual_lidar_height),0.0f)};
+    auto radial_div{static_cast<size_t>(std::floor(theta / radial_divider_angle_rad_))};
+    uint16_t grid_id = 0;
+    float grid_radius = 0.0f;
+    if(radius <=division_mode_distance_threshold_){
+      grid_id = static_cast<uint16_t>(radius / vertical_grid_resolution_distance_);
+      grid_radius = static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
+    }
+    else{
+      grid_id = division_mode_grid_id_threshold + (gama - division_mode_angle_rad_threshold) / vertical_grid_resolution_angle_rad_;
+      if (grid_id <= division_mode_grid_id_threshold  + back_steps_num){
+        grid_radius = static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
+      }else{
+        grid_radius = std::tan(gama - static_cast<float>(back_steps_num)*vertical_grid_resolution_angle_rad_) * virtual_lidar_height;
+      }
+    }
+     
 
     current_point.grid_id = grid_id;
     current_point.grid_radius = grid_radius;
