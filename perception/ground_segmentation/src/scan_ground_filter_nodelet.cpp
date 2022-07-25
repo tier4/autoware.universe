@@ -49,7 +49,7 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
       deg2rad(declare_parameter("vertical_grid_resolution_angle_", 0.5));
     vertical_grid_resolution_distance_ =
       static_cast<float>(declare_parameter("vertical_grid_resolution_distance", 0.1));
-    num_gnd_grids_reference_ = static_cast<int>(declare_parameter("num_gnd_grids_reference",10));
+    num_gnd_grids_reference_ = static_cast<int>(declare_parameter("num_gnd_grids_reference", 10));
     base_frame_ = declare_parameter("base_frame", "base_link");
     global_slope_max_angle_rad_ = deg2rad(declare_parameter("global_slope_max_angle_deg", 8.0));
     local_slope_max_angle_rad_ = deg2rad(declare_parameter("local_slope_max_angle_deg", 6.0));
@@ -103,33 +103,43 @@ void ScanGroundFilterComponent::convertPointcloud(
   PointRef current_point;
   float virtual_lidar_height = 2.5f;
   uint16_t back_steps_num = 2;
-  float division_mode_grid_id_threshold  = division_mode_distance_threshold_ / vertical_grid_resolution_distance_; // changing the mode of grid division
-  float division_mode_angle_rad_threshold = std::atan2(division_mode_distance_threshold_, virtual_lidar_height);
+  float division_mode_grid_id_threshold =
+    division_mode_distance_threshold_ /
+    vertical_grid_resolution_distance_;  // changing the mode of grid division
+  float division_mode_angle_rad_threshold =
+    std::atan2(division_mode_distance_threshold_, virtual_lidar_height);
 
-  vertical_grid_resolution_angle_rad_ = normalizeRadian(std::atan2(division_mode_distance_threshold_ + vertical_grid_resolution_distance_, virtual_lidar_height)) - 
-                                        normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
+  vertical_grid_resolution_angle_rad_ =
+    normalizeRadian(std::atan2(
+      division_mode_distance_threshold_ + vertical_grid_resolution_distance_,
+      virtual_lidar_height)) -
+    normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
     auto radius{static_cast<float>(std::hypot(in_cloud->points[i].x, in_cloud->points[i].y))};
     auto theta{normalizeRadian(std::atan2(in_cloud->points[i].x, in_cloud->points[i].y), 0.0)};
 
-    // divide by angle 
-    auto gama{normalizeRadian(std::atan2(radius,virtual_lidar_height),0.0f)};
+    // divide by angle
+    auto gama{normalizeRadian(std::atan2(radius, virtual_lidar_height), 0.0f)};
     auto radial_div{static_cast<size_t>(std::floor(theta / radial_divider_angle_rad_))};
     uint16_t grid_id = 0;
     float grid_radius = 0.0f;
-    if(radius <=division_mode_distance_threshold_){
+    if (radius <= division_mode_distance_threshold_) {
       grid_id = static_cast<uint16_t>(radius / vertical_grid_resolution_distance_);
-      grid_radius = static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
-    }
-    else{
-      grid_id = division_mode_grid_id_threshold + (gama - division_mode_angle_rad_threshold) / vertical_grid_resolution_angle_rad_;
-      if (grid_id <= division_mode_grid_id_threshold  + back_steps_num){
-        grid_radius = static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
-      }else{
-        grid_radius = std::tan(gama - static_cast<float>(back_steps_num)*vertical_grid_resolution_angle_rad_) * virtual_lidar_height;
+      grid_radius =
+        static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
+    } else {
+      grid_id = division_mode_grid_id_threshold +
+                (gama - division_mode_angle_rad_threshold) / vertical_grid_resolution_angle_rad_;
+      if (grid_id <= division_mode_grid_id_threshold + back_steps_num) {
+        grid_radius =
+          static_cast<float>((grid_id - back_steps_num) * vertical_grid_resolution_distance_);
+      } else {
+        grid_radius =
+          std::tan(
+            gama - static_cast<float>(back_steps_num) * vertical_grid_resolution_angle_rad_) *
+          virtual_lidar_height;
       }
     }
-     
 
     current_point.grid_id = grid_id;
     current_point.grid_radius = grid_radius;
@@ -194,7 +204,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
     float global_slope_rad;  // angle between current point and initial gnd point compared with
                              // horizontal plane
     global_slope_rad = std::atan2(p->orig_point->z, p->radius);
-    for (int j = 0; j < static_cast<int>(p->grid_radius / vertical_grid_resolution_distance_); j++){
+    for (int j = 0; j < static_cast<int>(p->grid_radius / vertical_grid_resolution_distance_);
+         j++) {
       prev_gnd_grid_height.push_back(0.0f);
       prev_gnd_grid_radius.push_back(0.0f);
     }
@@ -237,9 +248,11 @@ void ScanGroundFilterComponent::classifyPointCloud(
 
           float prev_gnd_gap_height = 0;
           float prev_gnd_gap_radius = 0;
-          for (int prev_grid_id = 0; prev_grid_id < num_gnd_grids_reference_; prev_grid_id++){
-            prev_gnd_gap_height += prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2 - prev_grid_id);
-            prev_gnd_gap_radius += prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2 - prev_grid_id);
+          for (int prev_grid_id = 0; prev_grid_id < num_gnd_grids_reference_; prev_grid_id++) {
+            prev_gnd_gap_height +=
+              prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2 - prev_grid_id);
+            prev_gnd_gap_radius +=
+              prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2 - prev_grid_id);
           }
           prev_local_slope_rad = std::atan2(prev_gnd_gap_height, prev_gnd_gap_radius);
         }
@@ -256,7 +269,9 @@ void ScanGroundFilterComponent::classifyPointCloud(
                                           ? non_ground_height_threshold_
                                           : non_ground_height_threshold_ * p->radius / 2.0;
         adap_non_ground_height_thresh =
-          adap_non_ground_height_thresh < 0.3 ? adap_non_ground_height_thresh : 0.3;
+          adap_non_ground_height_thresh < 2 * non_ground_height_threshold_
+            ? adap_non_ground_height_thresh
+            : 2 * non_ground_height_threshold_;
       }
 
       // check point class

@@ -128,7 +128,7 @@ private:
   float vertical_grid_resolution_distance_;
   int num_gnd_grids_reference_ = 10;
 
-  float division_mode_distance_threshold_  = 5.0f; // changing the mode of grid division
+  float division_mode_distance_threshold_ = 5.0f;  // threshold distance for changing the mode of grid division
 
   double global_slope_max_angle_rad_;       // radians
   double local_slope_max_angle_rad_;        // radians
