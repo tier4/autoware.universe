@@ -180,10 +180,10 @@ void ScanGroundFilterComponent::classifyPointCloud(
 
   for (size_t i = 0; i < in_radial_ordered_clouds.size(); i++) {
     // initialize the gnd_point(0,0,0)
-    float prev_gnd_height = 0.0f;
-    float prev_gn_grid_radius = 0.0f;  // origin of previous gnd point cloud
+    // float prev_gnd_height = 0.0f;
+    // float prev_gn_grid_radius = 0.0f;  // origin of previous gnd point cloud
     float prev_local_slope_rad = 0.0f;
-    uint16_t prev_gnd_grid_id = 0;
+    // uint16_t prev_gnd_grid_id = 0;
     PointsCentroid ground_cluster, non_ground_cluster;
     ground_cluster.initialize();
     non_ground_cluster.initialize();
