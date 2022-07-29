@@ -117,6 +117,8 @@ private:
     const std::string & target_frame, const std::string & source_frame,
     const geometry_msgs::msg::TransformStamped::SharedPtr & transform_stamped_ptr);
 
+  void setDiagnosticsValidationError();
+
   bool validateTimeStampDifference(
     const rclcpp::Time & target_time, const rclcpp::Time & reference_time,
     const double time_tolerance_sec);
@@ -161,6 +163,8 @@ private:
   NDTImplementType ndt_implement_type_;
   std::shared_ptr<NormalDistributionsTransformBase<PointSource, PointTarget>> ndt_ptr_;
 
+  std::size_t input_sensor_points_threshold_num_;
+
   Eigen::Matrix4f base_to_sensor_matrix_;
   std::string base_frame_;
   std::string ndt_base_frame_;
@@ -186,6 +190,8 @@ private:
 
   std::thread diagnostic_thread_;
   std::map<std::string, std::string> key_value_stdmap_;
+  size_t skipping_publish_num_;
+
 };
 
 #endif  // NDT_SCAN_MATCHER__NDT_SCAN_MATCHER_CORE_HPP_

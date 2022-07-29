@@ -7,6 +7,9 @@
     # Subscriber queue size
     input_sensor_points_queue_size: 1
 
+    # The minimum threshold for the number of sensor points
+    input_sensor_points_threshold_num: 150
+
     # NDT implementation type
     # 0=PCL_GENERIC, 1=PCL_MODIFIED, 2=OMP
     ndt_implement_type: 2

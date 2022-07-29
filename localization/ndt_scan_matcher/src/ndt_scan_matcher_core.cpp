@@ -99,6 +99,7 @@ NDTScanMatcher::NDTScanMatcher()
   tf2_listener_(tf2_buffer_),
   tf2_broadcaster_(*this),
   ndt_implement_type_(NDTImplementType::PCL_GENERIC),
+  input_sensor_points_threshold_num_(150),
   base_frame_("base_link"),
   ndt_base_frame_("ndt_base_link"),
   map_frame_("map"),
@@ -109,7 +110,8 @@ NDTScanMatcher::NDTScanMatcher()
   initial_pose_timeout_sec_(1.0),
   initial_pose_distance_tolerance_m_(10.0),
   inversion_vector_threshold_(-0.9),
-  oscillation_threshold_(10)
+  oscillation_threshold_(10),
+  skipping_publish_num_(0)
 {
   key_value_stdmap_["state"] = "Initializing";
 
@@ -144,6 +146,9 @@ NDTScanMatcher::NDTScanMatcher()
   int points_queue_size = this->declare_parameter("input_sensor_points_queue_size", 0);
   points_queue_size = std::max(points_queue_size, 0);
   RCLCPP_INFO(get_logger(), "points_queue_size: %d", points_queue_size);
+
+  input_sensor_points_threshold_num_ = this->declare_parameter("input_sensor_points_threshold_num", static_cast<int>(input_sensor_points_threshold_num_));
+  RCLCPP_INFO(get_logger(), "input_sensor_points_threshold_num: %ld", input_sensor_points_threshold_num_);
 
   base_frame_ = this->declare_parameter("base_frame", base_frame_);
   RCLCPP_INFO(get_logger(), "base_frame_id: %s", base_frame_.c_str());
@@ -446,6 +451,17 @@ void NDTScanMatcher::callbackSensorPoints(
     new pcl::PointCloud<PointSource>);
   pcl::transformPointCloud(
     *sensor_points_sensorTF_ptr, *sensor_points_baselinkTF_ptr, base_to_sensor_matrix);
+
+  if (sensor_points_baselinkTF_ptr->points.size() < input_sensor_points_threshold_num_) {
+    RCLCPP_WARN(
+      get_logger(),
+      "Validation error. The number of sensor points is below the threshold. Points: %ld, Threshold: %ld",
+      sensor_points_baselinkTF_ptr->points.size(),
+      input_sensor_points_threshold_num_);
+    setDiagnosticsValidationError();
+    return;
+  }
+
   ndt_ptr_->setInputSource(sensor_points_baselinkTF_ptr);
 
   // start of critical section for initial_pose_msg_ptr_array_
@@ -453,6 +469,7 @@ void NDTScanMatcher::callbackSensorPoints(
   // check
   if (initial_pose_msg_ptr_array_.size() <= 1) {
     RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 1, "No Pose!");
+    setDiagnosticsValidationError();
     return;
   }
   // searchNNPose using timestamp
@@ -477,6 +494,7 @@ void NDTScanMatcher::callbackSensorPoints(
   // must all validations are true
   if (!(valid_old_timestamp && valid_new_timestamp && valid_new_to_old_distance)) {
     RCLCPP_WARN(get_logger(), "Validation error.");
+    setDiagnosticsValidationError();
     return;
   }
 
@@ -492,6 +510,7 @@ void NDTScanMatcher::callbackSensorPoints(
 
   if (ndt_ptr_->getInputTarget() == nullptr) {
     RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 1, "No MAP!");
+    setDiagnosticsValidationError();
     return;
   }
   // align
@@ -581,13 +600,12 @@ void NDTScanMatcher::callbackSensorPoints(
   }
 
   bool is_converged = false;
-  static size_t skipping_publish_num = 0;
   if (is_ok_iteration_num && is_ok_converged_param) {
     is_converged = true;
-    skipping_publish_num = 0;
+    skipping_publish_num_ = 0;
   } else {
     is_converged = false;
-    ++skipping_publish_num;
+    ++skipping_publish_num_;
     RCLCPP_WARN(get_logger(), "Not Converged");
   }
 
@@ -673,7 +691,7 @@ void NDTScanMatcher::callbackSensorPoints(
   key_value_stdmap_["nearest_voxel_transformation_likelihood"] =
     std::to_string(nearest_voxel_transformation_likelihood);
   key_value_stdmap_["iteration_num"] = std::to_string(iteration_num);
-  key_value_stdmap_["skipping_publish_num"] = std::to_string(skipping_publish_num);
+  key_value_stdmap_["skipping_publish_num"] = std::to_string(skipping_publish_num_);
   if (is_local_optimal_solution_oscillation) {
     key_value_stdmap_["is_local_optimal_solution_oscillation"] = "1";
   } else {
@@ -772,6 +790,16 @@ bool NDTScanMatcher::getTransform(
     return false;
   }
   return true;
+}
+
+void NDTScanMatcher::setDiagnosticsValidationError()
+{
+  key_value_stdmap_["state"] = "validation error";
+  key_value_stdmap_["transform_probability"] = "0";
+  key_value_stdmap_["nearest_voxel_transformation_likelihood"] = "0";
+  key_value_stdmap_["iteration_num"] = "0";
+  key_value_stdmap_["skipping_publish_num"] = std::to_string(++skipping_publish_num_);;
+  key_value_stdmap_["is_local_optimal_solution_oscillation"] = "0";
 }
 
 bool NDTScanMatcher::validateTimeStampDifference(
