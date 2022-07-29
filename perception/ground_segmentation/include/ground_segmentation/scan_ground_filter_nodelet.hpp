@@ -126,7 +126,8 @@ private:
   float min_height_detection_range_;
   float vertical_grid_resolution_angle_rad_;
   float vertical_grid_resolution_distance_;
-  int num_gnd_grids_reference_ = 10;
+  uint16_t num_gnd_grids_reference_ = 10;
+  uint16_t num_prev_grid_slope_refer_ = 2;
 
   float division_mode_distance_threshold_ = 5.0f;  // threshold distance for changing the mode of grid division
 
