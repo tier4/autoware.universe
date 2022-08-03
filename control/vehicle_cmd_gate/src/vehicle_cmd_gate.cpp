@@ -81,6 +81,8 @@ VehicleCmdGate::VehicleCmdGate(const rclcpp::NodeOptions & node_options)
     "input/engage", 1, std::bind(&VehicleCmdGate::onEngage, this, _1));
   steer_sub_ = this->create_subscription<SteeringReport>(
     "input/steering", 1, std::bind(&VehicleCmdGate::onSteering, this, _1));
+  mrm_state_sub_ = this->create_subscription<MRMState>(
+    "input/mrm_state", 1, std::bind(&VehicleCmdGate::onMRMState, this, _1));
 
 
   // Subscriber for auto
@@ -561,6 +563,14 @@ void VehicleCmdGate::onEngageService(
 void VehicleCmdGate::onSteering(SteeringReport::ConstSharedPtr msg)
 {
   current_steer_ = msg->steering_tire_angle;
+}
+
+void VehicleCmdGate::onMRMState(MRMState::ConstSharedPtr msg)
+{
+  current_mrm_state_ = *msg;
+  is_system_emergency_ = (current_mrm_state_.state == MRMState::MRM_OPERATING ||
+                          current_mrm_state_.state == MRMState::MRM_SUCCEEDED) &&
+                         (current_mrm_state_.behavior == MRMState::SUDDEN_STOP);
 }
 
 double VehicleCmdGate::getDt()
