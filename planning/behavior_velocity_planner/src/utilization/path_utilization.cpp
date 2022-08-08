@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <interpolation/spline_interpolation.hpp>
+#include <interpolation/linear_interpolation.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <utilization/path_utilization.hpp>
 
@@ -84,8 +85,8 @@ bool splineInterpolate(
   // do spline for xy
   const std::vector<double> resampled_x = ::interpolation::slerp(base_s, base_x, resampled_s);
   const std::vector<double> resampled_y = ::interpolation::slerp(base_s, base_y, resampled_s);
-  const std::vector<double> resampled_z = ::interpolation::slerp(base_s, base_z, resampled_s);
-  const std::vector<double> resampled_v = ::interpolation::slerp(base_s, base_v, resampled_s);
+  const std::vector<double> resampled_z = ::interpolation::lerp(base_s, base_z, resampled_s);
+  const std::vector<double> resampled_v = ::interpolation::lerp(base_s, base_v, resampled_s);
 
   // set xy
   output->points.clear();
