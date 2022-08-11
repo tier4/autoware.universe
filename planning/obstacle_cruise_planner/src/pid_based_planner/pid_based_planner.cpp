@@ -159,8 +159,9 @@ void PIDBasedPlanner::calcObstaclesToCruise(
 double PIDBasedPlanner::calcDistanceToObstacle(
   const ObstacleCruisePlannerData & planner_data, const TargetObstacle & obstacle)
 {
-  const size_t ego_segment_idx =
-    findExtendedNearestSegmentIndex(planner_data.traj, planner_data.current_pose);
+  const size_t ego_segment_idx = findFirstNearestSegmentIndexWithSoftConstraints(
+    planner_data.traj, planner_data.current_pose, ego_nearest_dist_threshold_,
+    ego_nearest_yaw_threshold_);
   const double segment_offset = std::max(
     0.0, motion_utils::calcLongitudinalOffsetToSegment(
            planner_data.traj.points, ego_segment_idx, planner_data.current_pose.position));
@@ -217,7 +218,9 @@ VelocityLimit PIDBasedPlanner::doCruise(
   }();
   const double dist_to_obstacle = cruise_obstacle_info.dist_to_obstacle;
 
-  const size_t ego_idx = findExtendedNearestIndex(planner_data.traj, planner_data.current_pose);
+  const size_t ego_idx = findFirstNearestIndexWithSoftConstraints(
+    planner_data.traj, planner_data.current_pose, ego_nearest_dist_threshold_,
+    ego_nearest_yaw_threshold_);
 
   // calculate target velocity with acceleration limit by PID controller
   const double pid_output_vel = pid_controller_->calc(filtered_normalized_dist_to_cruise);

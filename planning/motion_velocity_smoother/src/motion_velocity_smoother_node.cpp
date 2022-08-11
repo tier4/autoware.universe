@@ -929,14 +929,9 @@ Trajectory MotionVelocitySmootherNode::toTrajectoryMsg(
 boost::optional<size_t> MotionVelocitySmootherNode::findNearestIndexFromEgo(
   const TrajectoryPoints & points) const
 {
-  return findNearestIndex(points, current_pose_ptr_->pose);
-}
-
-boost::optional<size_t> MotionVelocitySmootherNode::findNearestIndex(
-  const TrajectoryPoints & points, const geometry_msgs::msg::Pose & p) const
-{
-  return motion_utils::findNearestIndex(
-    points, p, std::numeric_limits<double>::max(), node_param_.delta_yaw_threshold);
+  return motion_utils::findFirstNearestIndexWithSoftConstraints(
+    points, current_pose_ptr_->pose, node_param_.nearest_ego_dist_threshold,
+    node_param_.nearest_ego_yaw_threshold);
 }
 
 bool MotionVelocitySmootherNode::isReverse(const TrajectoryPoints & points) const

@@ -38,18 +38,6 @@ VelocityLimitClearCommand createVelocityLimitClearCommandMsg(const rclcpp::Time 
   return msg;
 }
 
-// TODO(murooka) make this function common
-size_t findExtendedNearestIndex(
-  const Trajectory traj, const geometry_msgs::msg::Pose & pose, const double max_dist,
-  const double max_yaw)
-{
-  const auto nearest_idx = motion_utils::findNearestIndex(traj.points, pose, max_dist, max_yaw);
-  if (nearest_idx) {
-    return nearest_idx.get();
-  }
-  return motion_utils::findNearestIndex(traj.points, pose.position);
-}
-
 Trajectory trimTrajectoryFrom(const Trajectory & input, const double nearest_idx)
 {
   Trajectory output{};
@@ -62,9 +50,11 @@ Trajectory trimTrajectoryFrom(const Trajectory & input, const double nearest_idx
 }
 
 bool isFrontObstacle(
-  const Trajectory & traj, const size_t ego_idx, const geometry_msgs::msg::Point & obj_pos)
+  const Trajectory & traj, const size_t ego_idx, const geometry_msgs::msg::Point & obj_pos,
+  const double max_dist)
 {
-  size_t obj_idx = motion_utils::findNearestSegmentIndex(traj.points, obj_pos);
+  size_t obj_idx =
+    motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(traj.points, obj_pos, max_dist);
 
   const double ego_to_obj_distance =
     motion_utils::calcSignedArcLength(traj.points, ego_idx, obj_idx);
@@ -97,7 +87,8 @@ PredictedPath getHighestConfidencePredictedPath(const PredictedObject & predicte
 }
 
 bool isAngleAlignedWithTrajectory(
-  const Trajectory & traj, const geometry_msgs::msg::Pose & pose, const double threshold_angle)
+  const Trajectory & traj, const geometry_msgs::msg::Pose & pose, const double threshold_angle,
+  const double max_dist)
 {
   if (traj.points.empty()) {
     return false;
@@ -105,7 +96,8 @@ bool isAngleAlignedWithTrajectory(
 
   const double obj_yaw = tf2::getYaw(pose.orientation);
 
-  const size_t nearest_idx = motion_utils::findNearestIndex(traj.points, pose.position);
+  const size_t nearest_idx =
+    motion_utils::findFirstNearestIndexWithSoftConstraints(traj.points, pose.position, max_dist);
   const double traj_yaw = tf2::getYaw(traj.points.at(nearest_idx).pose.orientation);
 
   const double diff_yaw = tier4_autoware_utils::normalizeRadian(obj_yaw - traj_yaw);
@@ -118,13 +110,14 @@ bool isAngleAlignedWithTrajectory(
 }
 
 double calcAlignedAdaptiveCruise(
-  const PredictedObject & predicted_object, const Trajectory & trajectory)
+  const PredictedObject & predicted_object, const Trajectory & trajectory, cosnt double max_dist)
 {
   const auto & object_pos = predicted_object.kinematics.initial_pose_with_covariance.pose.position;
   const auto & object_vel =
     predicted_object.kinematics.initial_twist_with_covariance.twist.linear.x;
 
-  const size_t object_idx = motion_utils::findNearestIndex(trajectory.points, object_pos);
+  const size_t object_idx =
+    motion_utils::findFirstNearestIndexWithSoftConstraints(trajectory.points, object_pos, max_dist);
 
   const double object_yaw =
     tf2::getYaw(predicted_object.kinematics.initial_pose_with_covariance.pose.orientation);
@@ -625,7 +618,7 @@ std::vector<TargetObstacle> ObstacleCruisePlannerNode::filterObstacles(
   const auto current_time = now();
   const auto time_stamp = rclcpp::Time(predicted_objects.header.stamp);
 
-  const size_t ego_idx = findExtendedNearestIndex(
+  const size_t ego_idx = findFirstNearestIndexWithSoftConstraints(
     traj, current_pose, nearest_dist_deviation_threshold_, nearest_yaw_deviation_threshold_);
 
   // calculate decimated trajectory

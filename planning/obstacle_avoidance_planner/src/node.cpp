@@ -516,6 +516,11 @@ ObstacleAvoidancePlanner::ObstacleAvoidancePlanner(const rclcpp::NodeOptions & n
       declare_parameter<double>("replan.max_delta_time_sec_for_replan");
   }
 
+  {  // planning common
+    ego_nearest_dist_threshold_ = declare_parameter<double>("ego_nearest_dist_threshold");
+    ego_nearest_yaw_threshold_ = declare_parameter<double>("ego_nearest_yaw_threshold");
+  }
+
   // TODO(murooka) tune this param when avoiding with obstacle_avoidance_planner
   traj_param_.center_line_width = vehicle_param_.width;
 

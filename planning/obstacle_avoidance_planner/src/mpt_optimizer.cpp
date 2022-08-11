@@ -15,6 +15,7 @@
 #include "obstacle_avoidance_planner/mpt_optimizer.hpp"
 
 #include "interpolation/spline_interpolation_points_2d.hpp"
+#include "motion_utils/motion_utils.hpp"
 #include "obstacle_avoidance_planner/utils.hpp"
 #include "obstacle_avoidance_planner/vehicle_model/vehicle_model_bicycle_kinematics.hpp"
 #include "tf2/utils.h"
@@ -434,9 +435,8 @@ void MPTOptimizer::calcPlanningFromEgo(std::vector<ReferencePoint> & ref_points)
     */
 
     // assign fix kinematics
-    const size_t nearest_ref_idx = findNearestIndexWithSoftYawConstraints(
-      points_utils::convertToPoints(ref_points), current_ego_pose_,
-      traj_param_.delta_dist_threshold_for_closest_point,
+    const size_t nearest_ref_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
+      ref_points, current_ego_pose_, traj_param_.delta_dist_threshold_for_closest_point,
       traj_param_.delta_yaw_threshold_for_closest_point);
 
     // calculate cropped_ref_points.at(nearest_ref_idx) with yaw
@@ -473,10 +473,10 @@ std::vector<ReferencePoint> MPTOptimizer::getFixedReferencePoints(
   }
 
   const auto & prev_ref_points = prev_trajs->mpt_ref_points;
-  const int nearest_prev_ref_idx = static_cast<int>(findNearestIndexWithSoftYawConstraints(
-    points_utils::convertToPoints(prev_ref_points), current_ego_pose_,
-    traj_param_.delta_dist_threshold_for_closest_point,
-    traj_param_.delta_yaw_threshold_for_closest_point));
+  const int nearest_prev_ref_idx =
+    static_cast<int>(motion_utils::findFirstNearestIndexWithSoftConstraints(
+      prev_ref_points, current_ego_pose_, traj_param_.delta_dist_threshold_for_closest_point,
+      traj_param_.delta_yaw_threshold_for_closest_point));
 
   // calculate begin_prev_ref_idx
   const int begin_prev_ref_idx = [&]() {
@@ -1223,18 +1223,6 @@ std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> MPTOptimizer::get
   return traj_points;
 }
 
-size_t MPTOptimizer::findNearestIndexWithSoftYawConstraints(
-  const std::vector<geometry_msgs::msg::Point> & points, const geometry_msgs::msg::Pose & pose,
-  const double dist_threshold, const double yaw_threshold) const
-{
-  const auto points_with_yaw = points_utils::convertToPosesWithYawEstimation(points);
-
-  const auto nearest_idx_optional =
-    motion_utils::findNearestIndex(points_with_yaw, pose, dist_threshold, yaw_threshold);
-  return nearest_idx_optional ? *nearest_idx_optional
-                              : motion_utils::findNearestIndex(points_with_yaw, pose.position);
-}
-
 void MPTOptimizer::calcOrientation(std::vector<ReferencePoint> & ref_points) const
 {
   const auto yaw_angles = slerpYawFromReferencePoints(ref_points);
@@ -1330,8 +1318,8 @@ void MPTOptimizer::calcExtraPoints(
 
       const auto ref_points_with_yaw =
         points_utils::convertToPosesWithYawEstimation(points_utils::convertToPoints(ref_points));
-      const size_t prev_idx = findNearestIndexWithSoftYawConstraints(
-        points_utils::convertToPoints(prev_ref_points), ref_points_with_yaw.at(i),
+      const size_t prev_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
+        prev_ref_points, ref_points_with_yaw.at(i),
         traj_param_.delta_dist_threshold_for_closest_point,
         traj_param_.delta_yaw_threshold_for_closest_point);
       const double dist_to_nearest_prev_ref =

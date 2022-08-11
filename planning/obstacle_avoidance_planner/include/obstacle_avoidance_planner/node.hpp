@@ -199,6 +199,9 @@ private:
   std::unique_ptr<rclcpp::Time> latest_replanned_time_ptr_;
   tier4_autoware_utils::SelfPoseListener self_pose_listener_{this};
 
+  double ego_nearest_dist_threshold_;
+  double ego_nearest_yaw_threshold_;
+
   // ROS
   rclcpp::Publisher<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr traj_pub_;
   rclcpp::Publisher<autoware_auto_planning_msgs::msg::Trajectory>::SharedPtr
