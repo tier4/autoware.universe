@@ -77,6 +77,7 @@ private:
     float height_sum;
     float radius_avg;
     float height_avg;
+    float height_max;
     uint32_t point_num;
 
     PointsCentroid()
@@ -90,6 +91,7 @@ private:
       height_sum = 0.0f;
       radius_avg = 0.0f;
       height_avg = 0.0f;
+      height_max = 0.0f;
       point_num = 0;
     }
 
@@ -100,6 +102,7 @@ private:
       ++point_num;
       radius_avg = radius_sum / point_num;
       height_avg = height_sum / point_num;
+      height_max = height_max < height ? height : height_max;
     }
 
     float getAverageSlope() { return std::atan2(height_avg, radius_avg); }
@@ -107,6 +110,8 @@ private:
     float getAverageHeight() { return height_avg; }
 
     float getAverageRadius() { return radius_avg; }
+    
+    float getMaxheight() {return height_max;}
   };
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ground_pcl_pub_;
@@ -128,6 +133,7 @@ private:
   float vertical_grid_resolution_distance_;
   uint16_t num_gnd_grids_reference_ = 10;
   uint16_t num_prev_grid_slope_refer_ = 2;
+  uint16_t num_prev_grid_height_refer_ = 2;
 
   float division_mode_distance_threshold_ = 5.0f;  // threshold distance for changing the mode of grid division
 
