@@ -313,9 +313,9 @@ void ScanGroundFilterComponent::classifyPointCloud(
           ground_cluster.addPoint(p->grid_radius, p->orig_point->z);
           prev_p = p;
         } else if (
-          ((p->orig_point->z - predict_curr_gnd_heigh) >= non_ground_height_threshold_) ||
-          ((p->orig_point->z - predict_curr_gnd_heigh_max) >= non_ground_height_threshold_) &&
-          local_slope_curr_p >= local_slope_max_angle_rad_) {
+          (((p->orig_point->z - predict_curr_gnd_heigh) >= non_ground_height_threshold_) ||
+          (p->orig_point->z - predict_curr_gnd_heigh_max) >= non_ground_height_threshold_) &&
+          (local_slope_curr_p >= local_slope_max_angle_rad_)) {
           out_no_ground_indices.indices.push_back(p->orig_index);
           prev_p = p;
         } else {
