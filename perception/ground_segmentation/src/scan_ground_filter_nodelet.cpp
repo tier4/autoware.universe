@@ -275,6 +275,19 @@ void ScanGroundFilterComponent::classifyPointCloud(
         local_slope_curr_p = std::atan2(
           p->orig_point->z - *(prev_gnd_grid_aver_height_list.end() - back_grids_local_slope_ref),
           p->radius - *(prev_gnd_grid_radius_list.end() - 2));
+        // if ((p->radius - prev_gnd_grid_radius_list.back()) <
+        // std::tan(global_slope_max_angle_rad_) * non_ground_height_threshold_){
+        //   local_slope_curr_p  = std::atan2(p->orig_point->z -
+        //   prev_gnd_grid_aver_height_list.back(), p->radius - prev_gnd_grid_radius_list.back());
+        // }
+        // else{
+        //   local_slope_curr_p  = std::atan2(p->orig_point->z -
+        //   prev_gnd_grid_aver_height_list.back(), std::tan(global_slope_max_angle_rad_) *
+        //   non_ground_height_threshold_);
+        // }
+        local_slope_curr_p = std::atan2(
+          p->orig_point->z - prev_gnd_grid_aver_height_list.back(),
+          p->radius - prev_gnd_grid_radius_list.back());
         predict_curr_gnd_heigh = 0.0f;
         predict_curr_gnd_heigh_max = 0.0f;
         for (int prev_reference_grids = 0; prev_reference_grids < num_gnd_grids_reference_;
@@ -294,10 +307,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
 
         if ((p->orig_point->z - predict_curr_gnd_heigh) > max_height_detection_range_) {
           //
-          out_underground_indices.indices.push_back(p->orig_index);
-          prev_p = p;
-        } else if ((p->orig_point->z - predict_curr_gnd_heigh) < -non_ground_height_threshold_) {
-          out_underground_indices.indices.push_back(p->orig_index);
+          // out_underground_indices.indices.push_back(p->orig_index);
           prev_p = p;
         } else if (
           ((abs(p->orig_point->z - predict_curr_gnd_heigh) < non_ground_height_threshold_) &&
@@ -314,9 +324,12 @@ void ScanGroundFilterComponent::classifyPointCloud(
           prev_p = p;
         } else if (
           (((p->orig_point->z - predict_curr_gnd_heigh) >= non_ground_height_threshold_) ||
-          (p->orig_point->z - predict_curr_gnd_heigh_max) >= non_ground_height_threshold_) &&
-          (local_slope_curr_p >= local_slope_max_angle_rad_)) {
+           (p->orig_point->z - predict_curr_gnd_heigh_max) >= non_ground_height_threshold_) &&
+          local_slope_curr_p >= local_slope_max_angle_rad_) {
           out_no_ground_indices.indices.push_back(p->orig_index);
+          prev_p = p;
+        } else if ((p->orig_point->z - predict_curr_gnd_heigh) < -non_ground_height_threshold_) {
+          out_underground_indices.indices.push_back(p->orig_index);
           prev_p = p;
         } else {
           out_unknown_indices.indices.push_back(p->orig_index);
