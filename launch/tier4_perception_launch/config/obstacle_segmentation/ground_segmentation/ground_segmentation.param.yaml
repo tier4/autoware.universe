@@ -26,7 +26,5 @@
         vertical_grid_resolution_distance: 0.1
         vertical_grid_resolution_angle_: 0.41
         division_mode_distance_threshold: 20.0
-        num_gnd_grids_reference: 3
         num_prev_grid_slope_refer: 4
         num_gnd_grids_reference: 4
-
