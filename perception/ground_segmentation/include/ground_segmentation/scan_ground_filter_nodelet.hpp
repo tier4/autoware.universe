@@ -110,8 +110,8 @@ private:
     float getAverageHeight() { return height_avg; }
 
     float getAverageRadius() { return radius_avg; }
-    
-    float getMaxheight() {return height_max;}
+
+    float getMaxheight() { return height_max; }
   };
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ground_pcl_pub_;
@@ -134,8 +134,12 @@ private:
   uint16_t num_gnd_grids_reference_ = 10;
   uint16_t num_prev_grid_slope_refer_ = 2;
   uint16_t num_prev_grid_height_refer_ = 2;
-
-  float division_mode_distance_threshold_ = 5.0f;  // threshold distance for changing the mode of grid division
+  float division_mode_grid_id_threshold = 0.0f;
+  float division_mode_angle_rad_threshold = 0.0f;
+  float virtual_lidar_height = 2.5f;
+  float base_link_shift_ = 0.0f;
+  float division_mode_distance_threshold_ =
+    5.0f;  // threshold distance for changing the mode of grid division
 
   double global_slope_max_angle_rad_;       // radians
   double local_slope_max_angle_rad_;        // radians

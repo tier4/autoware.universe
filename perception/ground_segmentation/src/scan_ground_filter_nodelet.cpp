@@ -37,10 +37,11 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
 {
   // set initial parameters
   {
+    base_link_shift_ = static_cast<float>(declare_parameter("base_link_shift", 0.0));
     non_ground_height_threshold_ =
       static_cast<float>(declare_parameter("non_ground_height_threshold", 0.15));
-    num_prev_grid_slope_refer_ = 
-      static_cast<int>(declare_parameter("num_prev_grid_slope_refer",2));
+    num_prev_grid_slope_refer_ =
+      static_cast<int>(declare_parameter("num_prev_grid_slope_refer", 2));
     division_mode_distance_threshold_ =
       static_cast<float>(declare_parameter("division_mode_distance_threshold", 5.0));
     max_height_detection_range_ =
@@ -61,6 +62,12 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     use_virtual_ground_point_ = declare_parameter("use_virtual_ground_point", true);
     radial_dividers_num_ = std::ceil(2.0 * M_PI / radial_divider_angle_rad_);
     vehicle_info_ = VehicleInfoUtil(*this).getVehicleInfo();
+
+    division_mode_grid_id_threshold =
+      division_mode_distance_threshold_ /
+      vertical_grid_resolution_distance_;  // changing the mode of grid division
+    division_mode_angle_rad_threshold =
+      std::atan2(division_mode_distance_threshold_, virtual_lidar_height);
   }
   ground_pcl_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
     "debug/ground_pointcloud", rclcpp::SensorDataQoS());
@@ -103,13 +110,7 @@ void ScanGroundFilterComponent::convertPointcloud(
 {
   out_radial_ordered_points.resize(radial_dividers_num_);
   PointRef current_point;
-  float virtual_lidar_height = 2.5f;
   uint16_t back_steps_num = 1;
-  float division_mode_grid_id_threshold =
-    division_mode_distance_threshold_ /
-    vertical_grid_resolution_distance_;  // changing the mode of grid division
-  float division_mode_angle_rad_threshold =
-    std::atan2(division_mode_distance_threshold_, virtual_lidar_height);
 
   vertical_grid_resolution_angle_rad_ =
     normalizeRadian(std::atan2(
@@ -117,8 +118,10 @@ void ScanGroundFilterComponent::convertPointcloud(
       virtual_lidar_height)) -
     normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
-    auto radius{static_cast<float>(std::hypot(in_cloud->points[i].x, in_cloud->points[i].y))};
-    auto theta{normalizeRadian(std::atan2(in_cloud->points[i].x, in_cloud->points[i].y), 0.0)};
+    auto x{in_cloud->points[i].x - base_link_shift_};  // base on front wheel center
+    // auto y{in_cloud->points[i].y};
+    auto radius{static_cast<float>(std::hypot(x, in_cloud->points[i].y))};
+    auto theta{normalizeRadian(std::atan2(x, in_cloud->points[i].y), 0.0)};
 
     // divide by angle
     auto gama{normalizeRadian(std::atan2(radius, virtual_lidar_height), 0.0f)};
@@ -162,6 +165,16 @@ void ScanGroundFilterComponent::convertPointcloud(
       out_radial_ordered_points[i].begin(), out_radial_ordered_points[i].end(),
       [](const PointRef & a, const PointRef & b) { return a.radius < b.radius; });
   }
+  // std::cout<<"grid_id ";
+  // for (size_t j = 0; j < out_radial_ordered_points[0].size(); ++j){
+  //   std::cout<< out_radial_ordered_points[0][j].grid_id <<" ";
+  // }
+  // std::cout<< "\n";
+  // std::cout<<"grid_radius ";
+  // for (size_t j = 0; j < out_radial_ordered_points[0].size(); ++j){
+  //   std::cout<< out_radial_ordered_points[0][j].grid_radius <<" ";
+  // }
+  // std::cout << "\n";
 }
 
 void ScanGroundFilterComponent::calcVirtualGroundOrigin(pcl::PointXYZ & point)
@@ -191,8 +204,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
     PointsCentroid ground_cluster, non_ground_cluster;
     ground_cluster.initialize();
     non_ground_cluster.initialize();
-    std::vector<float> prev_gnd_grid_height;
-    std::vector<float> prev_gnd_grid_radius;
+    std::vector<float> prev_gnd_grid_aver_height_list;
+    std::vector<float> prev_gnd_grid_radius_list;
     std::vector<uint16_t> prev_gnd_grid_id_list;
     std::vector<float> prev_gnd_grid_max_height_list;
 
@@ -207,178 +220,113 @@ void ScanGroundFilterComponent::classifyPointCloud(
     prev_p = &in_radial_ordered_clouds[i][0];  // for checking the distance to prev point
     // float distance_to_prev = calcDistance3d(p->orig_point,prev_p->orig_point);
 
-    float global_slope_rad;  // angle between current point and initial gnd point compared with
-                             // horizontal plane
-    global_slope_rad = std::atan2(p->orig_point->z, p->radius);
     for (int j = 1; j < p->grid_id; j++) {
-      prev_gnd_grid_height.push_back(0.0f);
-      prev_gnd_grid_radius.push_back(j*vertical_grid_resolution_distance_);
+      prev_gnd_grid_aver_height_list.push_back(0.0f);
+      prev_gnd_grid_radius_list.push_back(j * vertical_grid_resolution_distance_);
       prev_gnd_grid_id_list.push_back(0.0f);
       prev_gnd_grid_max_height_list.push_back(0.0f);
     }
-    float curr_height_to_prev_gnd_;  // related height between current point and prev ground level
-    float curr_height_to_prev_max_gnd;
-    curr_height_to_prev_gnd_ = p->orig_point->z - prev_gnd_grid_height.back();
-    curr_height_to_prev_max_gnd = p->orig_point->z - prev_gnd_grid_max_height_list.back();
-    float local_gap_radius;  // distance between current point and previous ground pcl center in xy
-                             // plane
-    local_gap_radius = p->radius - prev_gnd_grid_radius.back();
-
-    float local_slope_rad;  // angle between current point and previous ground pcl center compared
-                            // with horizontal plane
-    // local_slope_rad = std::atan2(curr_height_to_prev_gnd_, local_gap_radius);
-    local_slope_rad = std::atan2(p->orig_point->z - prev_gnd_grid_height.back(), p->radius - prev_gnd_grid_radius.back());
-
-    // Assume only GROUND and NON-GROUND classes for the first point of the ray, no underground
-    // point
-    if (
-      (local_slope_rad < global_slope_max_angle_rad_) ||
-      (curr_height_to_prev_max_gnd < non_ground_height_threshold_)) {
-      ground_cluster.addPoint(p->radius, p->orig_point->z);
-      p->point_state = PointLabel::GROUND;
-      out_ground_indices.indices.push_back(p->orig_index);
-    } else {
-      non_ground_cluster.addPoint(p->radius, p->orig_point->z);
-      p->point_state = PointLabel::NON_GROUND;
-      out_no_ground_indices.indices.push_back(p->orig_index);
-    }
-
-    // loop from the second point in the ray
-
-    float average_last_gnds_height = 0;
-    float average_last_gnds_radius = 0;
-    for (size_t j = 1; j < in_radial_ordered_clouds[i].size(); j++) {
-      auto * p = &in_radial_ordered_clouds[i][j];
-      // check if point in a new grid then update ground_cluster and prev_gnd_xx
+    for (size_t j = 0; j < in_radial_ordered_clouds[i].size(); j++) {
+      p = &in_radial_ordered_clouds[i][j];
+      // chec if the current point cloud is new grid:
       if (p->grid_id > prev_p->grid_id) {
-        // check if prev grid had ground point:
+        // check if the prev grid have ground point cloud:
         if (ground_cluster.getAverageRadius() > 0.0) {
-          prev_gnd_grid_height.push_back(ground_cluster.getAverageHeight());
-          prev_gnd_grid_radius.push_back(
-            ground_cluster.getAverageRadius());  // use the origin of grid for radius refererence
+          prev_gnd_grid_aver_height_list.push_back(ground_cluster.getAverageHeight());
+
           prev_gnd_grid_max_height_list.push_back(ground_cluster.getMaxheight());
           prev_gnd_grid_id_list.push_back(prev_p->grid_id);
+          prev_gnd_grid_radius_list.push_back(prev_p->grid_radius);
           ground_cluster.initialize();
+          // update the approximation of local slope using latest n grid:
           approx_prev_local_gnd_slope_rad = 0.f;
-          average_last_gnds_height = 0.f;
-          average_last_gnds_radius = 0.f;
           for (int prev_grid_id = 0; prev_grid_id < num_gnd_grids_reference_; prev_grid_id++) {
-            average_last_gnds_height +=
-              prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2 - prev_grid_id);
-            average_last_gnds_radius +=
-              prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2 - prev_grid_id);
-            approx_prev_local_gnd_slope_rad += std::atan2(prev_gnd_grid_height.back() - *(prev_gnd_grid_height.end() - 2 - prev_grid_id),
-                                                          prev_gnd_grid_radius.back() - *(prev_gnd_grid_radius.end() - 2 - prev_grid_id));
-            predict_curr_gnd_heigh += *(prev_gnd_grid_height.end() - 2 - prev_grid_id) / (*(prev_gnd_grid_radius.end() - 2 - prev_grid_id));
-            predict_curr_gnd_heigh_max += *(prev_gnd_grid_max_height_list.end() - 2 - prev_grid_id) / (*(prev_gnd_grid_max_height_list.end() - 2 - prev_grid_id));
+            approx_prev_local_gnd_slope_rad += std::atan2(
+              prev_gnd_grid_aver_height_list.back() -
+                *(prev_gnd_grid_aver_height_list.end() - 2 - prev_grid_id),
+              prev_gnd_grid_radius_list.back() -
+                *(prev_gnd_grid_radius_list.end() - 2 - prev_grid_id));
           }
-          predict_curr_gnd_heigh *= p->radius;
-          predict_curr_gnd_heigh /= static_cast<float>(num_gnd_grids_reference_);
-
-          predict_curr_gnd_heigh_max *= p->radius;
-          predict_curr_gnd_heigh_max /= static_cast<float>(num_gnd_grids_reference_);
-
-          average_last_gnds_height /= num_gnd_grids_reference_;
-          average_last_gnds_radius /= num_gnd_grids_reference_;
           approx_prev_local_gnd_slope_rad /= num_gnd_grids_reference_;
-          // approx_prev_local_gnd_slope_rad = std::atan2(average_last_gnds_height - *(prev_gnd_grid_height.end()-2-num_gnd_grids_reference_), 
-          //                                             average_last_gnds_radius - *(prev_gnd_grid_radius.end()-2 - num_gnd_grids_reference_));
+          // std::cout <<"p grid_id :" << p->grid_id << " : prev_p grid_id :" << prev_p->grid_id <<
+          // " approx_prev_local_gnd_slope" << (approx_prev_local_gnd_slope_rad*180.0f / 3.14)
+          // <<"\n";
         }
-        // else{
-        //   //add predicted gnd:
-        //   //add predicted ground_height level
-        //   prev_gnd_grid_height.push_back(prev_gnd_grid_height.back() + (prev_p->radius - prev_gnd_grid_radius.back())*std::tan(approx_prev_local_gnd_slope_rad));
-        //   prev_gnd_grid_radius.push_back(prev_p->grid_id);
-        //   prev_gnd_grid_id_list.push_back(prev_p->grid_id);
-        // }
       }
-
-      //TODO: predict ground level for current pointcloud
-      // 
-      // predict_curr_gnd_heigh = average_last_gnds_height + (p->radius - average_last_gnds_radius)*std::tan(approx_prev_local_gnd_slope_rad); 
-      float curr_height_to_approx_curr_gnd_ = p->orig_point->z - predict_curr_gnd_heigh;
-      float curr_height_to_max_prev_gnd = p->orig_point->z - predict_curr_gnd_heigh_max;
-      //TODO: change the reference point if previous grid is gnd -> to some previous grids (num_gnd_grids_reference_?)
-
-      uint16_t refer_gnd_id =  prev_gnd_grid_id_list.size() - 1;// < num_prev_grid_slope_refer_ ? 0 : prev_gnd_grid_id_list.back() < num_prev_grid_slope_refer_;
-      //find the reference gnd point: 
-      while((p->grid_id < prev_gnd_grid_id_list[refer_gnd_id] + num_prev_grid_slope_refer_) && (refer_gnd_id > 0)){
-        refer_gnd_id -= 1;
-      }
-
-      curr_height_to_prev_gnd_ = p->orig_point->z - prev_gnd_grid_height.back();
-      curr_height_to_prev_max_gnd = p->orig_point->z - prev_gnd_grid_max_height_list.back();
-      local_gap_radius = p->radius - prev_gnd_grid_radius[refer_gnd_id];
-      local_slope_rad = std::atan2(p->orig_point->z - prev_gnd_grid_height.back(), p->radius - prev_gnd_grid_radius.back());
-
-      global_slope_rad = std::atan2(p->orig_point->z, p->radius);
-      float adap_non_ground_height_thresh = non_ground_height_threshold_;
-      // if (p->orig_point->x < 0) {
-      //   adap_non_ground_height_thresh = p->radius < 20.0
-      //                                     ? non_ground_height_threshold_
-      //                                     : non_ground_height_threshold_ * std::sqrt(p->radius / 20.f);
-      //   // adap_non_ground_height_thresh =
-      //   //   adap_non_ground_height_thresh < 2 * non_ground_height_threshold_
-      //   //     ? adap_non_ground_height_thresh
-      //   //     : 2 * non_ground_height_threshold_;
-      // // }
-      // // else{
-      // //   adap_non_ground_height_thresh = p->radius < 40.0
-      // //                                     ? non_ground_height_threshold_
-      // //                                     : non_ground_height_threshold_ * p->radius / 40.0;
-      // //   adap_non_ground_height_thresh =
-      // //     adap_non_ground_height_thresh < 2 * non_ground_height_threshold_
-      // //       ? adap_non_ground_height_thresh
-      // //       : 2 * non_ground_height_threshold_;
-      // }
-
-      // if (p->radius > 20.0f){
-      //   adap_non_ground_height_thresh = non_ground_height_threshold_ * std::sqrt(p->radius / 20.f); 
-      // }
-
-      // check point class
-      if (curr_height_to_approx_curr_gnd_ > max_height_detection_range_) {
-        // out of range, do not update prev_p
-        p->point_state = PointLabel::OUT_OF_RANGE;
-      } else if (
-        (curr_height_to_approx_curr_gnd_ < -adap_non_ground_height_thresh) &&
-        ((local_slope_rad < -global_slope_max_angle_rad_) )) {
-        // under ground point, skip update prev_p
-        p->point_state = PointLabel::OUT_OF_RANGE;
-        out_underground_indices.indices.push_back(p->orig_index);
-        if (curr_height_to_approx_curr_gnd_ > -3.0 * adap_non_ground_height_thresh){
+      if (j == 0) {
+        if (p->orig_point->z > non_ground_height_threshold_) {
+          out_no_ground_indices.indices.push_back(p->orig_index);
           prev_p = p;
-        }
-      } else if (global_slope_rad > global_slope_max_angle_rad_) {
-        p->point_state = PointLabel::NON_GROUND;
-        out_no_ground_indices.indices.push_back(p->orig_index);
-        non_ground_cluster.addPoint(p->radius, p->orig_point->z);
-        prev_p = p;
-      }
-      else if (abs(curr_height_to_approx_curr_gnd_) < adap_non_ground_height_thresh ||
-               (abs(curr_height_to_max_prev_gnd) < adap_non_ground_height_thresh)||
-               (abs(local_slope_rad) < global_slope_max_angle_rad_) ) {
-          // ground point
-          p->point_state = PointLabel::GROUND;
+        } else {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           prev_p = p;
+        }
+      } else {
+        // float global_slope_curr_p = 0.0f;
+        float local_slope_curr_p = 0.0f;
+        // float local_height_curr_p = 0.0f;
+        // global_slope_curr_p = std::atan2(p->orig_point->z, p->radius);
+        uint16_t back_grids_local_slope_ref = 2;
+        // while(p->radius - *(prev_gnd_grid_radius_list.end() - back_grids_local_slope_ref) <
+        // std::tan(global_slope_max_angle_rad_)*non_ground_height_threshold_){
+        //   back_grids_local_slope_ref += 1;
+        // }
+        local_slope_curr_p = std::atan2(
+          p->orig_point->z - *(prev_gnd_grid_aver_height_list.end() - back_grids_local_slope_ref),
+          p->radius - *(prev_gnd_grid_radius_list.end() - 2));
+        predict_curr_gnd_heigh = 0.0f;
+        predict_curr_gnd_heigh_max = 0.0f;
+        for (int prev_reference_grids = 0; prev_reference_grids < num_gnd_grids_reference_;
+             prev_reference_grids++) {
+          predict_curr_gnd_heigh +=
+            (*(prev_gnd_grid_aver_height_list.end() - 1 - prev_reference_grids)) /
+            (*(prev_gnd_grid_radius_list.end() - 1 - prev_reference_grids));
+          predict_curr_gnd_heigh_max +=
+            (*(prev_gnd_grid_max_height_list.end() - 1 - prev_reference_grids)) /
+            (*(prev_gnd_grid_radius_list.end() - 1 - prev_reference_grids));
+        }
+        predict_curr_gnd_heigh *= p->radius;
+        predict_curr_gnd_heigh /= static_cast<float>(num_gnd_grids_reference_);
+
+        predict_curr_gnd_heigh_max *= p->radius;
+        predict_curr_gnd_heigh_max /= static_cast<float>(num_gnd_grids_reference_);
+
+        if ((p->orig_point->z - predict_curr_gnd_heigh) > max_height_detection_range_) {
+          //
+          out_underground_indices.indices.push_back(p->orig_index);
+          prev_p = p;
+        } else if ((p->orig_point->z - predict_curr_gnd_heigh) < -non_ground_height_threshold_) {
+          out_underground_indices.indices.push_back(p->orig_index);
+          prev_p = p;
         } else if (
-          (curr_height_to_approx_curr_gnd_ > adap_non_ground_height_thresh) &&
-          (curr_height_to_max_prev_gnd > adap_non_ground_height_thresh)) {
-          // non ground point
-          p->point_state = PointLabel::NON_GROUND;
+          ((abs(p->orig_point->z - predict_curr_gnd_heigh) < non_ground_height_threshold_) &&
+           abs(p->orig_point->z - predict_curr_gnd_heigh_max) < non_ground_height_threshold_) ||
+          (abs(local_slope_curr_p) < local_slope_max_angle_rad_)) {
+          out_ground_indices.indices.push_back(p->orig_index);
+          // if (
+          //   (abs(p->orig_point->z - predict_curr_gnd_heigh) < non_ground_height_threshold_ / 2) ||
+          //   (ground_cluster.getAverageRadius() == 0.0f)) {
+          //   ground_cluster.addPoint(p->grid_radius, p->orig_point->z);
+          // }
+
+          ground_cluster.addPoint(p->grid_radius, p->orig_point->z);
+          prev_p = p;
+        } else if (
+          ((p->orig_point->z - predict_curr_gnd_heigh) >= non_ground_height_threshold_) ||
+          ((p->orig_point->z - predict_curr_gnd_heigh_max) >= non_ground_height_threshold_) &&
+          local_slope_curr_p >= local_slope_max_angle_rad_) {
           out_no_ground_indices.indices.push_back(p->orig_index);
-          non_ground_cluster.addPoint(p->radius, p->orig_point->z);
           prev_p = p;
         } else {
-          p->point_state = PointLabel::UNKNOWN;
           out_unknown_indices.indices.push_back(p->orig_index);
           prev_p = p;
         }
-      
-      // TODO: check distance to previous point or ground center, non ground center
+      }
     }
+    // estimate the height from predicted current ground and compare with threshold
+
+    // estimate the local slope to previous virtual gnd and compare with
   }
 }
 
@@ -440,9 +388,9 @@ void ScanGroundFilterComponent::classifyPointCloud(
         calculate_slope = false;
       } else if (
         (prev_point_label == PointLabel::NON_GROUND) &&
-        (std::abs(height_from_obj) >= split_height_distance_)) {
+        (abs(height_from_obj) >= split_height_distance_)) {
         calculate_slope = true;
-      } else if (is_point_close_to_prev && std::abs(height_from_gnd) < split_height_distance_) {
+      } else if (is_point_close_to_prev && abs(height_from_gnd) < split_height_distance_) {
         // close to the previous point, set point follow label
         p->point_state = PointLabel::POINT_FOLLOW;
         calculate_slope = false;
