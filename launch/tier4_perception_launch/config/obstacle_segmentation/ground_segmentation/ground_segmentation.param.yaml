@@ -1,5 +1,6 @@
 /**:
   ros__parameters:
+    # additional_lidars: ["rear","left","right"]
     additional_lidars: []
     ransac_input_topics: []
     use_single_frame_filter: False
@@ -17,7 +18,13 @@
       plugin: "ground_segmentation::ScanGroundFilterComponent"
       parameters:
         global_slope_max_angle_deg: 10.0
-        local_slope_max_angle_deg: 30.0
+        local_slope_max_angle_deg: 10.0
         split_points_distance_tolerance: 0.2
-        split_height_distance: 0.3
-        use_virtual_ground_point: True
+        split_height_distance: 0.2
+        use_virtual_ground_point: False
+        non_ground_height_threshold: 0.20
+        vertical_grid_resolution_distance: 0.1
+        vertical_grid_resolution_angle_: 0.41
+        division_mode_distance_threshold: 20.0
+        num_prev_grid_slope_refer: 4
+        num_gnd_grids_reference: 4
