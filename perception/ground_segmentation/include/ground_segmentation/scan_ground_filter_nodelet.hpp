@@ -54,9 +54,13 @@ private:
     POINT_FOLLOW,
     UNKNOWN,
     VIRTUAL_GROUND,
+    OUT_OF_RANGE
   };
   struct PointRef
   {
+    float gama;         // angle in vertical
+    float grid_radius;  // radius of grid
+    uint16_t grid_id;   // id of grid in vertical
     float radius;       // cylindrical coords on XY Plane
     float theta;        // angle deg on XY plane
     size_t radial_div;  // index of the radial division to which this point belongs to
@@ -73,6 +77,7 @@ private:
     float height_sum;
     float radius_avg;
     float height_avg;
+    float height_max;
     uint32_t point_num;
 
     PointsCentroid()
@@ -86,6 +91,7 @@ private:
       height_sum = 0.0f;
       radius_avg = 0.0f;
       height_avg = 0.0f;
+      height_max = 0.0f;
       point_num = 0;
     }
 
@@ -96,6 +102,7 @@ private:
       ++point_num;
       radius_avg = radius_sum / point_num;
       height_avg = height_sum / point_num;
+      height_max = height_max < height ? height : height_max;
     }
 
     float getAverageSlope() { return std::atan2(height_avg, radius_avg); }
@@ -103,8 +110,13 @@ private:
     float getAverageHeight() { return height_avg; }
 
     float getAverageRadius() { return radius_avg; }
+
+    float getMaxheight() { return height_max; }
   };
 
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ground_pcl_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr unknown_pcl_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr under_ground_pcl_pub_;
   void filter(
     const PointCloud2ConstPtr & input, const IndicesPtr & indices, PointCloud2 & output) override;
 
@@ -113,6 +125,22 @@ private:
 
   std::string base_frame_;
   std::string sensor_frame_;
+
+  float non_ground_height_threshold_;
+  float max_height_detection_range_;
+  float min_height_detection_range_;
+  float vertical_grid_resolution_angle_rad_;
+  float vertical_grid_resolution_distance_;
+  uint16_t num_gnd_grids_reference_ = 10;
+  uint16_t num_prev_grid_slope_refer_ = 2;
+  uint16_t num_prev_grid_height_refer_ = 2;
+  float division_mode_grid_id_threshold = 0.0f;
+  float division_mode_angle_rad_threshold = 0.0f;
+  float virtual_lidar_height = 2.5f;
+  float base_link_shift_ = 0.0f;
+  float division_mode_distance_threshold_ =
+    5.0f;  // threshold distance for changing the mode of grid division
+
   double global_slope_max_angle_rad_;       // radians
   double local_slope_max_angle_rad_;        // radians
   double radial_divider_angle_rad_;         // distance in rads between dividers
@@ -161,6 +189,11 @@ private:
   void classifyPointCloud(
     std::vector<PointCloudRefVector> & in_radial_ordered_clouds,
     pcl::PointIndices & out_no_ground_indices);
+
+  void classifyPointCloud(
+    std::vector<PointCloudRefVector> & in_radial_ordered_clouds,
+    pcl::PointIndices & out_no_ground_indices, pcl::PointIndices & out_ground_indices,
+    pcl::PointIndices & out_unknown_indices, pcl::PointIndices & out_underground_indices);
 
   /*!
    * Returns the resulting complementary PointCloud, one with the points kept
