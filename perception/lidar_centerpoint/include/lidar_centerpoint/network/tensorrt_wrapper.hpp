@@ -31,7 +31,7 @@ struct Deleter
   void operator()(T * obj) const
   {
     if (obj) {
-      delete obj;
+      obj->destroy();
     }
   }
 };
@@ -85,7 +85,6 @@ private:
   bool createContext();
 
   unique_ptr<nvinfer1::IRuntime> runtime_ = nullptr;
-  unique_ptr<nvinfer1::IHostMemory> plan_ = nullptr;
   unique_ptr<nvinfer1::ICudaEngine> engine_ = nullptr;
 };
 
