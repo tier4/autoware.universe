@@ -18,6 +18,7 @@
 #include <array>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 namespace interpolation_utils
 {
@@ -29,6 +30,7 @@ inline bool isIncreasing(const std::vector<double> & x)
 
   for (size_t i = 0; i < x.size() - 1; ++i) {
     if (x.at(i) >= x.at(i + 1)) {
+      std::cerr<<"base_keys is not sorted."<<std::endl;
       return false;
     }
   }
@@ -44,6 +46,7 @@ inline bool isNotDecreasing(const std::vector<double> & x)
 
   for (size_t i = 0; i < x.size() - 1; ++i) {
     if (x.at(i) > x.at(i + 1)) {
+      std::cerr<<"query_keys is not sorted."<<std::endl;
       return false;
     }
   }
@@ -67,7 +70,7 @@ inline void validateKeys(
 
   // when indices are not sorted
   if (!isIncreasing(base_keys) || !isNotDecreasing(query_keys)) {
-    throw std::invalid_argument("Either base_keys or query_keys is not sorted.");
+    std::cerr<<"Either base_keys or query_keys is not sorted."<<std::endl;
   }
 
   // when query_keys is out of base_keys (This function does not allow exterior division.)

@@ -44,8 +44,29 @@ bool splineInterpolate(
     return false;
   }
 
+  // print path
+  {
+    auto &p = input;
+    for (size_t i = 1; i < p.points.size(); i++)
+    {
+      auto p0 = p.points.at(i).point.pose.position;
+      auto p1 = p.points.at(i-1).point.pose.position;
+      double ds = std::hypot(p0.x-p1.x,p1.y-p0.y);
+      if(ds<0.01) std::cerr<<" idx "<<i<<" p0x "<<p0.x<<" p0y "<<p0.y<<" p1x"<<p1.x<<" p1y"<<p1.y<<std::endl;
+    }
+  }
   output = motion_utils::resamplePath(input, interval, false, true, true, false);
-
+  // print path
+  {
+    auto &p = output;
+    for (size_t i = 1; i < p.points.size(); i++)
+    {
+      auto p0 = p.points.at(i).point.pose.position;
+      auto p1 = p.points.at(i-1).point.pose.position;
+      double ds = std::hypot(p0.x-p1.x,p1.y-p0.y);
+      if(ds<0.01) std::cerr<<" idx "<<i<<" p0x "<<p0.x<<" p0y "<<p0.y<<" p1x"<<p1.x<<" p1y"<<p1.y<<std::endl;
+    }
+  }
   return true;
 }
 

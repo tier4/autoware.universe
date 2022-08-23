@@ -176,6 +176,17 @@ protected:
     infrastructure_command_array.stamp = clock_->now();
 
     first_stop_path_point_index_ = static_cast<int>(path->points.size()) - 1;
+    // print path
+    {
+      auto &p = *path;
+      for (size_t i = 1; i < p.points.size(); i++)
+      {
+        auto p0 = p.points.at(i).point.pose.position;
+        auto p1 = p.points.at(i-1).point.pose.position;
+        double ds = std::hypot(p0.x-p1.x,p1.y-p0.y);
+        if(ds<0.01) std::cerr<<"before module: "<<std::string(getModuleName())<<" idx "<<i<<" p0x "<<p0.x<<" p0y "<<p0.y<<" p1x"<<p1.x<<" p1y"<<p1.y<<std::endl;
+      }
+    }
     for (const auto & scene_module : scene_modules_) {
       tier4_planning_msgs::msg::StopReason stop_reason;
       scene_module->setPlannerData(planner_data_);
@@ -215,6 +226,17 @@ protected:
     pub_virtual_wall_->publish(virtual_wall_marker_array);
     processing_time_publisher_->publish<Float64Stamped>(
       std::string(getModuleName()) + "/processing_time_ms", stop_watch.toc("Total"));
+    // print path
+    {
+      auto &p = *path;
+      for (size_t i = 1; i < p.points.size(); i++)
+      {
+        auto p0 = p.points.at(i).point.pose.position;
+        auto p1 = p.points.at(i-1).point.pose.position;
+        double ds = std::hypot(p0.x-p1.x,p1.y-p0.y);
+        if(ds<0.01) std::cerr<<"after module: "<<std::string(getModuleName())<<" idx "<<i<<" p0x "<<p0.x<<" p0y "<<p0.y<<" p1x"<<p1.x<<" p1y"<<p1.y<<std::endl;
+      }
+    }
   }
 
   virtual void launchNewModules(const autoware_auto_planning_msgs::msg::PathWithLaneId & path) = 0;
