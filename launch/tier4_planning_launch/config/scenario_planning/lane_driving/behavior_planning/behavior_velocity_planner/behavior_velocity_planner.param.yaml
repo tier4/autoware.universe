@@ -4,7 +4,7 @@
     launch_crosswalk: true
     launch_traffic_light: true
     launch_intersection: true
-    launch_blind_spot: false
+    launch_blind_spot: true
     launch_detection_area: true
     launch_virtual_traffic_light: true
     launch_occlusion_spot: true
