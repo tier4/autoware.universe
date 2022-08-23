@@ -17,6 +17,8 @@
 
 #include <image_projection_based_fusion/debugger.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <tier4_autoware_utils/ros/debug_publisher.hpp>
+#include <tier4_autoware_utils/system/stop_watch.hpp>
 
 #include <autoware_auto_perception_msgs/msg/detected_objects.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
@@ -111,6 +113,10 @@ protected:
   float filter_scope_maxy_;
   float filter_scope_minz_;
   float filter_scope_maxz_;
+
+  std::unique_ptr<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_{
+    nullptr};
+  std::unique_ptr<tier4_autoware_utils::DebugPublisher> debug_publisher_ptr_{nullptr};
 };
 
 }  // namespace image_projection_based_fusion

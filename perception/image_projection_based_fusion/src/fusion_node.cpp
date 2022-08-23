@@ -140,6 +140,16 @@ FusionNode<Msg, ObjType>::FusionNode(
   filter_scope_maxy_ = declare_parameter("filter_scope_maxy", 100);
   filter_scope_minz_ = declare_parameter("filter_scope_minz", -100);
   filter_scope_maxz_ = declare_parameter("filter_scope_maxz", 100);
+
+  // initialize debug tool
+  {
+    using tier4_autoware_utils::DebugPublisher;
+    using tier4_autoware_utils::StopWatch;
+    stop_watch_ptr_ = std::make_unique<StopWatch<std::chrono::milliseconds>>();
+    debug_publisher_ptr_ = std::make_unique<DebugPublisher>(this, "image_projection_based_fusion");
+    stop_watch_ptr_->tic("cyclic_time");
+    stop_watch_ptr_->tic("processing_time");
+  }
 }
 
 template <class Msg, class Obj>
@@ -167,6 +177,9 @@ void FusionNode<Msg, Obj>::fusionCallback(
   DetectedObjectsWithFeature::ConstSharedPtr input_roi6_msg,
   DetectedObjectsWithFeature::ConstSharedPtr input_roi7_msg)
 {
+  if (stop_watch_ptr_) {
+    stop_watch_ptr_->toc("processing_time", true);
+  }
   Msg output_msg = *input_msg;
 
   preprocess(output_msg);
@@ -218,6 +231,16 @@ void FusionNode<Msg, Obj>::fusionCallback(
   postprocess(output_msg);
 
   publish(output_msg);
+
+  // add processing time for debug
+  if (debug_publisher_ptr_ && stop_watch_ptr_) {
+    const double cyclic_time_ms = stop_watch_ptr_->toc("cyclic_time", true);
+    const double processing_time_ms = stop_watch_ptr_->toc("processing_time", true);
+    debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+      "debug/cyclic_time_ms", cyclic_time_ms);
+    debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+      "debug/processing_time_ms", processing_time_ms);
+  }
 }
 
 template <class Msg, class Obj>
