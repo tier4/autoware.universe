@@ -116,6 +116,7 @@ bool BlindSpotModule::modifyPathVelocity(
   debug_data_.virtual_wall_pose = stop_line_pose;
   debug_data_.stop_point_pose = path->points.at(stop_line_idx).point.pose;
   debug_data_.judge_point_pose = path->points.at(pass_judge_line_idx).point.pose;
+  std::cout<<"index: stop line: "<<stop_line_idx<<" pass judge "<<pass_judge_line_idx<<std::endl;
 
   /* if current_state = GO, and current_pose is over judge_line, ignore planning. */
   is_over_pass_judge_line_ = static_cast<bool>(static_cast<int>(closest_idx) > pass_judge_line_idx);
@@ -249,6 +250,7 @@ bool BlindSpotModule::generateStopLine(
 
   /* insert stop_point */
   [[maybe_unused]] bool is_stop_point_inserted = true;
+  //  const size_t base_idx = motion_utils::findNearestSegmentIndex(output.points, stop_point);
   *stop_line_idx = insertPoint(stop_idx_ip, path_ip, path, is_stop_point_inserted);
 
   /* if another stop point exist before intersection stop_line, disable judge_line. */
@@ -306,6 +308,12 @@ void BlindSpotModule::cutPredictPathWithDuration(
     }
   }
 }
+
+//boost::optional<geometry_msgs::msg::Pose> insertStopPointFromInterpolatedPath(
+//  const geometry_msgs::msg::Point & stop_point, const PathWithLaneId & interp_path, PathWithLaneId & output){
+//  
+//  auto p = calcLongitudinalOffsetPose();
+//}
 
 int BlindSpotModule::insertPoint(
   const int insert_idx_ip, const autoware_auto_planning_msgs::msg::PathWithLaneId path_ip,
