@@ -126,7 +126,8 @@ void ScanGroundFilterComponent::convertPointcloud(
 
     // divide by angle
     auto gama{normalizeRadian(std::atan2(radius, virtual_lidar_height), 0.0f)};
-    auto radial_div{static_cast<size_t>(std::floor(normalizeDegree(theta / radial_divider_angle_rad_, 0.0)))};
+    auto radial_div{
+      static_cast<size_t>(std::floor(normalizeDegree(theta / radial_divider_angle_rad_, 0.0)))};
     uint16_t grid_id = 0;
     float grid_radius = 0.0f;
     if (radius <= division_mode_distance_threshold_) {
@@ -216,6 +217,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
       prev_gnd_grid_id_list.push_back(0.0f);
       prev_gnd_grid_max_height_list.push_back(0.0f);
     }
+    bool initilized_flg = false;
     for (size_t j = 0; j < in_radial_ordered_clouds[i].size(); j++) {
       p = &in_radial_ordered_clouds[i][j];
       float global_slope_curr_p = 0.0f;
@@ -246,26 +248,33 @@ void ScanGroundFilterComponent::classifyPointCloud(
       local_slope_curr_p = std::atan2(
         p->orig_point->z - prev_gnd_grid_aver_height_list.back(),
         p->radius - prev_gnd_grid_radius_list.back());
-      if (j == 0) {
+      if ((initilized_flg == 0)) {
         if (
           (p->orig_point->z > non_ground_height_threshold_) &&
           (global_slope_curr_p > global_slope_max_angle_rad_) &&
           (local_slope_curr_p > local_slope_max_angle_rad_)) {
           out_no_ground_indices.indices.push_back(p->orig_index);
           prev_p = p;
-        } else {
+          initilized_flg = true;
+
+        } else if ((abs(p->orig_point->z) < non_ground_height_threshold_)) {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           prev_p = p;
+          initilized_flg = true;
+        } else {
+          // nothing
         }
       } else {
         // TODO: calc next ground by approximated local ground
         // predict_curr_gnd_heigh =
         //   prev_gnd_grid_aver_height_list.back() + std::tan(approx_prev_local_gnd_slope_rad) *
-        //                                             (p->radius - prev_gnd_grid_radius_list.back());
+        //                                             (p->radius -
+        //                                             prev_gnd_grid_radius_list.back());
         // predict_curr_gnd_heigh_max =
         //   prev_gnd_grid_max_height_list.back() + std::tan(approx_prev_local_gnd_slope_rad) *
-        //                                            (p->radius - prev_gnd_grid_radius_list.back());
+        //                                            (p->radius -
+        //                                            prev_gnd_grid_radius_list.back());
         predict_curr_gnd_heigh = 0.0f;
         predict_curr_gnd_heigh_max = 0.0f;
         for (int prev_reference_grids = 0; prev_reference_grids < num_gnd_grids_reference_;
