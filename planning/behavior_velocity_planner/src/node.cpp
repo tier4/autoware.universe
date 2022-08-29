@@ -16,6 +16,7 @@
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <tier4_autoware_utils/ros/wait_for_param.hpp>
+#include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 #include <utilization/path_utilization.hpp>
 
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
@@ -90,7 +91,9 @@ BehaviorVelocityPlannerNode::BehaviorVelocityPlannerNode(const rclcpp::NodeOptio
 : Node("behavior_velocity_planner_node", node_options),
   tf_buffer_(this->get_clock()),
   tf_listener_(tf_buffer_),
-  planner_data_(*this)
+  planner_data_(*this),
+  prev_pose_(nullptr),
+  prev_closest_stop_dist_(nullptr)
 {
   using std::placeholders::_1;
   // Trigger Subscriber
@@ -416,8 +419,50 @@ void BehaviorVelocityPlannerNode::onTrigger(
     return;
   }
 
+  {
+    autoware_auto_planning_msgs::msg::Path tmp_path;
+    for (size_t i = 0; i < input_path_msg->points.size(); ++i) {
+      tmp_path.points.push_back(input_path_msg->points.at(i).point);
+    }
+
+    const auto closest_stop_dist =
+      motion_utils::calcDistanceToForwardStopPoint(tmp_path.points, planner_data.current_pose.pose);
+    const auto path_length = motion_utils::calcArcLength(tmp_path.points);
+    if (closest_stop_dist) {
+      std::cerr << "Behavior Input Closest Stop Dist: " << *closest_stop_dist << std::endl;
+      std::cerr << "Behavior Input path length: " << path_length << std::endl;
+    }
+  }
+
   const autoware_auto_planning_msgs::msg::Path output_path_msg =
     generatePath(input_path_msg, planner_data);
+
+  {
+    if (prev_pose_ == nullptr) {
+      prev_pose_ = std::make_shared<geometry_msgs::msg::PoseStamped>(planner_data.current_pose);
+    } else {
+      const double dist =
+        tier4_autoware_utils::calcDistance2d(prev_pose_->pose, planner_data.current_pose.pose);
+      std::cerr << "Behavior dist: " << dist << std::endl;
+      prev_pose_ = std::make_shared<geometry_msgs::msg::PoseStamped>(planner_data.current_pose);
+    }
+
+    const auto closest_stop_dist = motion_utils::calcDistanceToForwardStopPoint(
+      output_path_msg.points, planner_data.current_pose.pose);
+    const auto path_length = motion_utils::calcArcLength(output_path_msg.points);
+    if (closest_stop_dist) {
+      std::cerr << "Behavior Output Closest Stop Dist: " << *closest_stop_dist << std::endl;
+      std::cerr << "Behavior Output path length: " << path_length << std::endl;
+      if (prev_closest_stop_dist_ == nullptr) {
+        prev_closest_stop_dist_ = std::make_shared<double>(*closest_stop_dist);
+      } else {
+        std::cerr << "Behavior prev closest stop dist: " << *prev_closest_stop_dist_ << std::endl;
+        std::cerr << "Behavior closest stop dist diff: "
+                  << *prev_closest_stop_dist_ - *closest_stop_dist << std::endl;
+        prev_closest_stop_dist_ = std::make_shared<double>(*closest_stop_dist);
+      }
+    }
+  }
 
   path_pub_->publish(output_path_msg);
   stop_reason_diag_pub_->publish(planner_manager_.getStopReasonDiag());

@@ -117,6 +117,10 @@ private:
   autoware_auto_planning_msgs::msg::Path generatePath(
     const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr input_path_msg,
     const PlannerData & planner_data);
+
+  // tmp
+  std::shared_ptr<geometry_msgs::msg::PoseStamped> prev_pose_;
+  std::shared_ptr<double> prev_closest_stop_dist_;
 };
 }  // namespace behavior_velocity_planner
 

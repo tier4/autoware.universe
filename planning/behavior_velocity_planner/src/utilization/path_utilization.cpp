@@ -83,10 +83,6 @@ autoware_auto_planning_msgs::msg::Path interpolatePath(
     double s = 0.0;
     for (size_t idx = 0; idx < path.points.size(); ++idx) {
       const auto path_point = path.points.at(idx);
-      x.push_back(path_point.pose.position.x);
-      y.push_back(path_point.pose.position.y);
-      z.push_back(path_point.pose.position.z);
-      v.push_back(path_point.longitudinal_velocity_mps);
       if (idx != 0) {
         const auto path_point_prev = path.points.at(idx - 1);
         s += tier4_autoware_utils::calcDistance2d(path_point_prev.pose, path_point.pose);
@@ -94,6 +90,10 @@ autoware_auto_planning_msgs::msg::Path interpolatePath(
       if (s > path_len) {
         break;
       }
+      x.push_back(path_point.pose.position.x);
+      y.push_back(path_point.pose.position.y);
+      z.push_back(path_point.pose.position.z);
+      v.push_back(path_point.longitudinal_velocity_mps);
       s_in.push_back(s);
     }
 

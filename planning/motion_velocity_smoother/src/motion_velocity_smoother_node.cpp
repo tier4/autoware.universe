@@ -357,6 +357,16 @@ void MotionVelocitySmootherNode::onCurrentTrajectory(const Trajectory::ConstShar
     return;
   }
 
+  {
+    const auto closest_stop_dist =
+      motion_utils::calcDistanceToForwardStopPoint(msg->points, current_pose_ptr_->pose);
+    const auto traj_length = motion_utils::calcArcLength(msg->points);
+    if (closest_stop_dist) {
+      std::cerr << "Input Closest Stop Dist: " << *closest_stop_dist << std::endl;
+      std::cerr << "Input Trajectory Length: " << traj_length << std::endl;
+    }
+  }
+
   // calculate distance to insert external velocity limit
   updateDataForExternalVelocityLimit();
 
@@ -388,6 +398,16 @@ void MotionVelocitySmootherNode::onCurrentTrajectory(const Trajectory::ConstShar
   // Set 0 at the end of the trajectory
   if (!output_resampled->empty()) {
     output_resampled->back().longitudinal_velocity_mps = 0.0;
+  }
+
+  {
+    const auto closest_stop_dist =
+      motion_utils::calcDistanceToForwardStopPoint(*output_resampled, current_pose_ptr_->pose);
+    const auto traj_length = motion_utils::calcArcLength(*output_resampled);
+    if (closest_stop_dist) {
+      std::cerr << "Output Closest Stop Dist: " << *closest_stop_dist << std::endl;
+      std::cerr << "Output Trajectory Length: " << traj_length << std::endl;
+    }
   }
 
   // update previous step infomation
