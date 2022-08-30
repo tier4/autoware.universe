@@ -220,7 +220,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
       prev_gnd_grid_max_height_list.push_back(0.0f);
     }
     bool initilized_flg = false;
-    float dist_to_front = 1.150f; 
+
+    float dist_to_front = vehicle_info_.front_overhang_m + vehicle_info_.wheel_base_m / 2.0f; 
     for (size_t j = 0; j < in_radial_ordered_clouds[i].size(); j++) {
       p = &in_radial_ordered_clouds[i][j];
       if (p->grid_id > prev_p->grid_id) {
@@ -240,18 +241,16 @@ void ScanGroundFilterComponent::classifyPointCloud(
       // local_slope_curr_p = std::atan2(
       //   p->orig_point->z - prev_gnd_grid_aver_height_list.back(),
       //   p->radius - prev_gnd_grid_radius_list.back());
-      if ((initilized_flg == false) || (p->radius < dist_to_front + num_gnd_grids_reference_*vertical_grid_resolution_distance_)) {
+      if ((initilized_flg == false) || (p->radius < dist_to_front + vertical_grid_resolution_distance_)) {
         // add condition for suddent slope, but it lose ability to detect 20cm object near by
         if (
-          (p->orig_point->z >= non_ground_height_threshold_) &&
-          (global_slope_curr_p >= deg2rad(6.0))) {
+          (p->orig_point->z > non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * (dist_to_front + vertical_grid_resolution_distance_)) ) {
           out_no_ground_indices.indices.push_back(p->orig_index);
           prev_p = p;
           initilized_flg = true;
 
         } else if (
-          (abs(p->orig_point->z) < non_ground_height_threshold_) ||
-          (abs(global_slope_curr_p) < deg2rad(6.0))) {
+          (abs(p->orig_point->z) < non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * (dist_to_front + vertical_grid_resolution_distance_)))  {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           prev_p = p;
@@ -276,18 +275,17 @@ void ScanGroundFilterComponent::classifyPointCloud(
           mid_ref_gnd_radius /= static_cast<float>(num_gnd_grids_reference_);
           app_curr_gnd_slope = std::atan2(prev_gnd_grid_aver_height_list.back() - mid_ref_gnd_height,
                                           prev_gnd_grid_radius_list.back() - mid_ref_gnd_radius);
-          app_curr_gnd_slope = app_curr_gnd_slope < -global_slope_max_angle_rad_ ? - global_slope_max_angle_rad_ : app_curr_gnd_slope;
-          app_curr_gnd_slope = app_curr_gnd_slope > global_slope_max_angle_rad_ ? global_slope_max_angle_rad_ : app_curr_gnd_slope;
           
           predict_next_gnd_heigh = std::tan(app_curr_gnd_slope) * (p->radius - mid_ref_gnd_radius) + mid_ref_gnd_height;
           float gnd_z_threshold = std::tan(DEG2RAD(5.0)) * (p->radius - prev_gnd_grid_radius_list.back());
 
-          if ((p->grid_id < *(prev_gnd_grid_id_list.end() - num_gnd_grids_reference_) + num_gnd_grids_reference_ + 3 )||  
-            (p->radius - prev_gnd_grid_radius_list.back() < num_gnd_grids_reference_ * vertical_grid_resolution_distance_))
+          if ((p->grid_id < *(prev_gnd_grid_id_list.end() - num_gnd_grids_reference_) + num_gnd_grids_reference_ + 3 ) ||  
+            (p->radius - prev_gnd_grid_radius_list.back() <  num_gnd_grids_reference_ * vertical_grid_resolution_distance_))
           {
             //checking by last some gnd grids
 
-            if(abs(p->orig_point->z - predict_next_gnd_heigh) < non_ground_height_threshold_ + gnd_z_threshold){
+            if((p->orig_point->z - predict_next_gnd_heigh) <= non_ground_height_threshold_ + gnd_z_threshold &&
+                p->orig_point->z - predict_next_gnd_heigh >= -gnd_z_threshold){
               out_ground_indices.indices.push_back(p->orig_index);
               if (abs(p->orig_point->z - predict_next_gnd_heigh) <  gnd_z_threshold)
               {ground_cluster.addPoint(p->radius,p->orig_point->z);}
@@ -299,11 +297,11 @@ void ScanGroundFilterComponent::classifyPointCloud(
             //checking by reference only the last gnd grid
             float local_slope_p = std::atan2(p->orig_point->z - prev_gnd_grid_aver_height_list.back(), 
                                               p->radius - prev_gnd_grid_radius_list.back());
-            if ((abs(local_slope_p) < global_slope_max_angle_rad_)){
+            if ((abs(local_slope_p - app_curr_gnd_slope) < global_slope_max_angle_rad_)){
               out_ground_indices.indices.push_back(p->orig_index);
               ground_cluster.addPoint(p->radius, p->orig_point->z);
             }
-            else if ( local_slope_p > global_slope_max_angle_rad_){
+            else if ( local_slope_p - app_curr_gnd_slope > global_slope_max_angle_rad_){
               out_no_ground_indices.indices.push_back(p->orig_index);
             }
           }
