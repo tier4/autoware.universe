@@ -187,7 +187,6 @@ void ScanGroundFilterComponent::classifyPointCloud(
   out_ground_indices.indices.clear();
   out_unknown_indices.indices.clear();
   out_underground_indices.indices.clear();
-  std::cout << " predict_curr_gnd_heigh : ";
   for (size_t i = 0; i < in_radial_ordered_clouds.size(); i++) {
     // initialize the gnd_point(0,0,0)
     // float prev_gnd_height = 0.0f;
@@ -307,94 +306,6 @@ void ScanGroundFilterComponent::classifyPointCloud(
           }
         }
         
-
-
-
-
-        // if (global_slope_curr_p >= global_slope_max_angle_rad_) {
-        //   out_no_ground_indices.indices.push_back(p->orig_index);
-        // } else {
-        //   float reference_aveg_gnd_height = 0.0f;
-        //   float reference_aveg_gnd_radius = 0.0f;
-        //   float predict_curr_gnd_heigh = 0.0f;
-        //   float predict_curr_gnd_heigh_max = 0.0f;
-        //   float predict_curr_local_slope = 0.0f;
-        //   float ref_origin_height =
-        //     *(prev_gnd_grid_aver_height_list.end() - num_gnd_grids_reference_);
-        //   float ref_origin_height_max =
-        //     *(prev_gnd_grid_max_height_list.end() - num_gnd_grids_reference_);
-        //   float ref_origin_radius = *(prev_gnd_grid_radius_list.end() - num_gnd_grids_reference_);
-        //   for (int ind = num_gnd_grids_reference_ - 1; ind > 0; ind--) {
-        //     reference_aveg_gnd_height += *(prev_gnd_grid_aver_height_list.end() - ind);
-        //     reference_aveg_gnd_radius += *(prev_gnd_grid_radius_list.end() - ind);
-        //     float ind_height = *(prev_gnd_grid_aver_height_list.end() - ind) - ref_origin_height;
-        //     float ind_height_max =
-        //       *(prev_gnd_grid_max_height_list.end() - ind) - ref_origin_height_max;
-        //     float ind_radius = *(prev_gnd_grid_radius_list.end() - ind) - ref_origin_radius;
-        //     predict_curr_gnd_heigh += ind_height / ind_radius;
-        //     predict_curr_gnd_heigh_max += ind_height_max / ind_radius;
-        //   }
-        //   reference_aveg_gnd_height /= (num_gnd_grids_reference_ - 1);
-        //   reference_aveg_gnd_radius /= (num_gnd_grids_reference_ - 1);
-        //   local_slope_curr_p = std::atan(
-        //     (p->orig_point->z - reference_aveg_gnd_height) /
-        //     (p->radius - reference_aveg_gnd_radius));
-
-        //   predict_curr_gnd_heigh *=
-        //     (p->radius - ref_origin_radius) / (num_gnd_grids_reference_ - 1);
-        //   predict_curr_gnd_heigh += ref_origin_height;
-        //   predict_curr_gnd_heigh_max *=
-        //     (p->radius - ref_origin_radius) / (num_gnd_grids_reference_ - 1);
-        //   predict_curr_gnd_heigh_max += ref_origin_height_max;
-
-        //   predict_curr_local_slope = std::atan(
-        //     (predict_curr_gnd_heigh - reference_aveg_gnd_height) /
-        //     (p->radius - reference_aveg_gnd_radius));
-        //   // local slope reference to prev aproximation
-        //   local_slope_max_angle_rad_ = std::atan(
-        //     (0.15 + std::tan(deg2rad(5.0)) * vertical_grid_resolution_distance_) /
-        //     (vertical_grid_resolution_distance_ * 2.0f));
-        //   float posible_next_gnd_change =
-        //     (p->radius - reference_aveg_gnd_radius) * std::tan(deg2rad(5.0));
-        //   // local_slope_max_angle_rad_ =
-        //   // std::max(local_slope_max_angle_rad_,global_slope_max_angle_rad_);
-        //   if (i == 300 && p->grid_id > prev_p->grid_id) {
-        //     std::cout << " : " << p->radius << " : " << ref_origin_radius << " : "
-        //               << ref_origin_height << " : " << predict_curr_gnd_heigh << " : "
-        //               << RAD2DEG(predict_curr_local_slope) << " : " << RAD2DEG(local_slope_curr_p)
-        //               << " : " << RAD2DEG(local_slope_max_angle_rad_);
-        //   }
-        //   if (
-        //     p->grid_id <= *(prev_gnd_grid_id_list.end() - num_gnd_grids_reference_) +
-        //                     num_gnd_grids_reference_ + 3) {
-        //     if (
-        //       (p->orig_point->z - predict_curr_gnd_heigh <
-        //        non_ground_height_threshold_ + posible_next_gnd_change) ||
-        //       (p->orig_point->z - predict_curr_gnd_heigh > -posible_next_gnd_change)) {
-        //       ground_cluster.addPoint(p->radius, p->orig_point->z);
-        //       out_ground_indices.indices.push_back(p->orig_index);
-        //     } else if ((p->orig_point->z - predict_curr_gnd_heigh >
-        //                 non_ground_height_threshold_ + posible_next_gnd_change)) {
-        //       out_no_ground_indices.indices.push_back(p->orig_index);
-        //     } else if (
-        //       ((p->orig_point->z - predict_curr_gnd_heigh) <= -non_ground_height_threshold_) &&
-        //       (local_slope_curr_p <= -local_slope_max_angle_rad_)) {
-        //       out_underground_indices.indices.push_back(p->orig_index);
-        //     } else {
-        //       out_unknown_indices.indices.push_back(p->orig_index);
-        //     }
-        //   } else {
-        //     local_slope_curr_p = std::atan2(
-        //       p->orig_point->z - prev_gnd_grid_aver_height_list.back(),
-        //       p->radius - prev_gnd_grid_radius_list.back());
-        //     if (abs(local_slope_curr_p) < global_slope_max_angle_rad_) {
-        //       ground_cluster.addPoint(p->radius, p->orig_point->z);
-        //       out_ground_indices.indices.push_back(p->orig_index);
-        //     } else {
-        //       out_no_ground_indices.indices.push_back(p->orig_index);
-        //     }
-        //   }
-        // }
       }
       prev_p = p;
     }
@@ -402,7 +313,6 @@ void ScanGroundFilterComponent::classifyPointCloud(
 
     // estimate the local slope to previous virtual gnd and compare with
   }
-  std::cout << "    \n";
 }
 
 void ScanGroundFilterComponent::classifyPointCloud(
