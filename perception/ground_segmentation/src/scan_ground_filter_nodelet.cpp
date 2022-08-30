@@ -290,18 +290,26 @@ void ScanGroundFilterComponent::classifyPointCloud(
               {ground_cluster.addPoint(p->radius,p->orig_point->z);}
             }else if (p->orig_point->z - predict_next_gnd_heigh > non_ground_height_threshold_ + gnd_z_threshold){
               out_no_ground_indices.indices.push_back(p->orig_index);
+            }else if ( p->orig_point->z - predict_next_gnd_heigh < -(non_ground_height_threshold_ + gnd_z_threshold)){
+              out_underground_indices.indices.push_back(p->orig_index);
+            }else{
+              out_unknown_indices.indices.push_back(p->orig_index);
             }
 
           }else {
             //checking by reference only the last gnd grid
             float local_slope_p = std::atan2(p->orig_point->z - prev_gnd_grid_aver_height_list.back(), 
                                               p->radius - prev_gnd_grid_radius_list.back());
-            if ((abs(local_slope_p - app_curr_gnd_slope) < global_slope_max_angle_rad_)){
+            if ((abs(local_slope_p ) < global_slope_max_angle_rad_)){
               out_ground_indices.indices.push_back(p->orig_index);
               ground_cluster.addPoint(p->radius, p->orig_point->z);
             }
-            else if ( local_slope_p - app_curr_gnd_slope > global_slope_max_angle_rad_){
+            else if ( local_slope_p > global_slope_max_angle_rad_){
               out_no_ground_indices.indices.push_back(p->orig_index);
+            }else if(local_slope_p < -global_slope_max_angle_rad_){
+              out_underground_indices.indices.push_back(p->orig_index);
+            }else{
+              out_unknown_indices.indices.push_back(p->orig_index);
             }
           }
         }
