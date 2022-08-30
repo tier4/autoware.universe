@@ -244,13 +244,13 @@ void ScanGroundFilterComponent::classifyPointCloud(
       if ((initilized_flg == false) || (p->radius < dist_to_front + vertical_grid_resolution_distance_)) {
         // add condition for suddent slope, but it lose ability to detect 20cm object near by
         if (
-          (p->orig_point->z > non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * (dist_to_front + vertical_grid_resolution_distance_)) ) {
+          (p->orig_point->z >= non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * ( vehicle_info_.front_overhang_m  + vertical_grid_resolution_distance_  )) ) {
           out_no_ground_indices.indices.push_back(p->orig_index);
           prev_p = p;
           initilized_flg = true;
 
         } else if (
-          (abs(p->orig_point->z) < non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * (dist_to_front + vertical_grid_resolution_distance_)))  {
+          (abs(p->orig_point->z) < non_ground_height_threshold_ + std::tan(DEG2RAD(5.0)) * ( vehicle_info_.front_overhang_m  + vertical_grid_resolution_distance_ )))  {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           prev_p = p;
