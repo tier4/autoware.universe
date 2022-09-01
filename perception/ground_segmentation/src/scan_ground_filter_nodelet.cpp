@@ -247,16 +247,13 @@ void ScanGroundFilterComponent::classifyPointCloud(
           if (initilized_flg){
             //first grid is gnd:
             //initilize prev list by first gnd grid:
-            std::cout << " initial ray "<< i<< " : ";
             for (int ind_grid = p->grid_id - 1 - num_gnd_grids_reference_; ind_grid < p->grid_id - 1; ind_grid ++) {
               prev_gnd_grid_aver_height_list.push_back((ind_grid - p->grid_id + 1 + num_gnd_grids_reference_) * ground_cluster.getAverageHeight() / static_cast<float>(num_gnd_grids_reference_));
               prev_gnd_grid_radius_list.push_back((ind_grid - p->grid_id + 1 + num_gnd_grids_reference_) * ground_cluster.getAverageRadius()  / static_cast<float>(num_gnd_grids_reference_));
               prev_gnd_grid_id_list.push_back(ind_grid);
               prev_gnd_grid_max_height_list.push_back(static_cast<float>(ind_grid) * ground_cluster.getMaxheight() / static_cast<float>(num_gnd_grids_reference_));
-              std::cout << prev_gnd_grid_aver_height_list.back() <<" : "<< prev_gnd_grid_radius_list.back() <<" : ";
             }  
 
-            std::cout << ground_cluster.getAverageHeight()<<" : " << ground_cluster.getAverageRadius()<< "\n";
           }else{
             // assume first gnd grid is zero
             for (int ind_grid = p->grid_id - 1 - num_gnd_grids_reference_; ind_grid < p->grid_id; ind_grid ++) {
@@ -302,7 +299,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
         float gnd_z_threshold =
           std::tan(DEG2RAD(10.0f)) * (p->radius - prev_gnd_grid_radius_list.back());
 
-        if ((p->orig_point->z - predict_next_gnd_heigh) < vehicle_info_.vehicle_height_m) {
+        // if ((p->orig_point->z - predict_next_gnd_heigh) < vehicle_info_.vehicle_height_m) {
           //
           if (global_slope_curr_p > global_slope_max_angle_rad_) {
             out_no_ground_indices.indices.push_back(p->orig_index);
@@ -352,7 +349,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
               }
             }
           }
-        }
+        // }
       }
       prev_p = p;
     }
