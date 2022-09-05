@@ -55,8 +55,8 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     num_gnd_grids_reference_ = static_cast<int>(declare_parameter("num_gnd_grids_reference", 10));
     base_frame_ = declare_parameter("base_frame", "base_link");
     global_slope_max_angle_rad_ = deg2rad(declare_parameter("global_slope_max_angle_deg", 8.0));
-
-    radial_divider_angle_rad_ = deg2rad(declare_parameter("radial_divider_angle_deg", 1.0));
+    local_slope_max_angle_rad_  = deg2rad(declare_parameter("local_slope_max_angle_rad",10.0));
+    radial_divider_angle_rad_ = deg2rad(declare_parameter("radial_divider_angle_deg", 1.0));  
     split_points_distance_tolerance_ = declare_parameter("split_points_distance_tolerance", 0.2);
     split_height_distance_ = declare_parameter("split_height_distance", 0.2);
     use_virtual_ground_point_ = declare_parameter("use_virtual_ground_point", true);
@@ -309,8 +309,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
         // if ((p->orig_point->z - predict_next_gnd_heigh) < vehicle_info_.vehicle_height_m) {
           //
           float local_slope_p = std::atan(
-                (p->orig_point->z - *(prev_gnd_grid_aver_height_list.end()-2)) /
-                (p->radius - *(prev_gnd_grid_radius_list.end() - 2)));
+                (p->orig_point->z - *(prev_gnd_grid_aver_height_list.end()-3)) /
+                (p->radius - *(prev_gnd_grid_radius_list.end() - 3)));
 
           if (global_slope_curr_p > global_slope_max_angle_rad_) {
             out_no_ground_indices.indices.push_back(p->orig_index);
@@ -319,12 +319,12 @@ void ScanGroundFilterComponent::classifyPointCloud(
               (p->grid_id < *(prev_gnd_grid_id_list.end() - num_gnd_grids_reference_) +
                               num_gnd_grids_reference_ + 3) &&
               (p->radius - prev_gnd_grid_radius_list.back() <
-               num_gnd_grids_reference_ * vertical_grid_resolution_distance_)) {
+               3 * vertical_grid_resolution_distance_)) {
               // checking by last some gnd grids
               //TODO: add compare with hightest ring
               if (
                 ((abs(p->orig_point->z - predict_next_gnd_heigh) <=
-                  non_ground_height_threshold_ ) || 
+                  non_ground_height_threshold_  + gnd_z_threshold) || 
                   (abs(local_slope_p)  < global_slope_max_angle_rad_))) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 // if (abs(p->orig_point->z - predict_next_gnd_heigh) < gnd_z_threshold) {
@@ -368,10 +368,10 @@ void ScanGroundFilterComponent::classifyPointCloud(
                 (p->orig_point->z - prev_gnd_grid_aver_height_list.back()) /
                 (p->radius - prev_gnd_grid_radius_list.back()));
 
-              if ((abs(local_slope_p) < global_slope_max_angle_rad_)) {
+              if ((abs(local_slope_p) < local_slope_max_angle_rad_)) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
-              } else if (local_slope_p > global_slope_max_angle_rad_) {
+              } else if (local_slope_p > local_slope_max_angle_rad_) {
                 out_no_ground_indices.indices.push_back(p->orig_index);
               } else if (local_slope_p < -global_slope_max_angle_rad_) {
                 out_underground_indices.indices.push_back(p->orig_index);
