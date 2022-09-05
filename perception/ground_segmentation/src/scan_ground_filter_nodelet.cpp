@@ -276,7 +276,15 @@ void ScanGroundFilterComponent::classifyPointCloud(
           }
         }
 
-        float predict_next_gnd_heigh = 0.0f;
+        if (prev_p->point_state == PointLabel::GROUND &&
+        std::hypot(p->orig_point->x - prev_p->orig_point->x, p->orig_point->y - prev_p->orig_point->y) < split_points_distance_tolerance_ &&
+        p->orig_point->z - prev_p->orig_point->z >= non_ground_height_threshold_){
+          out_no_ground_indices.indices.push_back(p->orig_index);
+          p->point_state = PointLabel::NON_GROUND;
+        }
+        else
+
+        {float predict_next_gnd_heigh = 0.0f;
         float app_curr_gnd_slope = 0.0f;
         float mid_ref_gnd_height = 0.0f;
         float mid_ref_gnd_radius = 0.0f;
@@ -309,8 +317,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
         // if ((p->orig_point->z - predict_next_gnd_heigh) < vehicle_info_.vehicle_height_m) {
           //
           float local_slope_p = std::atan(
-                (p->orig_point->z - *(prev_gnd_grid_aver_height_list.end()-3)) /
-                (p->radius - *(prev_gnd_grid_radius_list.end() - 3)));
+                (p->orig_point->z - *(prev_gnd_grid_aver_height_list.end()-2)) /
+                (p->radius - *(prev_gnd_grid_radius_list.end() - 2)));
 
           if (global_slope_curr_p > global_slope_max_angle_rad_) {
             out_no_ground_indices.indices.push_back(p->orig_index);
@@ -325,21 +333,25 @@ void ScanGroundFilterComponent::classifyPointCloud(
               if (
                 ((abs(p->orig_point->z - predict_next_gnd_heigh) <=
                   non_ground_height_threshold_  + gnd_z_threshold) || 
-                  (abs(local_slope_p)  < global_slope_max_angle_rad_))) {
+                  (abs(local_slope_p)  < local_slope_max_angle_rad_))) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 // if (abs(p->orig_point->z - predict_next_gnd_heigh) < gnd_z_threshold) {
                   ground_cluster.addPoint(p->radius, p->orig_point->z);
+                  p->point_state = PointLabel::GROUND;
                 // }
               } else if (
                 p->orig_point->z - predict_next_gnd_heigh >
                 non_ground_height_threshold_ + gnd_z_threshold) {
                 out_no_ground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::NON_GROUND;
               } else if (
                 p->orig_point->z - predict_next_gnd_heigh <
                 -(non_ground_height_threshold_ + gnd_z_threshold)) {
                 out_underground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::OUT_OF_RANGE;
               } else {
                 out_unknown_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::UNKNOWN;
               }
 
             } else if (
@@ -349,17 +361,21 @@ void ScanGroundFilterComponent::classifyPointCloud(
                 (p->orig_point->z - prev_gnd_grid_aver_height_list.back()) /
                 (p->radius - prev_gnd_grid_radius_list.back()));
 
-              if ((abs(local_slope_p) < global_slope_max_angle_rad_) ||
+              if ((abs(local_slope_p) < local_slope_max_angle_rad_) ||
                   (abs(p->orig_point->z - prev_gnd_grid_aver_height_list.back()) < non_ground_height_threshold_) ||
                   (abs(p->orig_point->z - prev_gnd_grid_max_height_list.back()) < non_ground_height_threshold_)) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
+                p->point_state = PointLabel::GROUND;
               } else if (local_slope_p > global_slope_max_angle_rad_) {
                 out_no_ground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::NON_GROUND;
               } else if (local_slope_p < -global_slope_max_angle_rad_) {
                 out_underground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::OUT_OF_RANGE;
               } else {
                 out_unknown_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::UNKNOWN;
               }
                }
              else {
@@ -368,20 +384,24 @@ void ScanGroundFilterComponent::classifyPointCloud(
                 (p->orig_point->z - prev_gnd_grid_aver_height_list.back()) /
                 (p->radius - prev_gnd_grid_radius_list.back()));
 
-              if ((abs(local_slope_p) < local_slope_max_angle_rad_)) {
+              if ((abs(local_slope_p) < global_slope_max_angle_rad_)) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
-              } else if (local_slope_p > local_slope_max_angle_rad_) {
+                p->point_state = PointLabel::GROUND;
+              } else if (local_slope_p > global_slope_max_angle_rad_) {
                 out_no_ground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::NON_GROUND;
               } else if (local_slope_p < -global_slope_max_angle_rad_) {
                 out_underground_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::OUT_OF_RANGE;
               } else {
                 out_unknown_indices.indices.push_back(p->orig_index);
+                p->point_state = PointLabel::UNKNOWN;
               }
             }
           }
         // }
-      }
+      }}
       prev_p = p;
     }
     // estimate the height from predicted current ground and compare with threshold
