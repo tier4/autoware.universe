@@ -236,7 +236,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
           p->orig_point->z > non_ground_height_threshold_) {
           out_no_ground_indices.indices.push_back(p->orig_index);
         } else if (
-          (abs(global_slope_curr_p) < DEG2RAD(10.0)) ||
+          (abs(global_slope_curr_p) < DEG2RAD(10.0)) &&
           abs(p->orig_point->z) < non_ground_height_threshold_) {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
