@@ -50,6 +50,26 @@ Float32MultiArrayStamped convertDebugValuesToMsg(
   }
   return debug_msg;
 }
+
+double linear(const double v, const double x1, const double x2, const double y1, const double y2)
+{
+  if (v < x1) {
+    return y1;
+  } else if (x2 < v) {
+    return y2;
+  }
+  return y1 + (y2 - y1) / (x2 - x1) * (v - x1);
+}
+
+double linearSym(const double v, const double x, const double y)
+{
+  if (v < -x) {
+    return -y;
+  } else if (x < v) {
+    return y;
+  }
+  return v / x * y;
+}
 }  // namespace
 
 PIDBasedPlanner::PIDBasedPlanner(
@@ -81,6 +101,10 @@ PIDBasedPlanner::PIDBasedPlanner(
   const double lpf_cruise_gain =
     node.declare_parameter<double>("pid_based_planner.lpf_cruise_gain");
   lpf_cruise_ptr_ = std::make_shared<LowpassFilter1d>(lpf_cruise_gain);
+
+  const double lpf_output_acc_gain =
+    node.declare_parameter<double>("pid_based_planner.lpf_output_acc_gain");
+  lpf_output_acc_ptr_ = std::make_shared<LowpassFilter1d>(lpf_output_acc_gain);
 
   // publisher
   debug_values_pub_ = node.create_publisher<Float32MultiArrayStamped>("~/debug/values", 1);
@@ -189,6 +213,7 @@ void PIDBasedPlanner::planCruise(
     // reset previous target velocity if adaptive cruise is not enabled
     prev_target_vel_ = {};
     lpf_cruise_ptr_->reset();
+    lpf_output_acc_ptr_->reset();
   }
 }
 
@@ -207,6 +232,14 @@ VelocityLimit PIDBasedPlanner::doCruise(
   const size_t ego_idx = findExtendedNearestIndex(planner_data.traj, planner_data.current_pose);
 
   // calculate target velocity with acceleration limit by PID controller
+
+  // for smaller cruise distance //CHECK
+  /*
+  const double modified_kp = linear(cruise_obstacle_info.dist_to_cruise, -5.0, 0.0, 10.0, 2.5); // 15.0, 2.5);
+  pid_controller_->setKp(modified_kp);
+  std::cerr << modified_kp << std::endl;
+  */
+
   const double pid_output_vel = pid_controller_->calc(filtered_normalized_dist_to_cruise);
   [[maybe_unused]] const double prev_vel =
     prev_target_vel_ ? prev_target_vel_.get() : planner_data.current_vel;
@@ -222,9 +255,25 @@ VelocityLimit PIDBasedPlanner::doCruise(
     std::max(min_cruise_target_vel_, planner_data.current_vel + additional_vel);
 
   // calculate target acceleration
+  // for stable cruise control1 // CHECK
+  /*
+  const double modified_vel_to_acc_weight = linearSym(cruise_obstacle_info.dist_to_cruise, 3.0, modified_vel_to_acc_weight);
+  const double target_acc = modified_vel_to_acc_weight * additional_vel;
+  */
   const double target_acc = vel_to_acc_weight_ * additional_vel;
-  const double target_acc_with_acc_limit =
+
+  double target_acc_with_acc_limit =
     std::clamp(target_acc, min_accel_during_cruise_, longitudinal_info_.max_accel);
+
+  // for stable cruise control2 // CHECK
+  /*
+  if (std::abs(cruise_obstacle_info.dist_to_cruise) < 3.0) {
+    // target_acc_with_acc_limit = std::min(std::max(target_acc_with_acc_limit * 0.1, -0.1), 0.1);
+    target_acc_with_acc_limit = std::min(std::max(target_acc_with_acc_limit * 0.1, -0.1), 0.1);
+  }
+  */
+  // target_acc_with_acc_limit = lpf_output_acc_ptr_->filter(target_acc_with_acc_limit);
+
 
   RCLCPP_INFO_EXPRESSION(
     rclcpp::get_logger("ObstacleCruisePlanner::PIDBasedPlanner"), is_showing_debug_info_,

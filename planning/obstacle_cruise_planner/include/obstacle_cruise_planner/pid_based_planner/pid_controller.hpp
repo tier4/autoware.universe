@@ -39,6 +39,7 @@ public:
   double getKp() const { return kp_; }
   double getKi() const { return ki_; }
   double getKd() const { return kd_; }
+  void setKp(const double kp) { kp_ = kp; }
 
   void updateParam(const double kp, const double ki, const double kd)
   {
