@@ -228,17 +228,21 @@ void ScanGroundFilterComponent::classifyPointCloud(
       // local_slope_curr_p = std::atan2(
       //   p->orig_point->z - prev_gnd_grid_aver_height_list.back(),
       //   p->radius - prev_gnd_grid_radius_list.back());
+      float non_ground_height_threshold_adap = non_ground_height_threshold_;
+      if (p->orig_point->x < -20.0f){
+        non_ground_height_threshold_adap = non_ground_height_threshold_ * (p->radius / 20.0f);
+      }
       if (
         (initilized_flg == false) &&
         (p->radius <= first_ring_distance_ )) {
         // add condition for suddent slope, but it lose ability to detect 20cm object near by
         if (
           (global_slope_curr_p >= DEG2RAD(10.0f)) &&
-          p->orig_point->z > non_ground_height_threshold_) {
+          p->orig_point->z > non_ground_height_threshold_adap) {
           out_no_ground_indices.indices.push_back(p->orig_index);
         } else if (
           (abs(global_slope_curr_p) < DEG2RAD(10.0)) &&
-          abs(p->orig_point->z) < non_ground_height_threshold_) {
+          abs(p->orig_point->z) < non_ground_height_threshold_adap) {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           if (p->grid_id > prev_p->grid_id) {
@@ -289,13 +293,14 @@ void ScanGroundFilterComponent::classifyPointCloud(
         }
         if (p->orig_point->z - prev_gnd_grid_aver_height_list.back() > detection_range_max_){
           out_unknown_indices.indices.push_back(p->orig_index);
+          p->point_state = PointLabel::OUT_OF_RANGE;
         }
         else if (
           prev_p->point_state == PointLabel::GROUND &&
           std::hypot(
             p->orig_point->x - prev_p->orig_point->x, p->orig_point->y - prev_p->orig_point->y) <
             split_points_distance_tolerance_ &&
-          p->orig_point->z - prev_p->orig_point->z >= non_ground_height_threshold_) {
+          p->orig_point->z - prev_p->orig_point->z >= non_ground_height_threshold_adap) {
           out_no_ground_indices.indices.push_back(p->orig_index);
           p->point_state = PointLabel::NON_GROUND;
         } else if ( prev_p->point_state == PointLabel::NON_GROUND && std::hypot(
@@ -360,7 +365,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
               // checking by last some gnd grids
               // TODO: add compare with hightest ring
               if (((abs(p->orig_point->z - predict_next_gnd_heigh) <=
-                    non_ground_height_threshold_ + gnd_z_threshold) ||
+                    non_ground_height_threshold_adap + gnd_z_threshold) ||
                    (abs(local_slope_p) < local_slope_max_angle_rad_))) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 // if (abs(p->orig_point->z - predict_next_gnd_heigh) < gnd_z_threshold) {
@@ -369,12 +374,12 @@ void ScanGroundFilterComponent::classifyPointCloud(
                 // }
               } else if (
                 p->orig_point->z - predict_next_gnd_heigh >
-                non_ground_height_threshold_ + gnd_z_threshold) {
+                non_ground_height_threshold_adap + gnd_z_threshold) {
                 out_no_ground_indices.indices.push_back(p->orig_index);
                 p->point_state = PointLabel::NON_GROUND;
               } else if (
                 p->orig_point->z - predict_next_gnd_heigh <
-                -(non_ground_height_threshold_ + gnd_z_threshold)) {
+                -(non_ground_height_threshold_adap + gnd_z_threshold)) {
                 out_underground_indices.indices.push_back(p->orig_index);
                 p->point_state = PointLabel::OUT_OF_RANGE;
               } else {
@@ -391,9 +396,9 @@ void ScanGroundFilterComponent::classifyPointCloud(
               if (
                 (abs(local_slope_p) < local_slope_max_angle_rad_) ||
                 (abs(p->orig_point->z - prev_gnd_grid_aver_height_list.back()) <
-                 non_ground_height_threshold_) ||
+                 non_ground_height_threshold_adap) ||
                 (abs(p->orig_point->z - prev_gnd_grid_max_height_list.back()) <
-                 non_ground_height_threshold_)) {
+                 non_ground_height_threshold_adap)) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
                 p->point_state = PointLabel::GROUND;
