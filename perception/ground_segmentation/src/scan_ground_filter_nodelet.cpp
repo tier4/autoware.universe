@@ -361,7 +361,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
               (p->grid_id < *(prev_gnd_grid_id_list.end() - num_gnd_grids_reference_) +
                               num_gnd_grids_reference_ + 3) &&
               (p->radius - prev_gnd_grid_radius_list.back() <
-               3 * vertical_grid_resolution_distance_)) {
+               3 * p->grid_radius)) {
               // checking by last some gnd grids
               // TODO: add compare with hightest ring
               if (((abs(p->orig_point->z - predict_next_gnd_heigh) <=
@@ -388,7 +388,7 @@ void ScanGroundFilterComponent::classifyPointCloud(
               }
 
             } else if ((p->radius - prev_gnd_grid_radius_list.back() <
-                        num_gnd_grids_reference_ * vertical_grid_resolution_distance_)) {
+                        3 * p->grid_radius)) {
               local_slope_p = std::atan(
                 (p->orig_point->z - prev_gnd_grid_aver_height_list.back()) /
                 (p->radius - prev_gnd_grid_radius_list.back()));
