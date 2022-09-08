@@ -137,6 +137,7 @@ private:
   float division_mode_grid_id_threshold = 0.0f;
   float division_mode_angle_rad_threshold = 0.0f;
   float virtual_lidar_height = 2.5f;
+  float detection_range_max_ = 2.5f;
   float base_frame_shift_ = 0.0f;
   float division_mode_distance_threshold_ =
     5.0f;  // threshold distance for changing the mode of grid division

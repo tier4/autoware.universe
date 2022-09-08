@@ -39,6 +39,7 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
   // set initial parameters
   {
     first_ring_distance_ = static_cast<float>(declare_parameter("first_ring_distance", 10.0f));
+    detection_range_max_ = static_cast<float>(declare_parameter("detection_range_max",2.5f));
     base_frame_shift_ = static_cast<float>(declare_parameter("base_link_shift", 0.0));
     non_ground_height_threshold_ =
       static_cast<float>(declare_parameter("non_ground_height_threshold", 0.15));
@@ -286,8 +287,10 @@ void ScanGroundFilterComponent::classifyPointCloud(
             ground_cluster.initialize();
           }
         }
-
-        if (
+        if (p->orig_point->z - prev_gnd_grid_aver_height_list.back() > detection_range_max_){
+          out_unknown_indices.indices.push_back(p->orig_index);
+        }
+        else if (
           prev_p->point_state == PointLabel::GROUND &&
           std::hypot(
             p->orig_point->x - prev_p->orig_point->x, p->orig_point->y - prev_p->orig_point->y) <
