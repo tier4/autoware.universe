@@ -234,11 +234,9 @@ VelocityLimit PIDBasedPlanner::doCruise(
   // calculate target velocity with acceleration limit by PID controller
 
   // for smaller cruise distance //CHECK
-  /*
   const double modified_kp = linear(cruise_obstacle_info.dist_to_cruise, -5.0, 0.0, 10.0, 2.5); // 15.0, 2.5);
   pid_controller_->setKp(modified_kp);
   std::cerr << modified_kp << std::endl;
-  */
 
   const double pid_output_vel = pid_controller_->calc(filtered_normalized_dist_to_cruise);
   [[maybe_unused]] const double prev_vel =
