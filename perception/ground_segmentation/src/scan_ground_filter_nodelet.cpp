@@ -126,7 +126,7 @@ void ScanGroundFilterComponent::convertPointcloud(
       virtual_lidar_height)) -
     normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
-    auto x{in_cloud->points[i].x - base_frame_shift_};  // base on front wheel center
+    auto x{in_cloud->points[i].x - vehicle_info_.wheel_base_m / 2.0f - base_frame_shift_};  // base on front wheel center
     // auto y{in_cloud->points[i].y};
     auto radius{static_cast<float>(std::hypot(x, in_cloud->points[i].y))};
     auto theta{normalizeRadian(std::atan2(x, in_cloud->points[i].y), 0.0)};
