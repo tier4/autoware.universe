@@ -126,7 +126,7 @@ void ScanGroundFilterComponent::convertPointcloud(
       virtual_lidar_height)) -
     normalizeRadian(std::atan2(division_mode_distance_threshold_, virtual_lidar_height));
   for (size_t i = 0; i < in_cloud->points.size(); ++i) {
-    auto x{in_cloud->points[i].x - vehicle_info_.wheel_base_m/2.0f};  // base on front wheel center
+    auto x{in_cloud->points[i].x - base_frame_shift_};  // base on front wheel center
     // auto y{in_cloud->points[i].y};
     auto radius{static_cast<float>(std::hypot(x, in_cloud->points[i].y))};
     auto theta{normalizeRadian(std::atan2(x, in_cloud->points[i].y), 0.0)};
@@ -237,14 +237,12 @@ void ScanGroundFilterComponent::classifyPointCloud(
         (p->radius <= first_ring_distance_ )) {
         // add condition for suddent slope, but it lose ability to detect 20cm object near by
         if (
-          (global_slope_curr_p >= global_slope_max_angle_rad_) &&
+          (global_slope_curr_p >= DEG2RAD(10.0f)) &&
           p->orig_point->z > non_ground_height_threshold_adap) {
           out_no_ground_indices.indices.push_back(p->orig_index);
         } else if (
-          (global_slope_curr_p < global_slope_max_angle_rad_) &&
-          (global_slope_curr_p > -global_slope_max_angle_rad_/2.0) &&
-          (p->orig_point->z < non_ground_height_threshold_adap) &&
-          (p->orig_point->z > -non_ground_height_threshold_adap/2.0)){
+          (abs(global_slope_curr_p) < DEG2RAD(10.0)) &&
+          abs(p->orig_point->z) < non_ground_height_threshold_adap) {
           out_ground_indices.indices.push_back(p->orig_index);
           ground_cluster.addPoint(p->radius, p->orig_point->z);
           if (p->grid_id > prev_p->grid_id) {
@@ -366,10 +364,9 @@ void ScanGroundFilterComponent::classifyPointCloud(
                3 * p->grid_radius)) {
               // checking by last some gnd grids
               // TODO: add compare with hightest ring
-              if ((((p->orig_point->z - predict_next_gnd_heigh) <=
-                    non_ground_height_threshold_adap + gnd_z_threshold && 
-                    p->orig_point->z - predict_next_gnd_heigh > -non_ground_height_threshold_) ||
-                   (local_slope_p < local_slope_max_angle_rad_ && local_slope_p > -global_slope_max_angle_rad_))) {
+              if (((abs(p->orig_point->z - predict_next_gnd_heigh) <=
+                    non_ground_height_threshold_adap + gnd_z_threshold) ||
+                   (abs(local_slope_p) < local_slope_max_angle_rad_))) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 // if (abs(p->orig_point->z - predict_next_gnd_heigh) < gnd_z_threshold) {
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
@@ -397,11 +394,10 @@ void ScanGroundFilterComponent::classifyPointCloud(
                 (p->radius - prev_gnd_grid_radius_list.back()));
 
               if (
-                (local_slope_p < local_slope_max_angle_rad_ &&
-                 local_slope_p > -global_slope_max_angle_rad_) ||
-                ((p->orig_point->z - prev_gnd_grid_aver_height_list.back()) >
-                 -non_ground_height_threshold_adap) ||
-                ((p->orig_point->z - prev_gnd_grid_max_height_list.back()) <
+                (abs(local_slope_p) < local_slope_max_angle_rad_) ||
+                (abs(p->orig_point->z - prev_gnd_grid_aver_height_list.back()) <
+                 non_ground_height_threshold_adap) ||
+                (abs(p->orig_point->z - prev_gnd_grid_max_height_list.back()) <
                  non_ground_height_threshold_adap)) {
                 out_ground_indices.indices.push_back(p->orig_index);
                 ground_cluster.addPoint(p->radius, p->orig_point->z);
