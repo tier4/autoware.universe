@@ -19,6 +19,9 @@
 #include <thrust/count.h>
 #include <thrust/sort.h>
 
+#include <algorithm>
+#include <iostream>
+
 namespace
 {
 const std::size_t THREADS_PER_BLOCK = 32;
@@ -35,6 +38,25 @@ struct is_score_greater
 
 private:
   float t_{0.0};
+};
+
+struct is_in_class_group
+{
+  is_in_class_group(int * g, const std::size_t size) : g_(g), size_(size) {}
+
+  __device__ bool operator()(const Box3D & b)
+  {
+    for (std::size_t gi = 0; gi < size_; ++gi) {
+      if (g_[gi] == b.label) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+private:
+  int * g_{nullptr};
+  std::size_t size_{0};
 };
 
 struct is_kept
@@ -141,18 +163,38 @@ cudaError_t PostProcessCUDA::generateDetectedBoxes3D_launch(
   thrust::sort(det_boxes3d_d.begin(), det_boxes3d_d.end(), score_greater());
 
   // supress by NMS
-  thrust::device_vector<bool> final_keep_mask_d(num_det_boxes3d);
-  const auto num_final_det_boxes3d =
-    circleNMS(det_boxes3d_d, config_.circle_nms_dist_threshold_, final_keep_mask_d, stream);
+  std::size_t out_boxes3d_size = 0;
+  thrust::device_vector<Box3D> out_boxes3d_d(num_det_boxes3d);
+  const std::vector<std::vector<int>> nms_class_groups = {{0, 1, 2}, {3}, {4}};
+  for (const auto & class_group : nms_class_groups) {
+    thrust::device_vector<int> class_group_d(class_group.size());
+    thrust::copy(class_group.begin(), class_group.end(), class_group_d.begin());
+    const auto boxes3d_group_size = thrust::count_if(
+      thrust::device, det_boxes3d_d.begin(), det_boxes3d_d.end(),
+      is_in_class_group(thrust::raw_pointer_cast(class_group_d.data()), class_group_d.size()));
+    if (boxes3d_group_size == 0) {
+      continue;
+    }
 
-  thrust::device_vector<Box3D> final_det_boxes3d_d(num_final_det_boxes3d);
-  thrust::copy_if(
-    thrust::device, det_boxes3d_d.begin(), det_boxes3d_d.end(), final_keep_mask_d.begin(),
-    final_det_boxes3d_d.begin(), is_kept());
+    thrust::device_vector<Box3D> boxes3d_group_d(boxes3d_group_size);
+    thrust::device_vector<bool> keep_mask_group_d(boxes3d_group_size);
+    thrust::copy_if(
+      thrust::device, det_boxes3d_d.begin(), det_boxes3d_d.end(), boxes3d_group_d.begin(),
+      is_in_class_group(thrust::raw_pointer_cast(class_group_d.data()), class_group_d.size()));
+
+    const auto boxes_in_gruop_nms_size =
+      circleNMS(boxes3d_group_d, config_.circle_nms_dist_threshold_, keep_mask_group_d, stream);
+
+    thrust::copy_if(
+      thrust::device, boxes3d_group_d.begin(), boxes3d_group_d.end(), keep_mask_group_d.begin(),
+      out_boxes3d_d.begin() + out_boxes3d_size, is_kept());
+    out_boxes3d_size += boxes_in_gruop_nms_size;
+  }
 
   // memcpy device to host
-  det_boxes3d.resize(num_final_det_boxes3d);
-  thrust::copy(final_det_boxes3d_d.begin(), final_det_boxes3d_d.end(), det_boxes3d.begin());
+  det_boxes3d.resize(out_boxes3d_size);
+  thrust::copy(
+    out_boxes3d_d.begin(), out_boxes3d_d.begin() + out_boxes3d_size, det_boxes3d.begin());
 
   return cudaGetLastError();
 }
