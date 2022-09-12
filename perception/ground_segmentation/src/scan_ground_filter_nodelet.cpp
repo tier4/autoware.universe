@@ -265,14 +265,6 @@ void ScanGroundFilterComponent::classifyPointCloud(
           out_unknown_indices.indices.push_back(p->orig_index);
           p->point_state = PointLabel::OUT_OF_RANGE;
         } else if (
-          prev_p->point_state == PointLabel::GROUND &&
-          std::hypot(
-            p->orig_point->x - prev_p->orig_point->x, p->orig_point->y - prev_p->orig_point->y) <
-            split_points_distance_tolerance_ &&
-          p->orig_point->z - prev_p->orig_point->z >= non_ground_height_threshold_adap) {
-          out_no_ground_indices.indices.push_back(p->orig_index);
-          p->point_state = PointLabel::NON_GROUND;
-        } else if (
           prev_p->point_state == PointLabel::NON_GROUND &&
           std::hypot(
             p->orig_point->x - prev_p->orig_point->x, p->orig_point->y - prev_p->orig_point->y) <
