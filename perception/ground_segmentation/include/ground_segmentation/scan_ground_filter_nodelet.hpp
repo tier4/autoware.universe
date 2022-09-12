@@ -59,7 +59,7 @@ private:
   struct PointRef
   {
     float gama;         // angle in vertical
-    float grid_radius;  // radius of grid
+    float grid_size;    // radius of grid
     uint16_t grid_id;   // id of grid in vertical
     float radius;       // cylindrical coords on XY Plane
     float theta;        // angle deg on XY plane
@@ -127,21 +127,20 @@ private:
   std::string sensor_frame_;
 
   float non_ground_height_threshold_;
-  float max_height_detection_range_;
   float min_height_detection_range_;
-  float vertical_grid_resolution_angle_rad_;
-  float vertical_grid_resolution_distance_;
-  uint16_t num_gnd_grids_reference_ = 10;
-  uint16_t num_prev_grid_slope_refer_ = 2;
+  float grid_size_rad_;
+  float grid_size_m_;
+  float less_interest_dist_ = 20.0f;
+  uint16_t gnd_grid_buffer_size_ = 10;
   uint16_t num_prev_grid_height_refer_ = 2;
-  float division_mode_grid_id_threshold = 0.0f;
-  float division_mode_angle_rad_threshold = 0.0f;
-  float virtual_lidar_height = 2.5f;
-  float detection_range_max_ = 2.5f;
-  float base_frame_shift_ = 0.0f;
-  float division_mode_distance_threshold_ =
+  float grid_mode_switch_grid_id_ = 0.0f;
+  float grid_mode_switch_angle_rad_ = 0.0f;
+  float virtual_lidar_z_ = 2.5f;
+  float detection_range_z_max_ = 2.5f;
+  float center_pcl_shift_ = 0.0f;
+  float grid_mode_switch_radius_ =
     5.0f;  // threshold distance for changing the mode of grid division
-  float first_ring_distance_;
+  float first_ring_distance_ = 20.0f;
   // float center_to_wheel_distance = 0.0f;
   double global_slope_max_angle_rad_;       // radians
   double local_slope_max_angle_rad_;        // radians
