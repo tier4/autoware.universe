@@ -165,8 +165,11 @@ cudaError_t PostProcessCUDA::generateDetectedBoxes3D_launch(
   // supress by NMS
   std::size_t out_boxes3d_size = 0;
   thrust::device_vector<Box3D> out_boxes3d_d(num_det_boxes3d);
-  const std::vector<std::vector<int>> nms_class_groups = {{0, 1, 2}, {3}, {4}};
-  for (const auto & class_group : nms_class_groups) {
+  const std::vector<std::vector<int>> nms_class_groups = {{0, 1, 2}, {3, 4}};
+  const std::vector<float> nms_thresholds = {1.5, 0.5};
+  for (std::size_t gi = 0; gi < nms_class_groups.size(); ++gi) {
+    const auto & class_group = nms_class_groups.at(gi);
+    const auto & nms_threshold = nms_thresholds.at(gi);
     thrust::device_vector<int> class_group_d(class_group.size());
     thrust::copy(class_group.begin(), class_group.end(), class_group_d.begin());
     const auto boxes3d_group_size = thrust::count_if(
@@ -183,7 +186,7 @@ cudaError_t PostProcessCUDA::generateDetectedBoxes3D_launch(
       is_in_class_group(thrust::raw_pointer_cast(class_group_d.data()), class_group_d.size()));
 
     const auto boxes_in_gruop_nms_size =
-      circleNMS(boxes3d_group_d, config_.circle_nms_dist_threshold_, keep_mask_group_d, stream);
+      circleNMS(boxes3d_group_d, nms_threshold, keep_mask_group_d, stream);
 
     thrust::copy_if(
       thrust::device, boxes3d_group_d.begin(), boxes3d_group_d.end(), keep_mask_group_d.begin(),
