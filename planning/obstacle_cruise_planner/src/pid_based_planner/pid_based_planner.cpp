@@ -61,7 +61,7 @@ double linear(const double v, const double x1, const double x2, const double y1,
   return y1 + (y2 - y1) / (x2 - x1) * (v - x1);
 }
 
-double linearSym(const double v, const double x, const double y)
+[[maybe_unused]] double linearSym(const double v, const double x, const double y)
 {
   if (v < -x) {
     return -y;
