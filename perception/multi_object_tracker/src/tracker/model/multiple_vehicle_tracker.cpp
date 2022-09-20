@@ -62,3 +62,24 @@ bool MultipleVehicleTracker::getTrackedObject(
   object.classification = getClassification();
   return true;
 }
+
+void MultipleVehicleTracker::fillAccel(
+  const rclcpp::Time & time, autoware_auto_perception_msgs::msg::TrackedObject & object)
+{
+  const auto twist_ptr = std::make_shared<geometry_msgs::msg::Twist>(
+    lpf_.filter(object.kinematics.twist_with_covariance.twist));
+  if (prev_twist_ptr_ && prev_time_ptr_) {
+    const double dt = (time - *prev_time_ptr_).seconds();
+
+    if (dt != 0.0) {
+      geometry_msgs::msg::Accel accel;
+      accel.linear.x = (twist_ptr->linear.x - prev_twist_ptr_->linear.x) / dt;
+      accel.linear.y = (twist_ptr->linear.y - prev_twist_ptr_->linear.y) / dt;
+      accel.linear.z = (twist_ptr->linear.z - prev_twist_ptr_->linear.z) / dt;
+      object.kinematics.acceleration_with_covariance.accel = accel;
+    }
+  }
+
+  prev_twist_ptr_ = twist_ptr;
+  prev_time_ptr_ = std::make_shared<rclcpp::Time>(time);
+}

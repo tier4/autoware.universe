@@ -19,6 +19,7 @@
 #ifndef MULTI_OBJECT_TRACKER__TRACKER__MODEL__NORMAL_VEHICLE_TRACKER_HPP_
 #define MULTI_OBJECT_TRACKER__TRACKER__MODEL__NORMAL_VEHICLE_TRACKER_HPP_
 
+#include "signal_processing/lowpass_filter.hpp"
 #include "tracker_base.hpp"
 
 #include <kalman_filter/kalman_filter.hpp>
@@ -64,6 +65,9 @@ private:
   double max_wz_;
   float z_;
   double velocity_deviation_threshold_;
+
+  LowpassFilterTwist lpf_{0.3};
+  std::shared_ptr<geometry_msgs::msg::Twist> prev_twist_ptr_;
 
 private:
   struct BoundingBox

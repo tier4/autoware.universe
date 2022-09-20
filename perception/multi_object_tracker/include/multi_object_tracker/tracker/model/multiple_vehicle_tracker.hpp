@@ -22,6 +22,7 @@
 #include "multi_object_tracker/tracker/model/big_vehicle_tracker.hpp"
 #include "multi_object_tracker/tracker/model/normal_vehicle_tracker.hpp"
 #include "multi_object_tracker/tracker/model/tracker_base.hpp"
+#include "signal_processing/lowpass_filter.hpp"
 
 #include <kalman_filter/kalman_filter.hpp>
 #include <rclcpp/time.hpp>
@@ -31,6 +32,10 @@ class MultipleVehicleTracker : public Tracker
 private:
   NormalVehicleTracker normal_vehicle_tracker_;
   BigVehicleTracker big_vehicle_tracker_;
+
+  LowpassFilterTwist lpf_{0.3};
+  std::shared_ptr<geometry_msgs::msg::Twist> prev_twist_ptr_;
+  std::shared_ptr<rclcpp::Time> prev_time_ptr_;
 
 public:
   MultipleVehicleTracker(
@@ -43,6 +48,8 @@ public:
   bool getTrackedObject(
     const rclcpp::Time & time,
     autoware_auto_perception_msgs::msg::TrackedObject & object) const override;
+  void fillAccel(
+    const rclcpp::Time & time, autoware_auto_perception_msgs::msg::TrackedObject & object) override;
   virtual ~MultipleVehicleTracker() {}
 };
 
