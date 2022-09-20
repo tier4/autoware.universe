@@ -88,7 +88,7 @@ public:
     const rclcpp::Time & time,
     autoware_auto_perception_msgs::msg::TrackedObject & object) const = 0;
   virtual void fillAccel(
-    const rclcpp::Time & time, autoware_auto_perception_msgs::msg::TrackedObject & object)
+    [[maybe_unused]] const rclcpp::Time & time, [[maybe_unused]] autoware_auto_perception_msgs::msg::TrackedObject & object)
   {
   }
   virtual bool predict(const rclcpp::Time & time) = 0;
