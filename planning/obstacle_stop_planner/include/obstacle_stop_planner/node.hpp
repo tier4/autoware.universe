@@ -110,7 +110,10 @@ public:
   {
     double stop_margin;               // stop margin distance from obstacle on the path [m]
     double min_behavior_stop_margin;  // margin distance, any other stop point is inserted [m]
-    double expand_stop_range;         // margin of vehicle footprint [m]
+    double expand_stop_range;         // default
+    double expand_stop_range_l;       // for isuzu proj
+    double expand_stop_range_r;       // for isuzu proj
+    double mirror_width;              // for isuzu proj
     double extend_distance;           // trajectory extend_distance [m]
     double step_length;               // step length for pointcloud search range [m]
     double stop_search_radius;        // search radius for obstacle point cloud [m]
@@ -118,27 +121,36 @@ public:
 
   struct SlowDownParam
   {
-    double normal_min_jerk;         // min jerk limit for mild stop [m/sss]
-    double normal_min_acc;          // min deceleration limit for mild stop [m/ss]
-    double limit_min_jerk;          // min jerk limit [m/sss]
-    double limit_min_acc;           // min deceleration limit [m/ss]
-    double forward_margin;          // slow down margin(vehicle front -> obstacle) [m]
-    double backward_margin;         // slow down margin(obstacle vehicle rear) [m]
-    double expand_slow_down_range;  // lateral range of detection area [m]
-    double max_slow_down_vel;       // maximum speed in slow down section [m/s]
-    double min_slow_down_vel;       // minimum velocity in slow down section [m/s]
-    bool consider_constraints;      // set "True", decel point is planned under jerk/dec constraints
-    double slow_down_vel;           // target slow down velocity [m/s]
-    double forward_margin_min;      // min margin for relaxing slow down margin [m/s]
-    double forward_margin_span;     // fineness param for relaxing slow down margin [m/s]
-    double slow_down_min_jerk;      // min slow down jerk constraint [m/sss]
-    double jerk_start;              // init jerk used for deceleration planning [m/sss]
-    double jerk_span;               // fineness param for planning deceleration jerk [m/sss]
+    double normal_min_jerk;           // min jerk limit for mild stop [m/sss]
+    double normal_min_acc;            // min deceleration limit for mild stop [m/ss]
+    double limit_min_jerk;            // min jerk limit [m/sss]
+    double limit_min_acc;             // min deceleration limit [m/ss]
+    double forward_margin;            // slow down margin(vehicle front -> obstacle) [m]
+    double backward_margin;           // slow down margin(obstacle vehicle rear) [m]
+    double expand_slow_down_range;    // lateral range of detection area [m]
+    double expand_slow_down_range_r;  // for isuzu proj
+    double expand_slow_down_range_l;  // for isuzu proj
+    double max_slow_down_vel;         // maximum speed in slow down section [m/s]
+    double min_slow_down_vel;         // minimum velocity in slow down section [m/s]
+    double max_deceleration;
+    bool consider_constraints;   // set "True", decel point is planned under jerk/dec constraints
+    double slow_down_vel;        // target slow down velocity [m/s]
+    double forward_margin_min;   // min margin for relaxing slow down margin [m/s]
+    double forward_margin_span;  // fineness param for relaxing slow down margin [m/s]
+    double slow_down_min_jerk;   // min slow down jerk constraint [m/sss]
+    double jerk_start;           // init jerk used for deceleration planning [m/sss]
+    double jerk_span;            // fineness param for planning deceleration jerk [m/sss]
     double vel_threshold_reset_velocity_limit_;  // velocity threshold,
                                                  // check complete deceleration [m/s]
     double dec_threshold_reset_velocity_limit_;  // acceleration threshold,
                                                  // check complete deceleration [m/ss]
     double slow_down_search_radius;  // search radius for slow down obstacle point cloud [m]
+    double min_acc_lim;
+    double curvature_thresh;
+    int curvature_smoothing_num;
+    double speed_thresh_high;
+    double speed_thresh_low;
+    double yaw_rate_thresh;
   };
 
   struct PlannerData
@@ -191,6 +203,9 @@ private:
   PredictedObjects::ConstSharedPtr object_ptr_{nullptr};
   rclcpp::Time last_detection_time_;
 
+  Eigen::Vector2d trajectory_vec_;
+  Eigen::Vector2d slow_down_point_vec_;
+  
   nav_msgs::msg::Odometry::ConstSharedPtr current_velocity_ptr_{nullptr};
   nav_msgs::msg::Odometry::ConstSharedPtr prev_velocity_ptr_{nullptr};
   double current_acc_{0.0};
@@ -217,6 +232,12 @@ private:
   void externalExpandStopRangeCallback(const ExpandStopRange::ConstSharedPtr input_msg);
 
 private:
+  std::vector<double> calcTrajectoryCurvature(
+    const int curvature_smoothing_num,
+    const TrajectoryPoints & traj);  // for isuzu proj
+  double calcDist2d(
+    const geometry_msgs::msg::Point & p0, const geometry_msgs::msg::Point & p1);  // for isuzu proj
+
   bool isBackwardPath(const autoware_auto_planning_msgs::msg::Trajectory & trajectory) const;
 
   bool withinPolygon(
@@ -253,8 +274,11 @@ private:
 
   void createOneStepPolygon(
     const geometry_msgs::msg::Pose & base_step_pose,
-    const geometry_msgs::msg::Pose & next_step_pose, std::vector<cv::Point2d> & polygon,
-    const VehicleInfo & vehicle_info, const double expand_width = 0.0);
+    const geometry_msgs::msg::Pose & next_step_pose, 
+    std::vector<cv::Point2d> & polygon,
+    const VehicleInfo & vehicle_info, 
+    const double expand_width_l = 0.0,
+    const double expand_width_r = 0.0);  // for isuzu proj
 
   bool getSelfPose(
     const std_msgs::msg::Header & header, const tf2_ros::Buffer & tf_buffer,

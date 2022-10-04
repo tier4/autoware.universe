@@ -411,9 +411,8 @@ geometry_msgs::msg::Pose transformAbsCoordinate2D(
 double calcJudgeLineDistWithAccLimit(
   const double velocity, const double max_stop_acceleration, const double delay_response_time)
 {
-  double judge_line_dist =
-    (velocity * velocity) / (2.0 * (-max_stop_acceleration)) + delay_response_time * velocity;
-  return judge_line_dist;
+  double judge_line_dist = (velocity * velocity) / (2.0 * (-max_stop_acceleration)) + delay_response_time * velocity;
+  return judge_line_dist; // return positive dist[m] value if max_stop_acceleration is a negative value.
 }
 
 double calcJudgeLineDistWithJerkLimit(
