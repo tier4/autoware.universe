@@ -491,8 +491,9 @@ PidLongitudinalController::ControlState PidLongitudinalController::updateControl
     stop_dist > p.drive_state_stop_dist + p.drive_state_offset_stop_dist;
   const bool8_t departure_condition_from_stopped = stop_dist > p.drive_state_stop_dist;
 
-  const bool8_t keep_stopped_condition =
-    m_enable_keep_stopped_until_steer_convergence && !lateral_sync_data_.is_steer_converged;
+  const bool8_t keep_stopped_condition = !lateral_sync_data_.is_steer_converged;
+    // const bool8_t keep_stopped_condition =
+    // m_enable_keep_stopped_until_steer_convergence && !lateral_sync_data_.is_steer_converged; // temporal comment out 
 
   const bool8_t stopping_condition = stop_dist < p.stopping_state_stop_dist;
   if (

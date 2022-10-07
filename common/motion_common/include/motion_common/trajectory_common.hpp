@@ -68,7 +68,7 @@ calcYawDeviation(const float64_t & base_yaw, const float64_t & target_yaw);
  */
 MOTION_COMMON_PUBLIC std::experimental::optional<size_t> searchZeroVelocityIndex(
   const Points & points, const size_t src_idx, const size_t dst_idx,
-  const float64_t epsilon = 1e-3);
+  const float64_t epsilon = 1e-10);
 
 /**
  * @brief search first index with a velocity of zero in the given points
