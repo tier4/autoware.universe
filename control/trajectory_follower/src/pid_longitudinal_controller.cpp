@@ -487,11 +487,16 @@ PidLongitudinalController::ControlState PidLongitudinalController::updateControl
   // flags for state transition
   const auto & p = m_state_transition_params;
 
-  const bool8_t departure_condition_from_stopping =
-    stop_dist > p.drive_state_stop_dist + p.drive_state_offset_stop_dist;
-  const bool8_t departure_condition_from_stopped = stop_dist > p.drive_state_stop_dist;
+  const bool8_t departure_condition_from_stopping = true;
+    // stop_dist > p.drive_state_stop_dist + p.drive_state_offset_stop_dist;
+  const bool8_t departure_condition_from_stopped = true;
+  // stop_dist > p.drive_state_stop_dist;
+  // RCLCPP_INFO(node_->get_logger(), "p.drive_state_stop_dist: %lf",p.drive_state_stop_dist);
+  // RCLCPP_INFO(node_->get_logger(), "p.drive_state_offset_stop_dist: %lf",p.drive_state_offset_stop_dist);
+  // RCLCPP_INFO(node_->get_logger(), "stop_dist: %lf",stop_dist);
 
-  const bool8_t keep_stopped_condition = !lateral_sync_data_.is_steer_converged;
+  const bool8_t keep_stopped_condition = false;
+  // !lateral_sync_data_.is_steer_converged;
     // const bool8_t keep_stopped_condition =
     // m_enable_keep_stopped_until_steer_convergence && !lateral_sync_data_.is_steer_converged; // temporal comment out 
 
@@ -548,7 +553,10 @@ PidLongitudinalController::ControlState PidLongitudinalController::updateControl
       return ControlState::DRIVE;
     }
   } else if (current_control_state == ControlState::STOPPED) {
-    if (keep_stopped_condition) return ControlState::STOPPED;
+    if (keep_stopped_condition) {
+      RCLCPP_INFO(node_->get_logger(), "STOPPED -> STOPPED, keep_stopped_condition = true");
+      return ControlState::STOPPED;
+    }
     if (departure_condition_from_stopped) {
       m_pid_vel.reset();
       m_lpf_vel_error->reset(0.0);
