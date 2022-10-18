@@ -13,6 +13,11 @@
               path: topic_status
               contains: [": localization_topic_status"]
               timeout: 1.0
+            tf_status:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: tf_status
+              contains: [": localization_tf_status"]
+              timeout: 1.0
 
         performance_monitoring:
           type: diagnostic_aggregator/AnalyzerGroup
@@ -29,3 +34,145 @@
               path: localization_accuracy
               contains: [": localization_accuracy"]
               timeout: 1.0
+
+        eagleye:
+          type: diagnostic_aggregator/AnalyzerGroup
+          path: eagleye
+          analyzers:
+            distance:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: distance
+              contains: [": eagleye_distance"]
+              timeout: 3.0
+
+            enu_absolute_pos:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: enu_absolute_pos
+              contains: [": eagleye_enu_absolute_pos"]
+              timeout: 3.0
+
+            enu_absolute_pos_interpolate:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: enu_absolute_pos_interpolate
+              contains: [": eagleye_enu_absolute_pos_interpolate"]
+              timeout: 3.0
+
+            enu_vel:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: enu_vel
+              contains: [": eagleye_enu_vel"]
+              timeout: 3.0
+            
+            heading_1st:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_1st
+              contains: [": eagleye_heading_1st"]
+              timeout: 3.0
+
+            heading_2nd:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_2nd
+              contains: [": eagleye_heading_2nd"]
+              timeout: 3.0
+
+            heading_3rd:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_3rd
+              contains: [": eagleye_heading_3rd"]
+              timeout: 3.0
+            
+            heading_interpolate_1st:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_interpolate_1st
+              contains: [": eagleye_heading_interpolate_1st"]
+              timeout: 3.0
+
+            heading_interpolate_2nd:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_interpolate_2nd
+              contains: [": eagleye_heading_interpolate_2nd"]
+              timeout: 3.0
+
+            heading_interpolate_3rd:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: heading_interpolate_3rd
+              contains: [": eagleye_heading_interpolate_3rd"]
+              timeout: 3.0
+
+            height:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: height
+              contains: [": eagleye_height"]
+              timeout: 3.0
+
+            input_imu:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: input_imu
+              contains: [": eagleye_input_imu"]
+              timeout: 3.0
+
+            input_navsat_gga:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: input_navsat_gga
+              contains: [": eagleye_input_navsat_gga"]
+              timeout: 3.0
+
+            input_rtklib_nav:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: input_rtklib_nav
+              contains: [": eagleye_input_rtklib_nav"]
+              timeout: 3.0
+
+            input_velocity:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: input_velocity
+              contains: [": eagleye_input_velocity"]
+              timeout: 3.0
+
+            pitching:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: pitching
+              contains: [": eagleye_pitching"]
+              timeout: 3.0
+
+            slip_angle:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: slip_angle
+              contains: [": eagleye_slip_angle"]
+              timeout: 3.0
+
+            twist:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: twist
+              contains: [": eagleye_twist"]
+              timeout: 3.0
+
+            velocity_scale_factor:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: velocity_scale_factor
+              contains: [": eagleye_velocity_scale_factor"]
+              timeout: 3.0
+
+            yawrate_offset_1st:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: yawrate_offset_1st
+              contains: [": eagleye_yawrate_offset_1st"]
+              timeout: 3.0
+
+            yawrate_offset_2nd:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: yawrate_offset_2nd
+              contains: [": eagleye_yawrate_offset_2nd"]
+              timeout: 3.0
+
+            yawrate_offset_stop:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: yawrate_offset_stop
+              contains: [": eagleye_yawrate_offset_stop"]
+              timeout: 3.0
+
+            corrected_imu:
+              type: diagnostic_aggregator/GenericAnalyzer
+              path: corrected_imu
+              contains: [": eagleye_corrected_imu"]
+              timeout: 3.0
