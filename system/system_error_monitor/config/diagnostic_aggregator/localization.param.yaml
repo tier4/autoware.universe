@@ -171,8 +171,8 @@
               contains: [": eagleye_yawrate_offset_stop"]
               timeout: 3.0
 
-            corrected_imu:
+            imu_comparison:
               type: diagnostic_aggregator/GenericAnalyzer
-              path: corrected_imu
-              contains: [": eagleye_corrected_imu"]
+              path: imu_comparison
+              contains: [": eagleye_imu_comparison"]
               timeout: 3.0
