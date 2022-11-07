@@ -57,9 +57,10 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
   using std::chrono_literals::operator""ms;
 
   // data_manager
+  common_param_ptr_ = std::make_shared<BehaviorPathPlannerParameters>(getCommonParam());
   {
     planner_data_ = std::make_shared<PlannerData>();
-    planner_data_->parameters = getCommonParam();
+    planner_data_->parameters = std::ref(*common_param_ptr_);
   }
 
   // publisher
@@ -123,6 +124,9 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
   route_subscriber_ = create_subscription<HADMapRoute>(
     "~/input/route", qos_transient_local, std::bind(&BehaviorPathPlannerNode::onRoute, this, _1),
     createSubscriptionOptions(this));
+  lane_change_param_ptr = std::make_shared<LaneChangeParameters>(getLaneChangeParam());
+  m_set_param_res = this->add_on_set_parameters_callback(
+    std::bind(&BehaviorPathPlannerNode::onSetParam, this, std::placeholders::_1));
 
   // behavior tree manager
   {
@@ -142,10 +146,8 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
       std::make_shared<LaneFollowingModule>("LaneFollowing", *this, getLaneFollowingParam());
     bt_manager_->registerSceneModule(lane_following_module);
 
-    const auto lane_change_param = getLaneChangeParam();
-
     auto lane_change_module =
-      std::make_shared<LaneChangeModule>("LaneChange", *this, lane_change_param);
+      std::make_shared<LaneChangeModule>("LaneChange", *this, lane_change_param_ptr);
     bt_manager_->registerSceneModule(lane_change_module);
 
     auto pull_over_module = std::make_shared<PullOverModule>("PullOver", *this, getPullOverParam());
@@ -785,6 +787,36 @@ void BehaviorPathPlannerNode::clipPathLength(PathWithLaneId & path) const
   const double backward = planner_data_->parameters.backward_path_length;
 
   util::clipPathLength(path, ego_pose, forward, backward);
+}
+SetParametersResult BehaviorPathPlannerNode::onSetParam(
+  const std::vector<rclcpp::Parameter> & parameters)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+
+  if (!lane_change_param_ptr && !common_param_ptr_) {
+    result.successful = false;
+    result.reason = "param not initialized";
+    return result;
+  }
+
+  result.successful = true;
+  result.reason = "success";
+
+  try {
+    update_param(
+      parameters, "lane_change.publish_debug_marker", lane_change_param_ptr->publish_debug_marker);
+    update_param(
+      parameters, "lateral_distance_max_threshold",
+      common_param_ptr_->lateral_distance_max_threshold);
+    update_param(
+      parameters, "longitudinal_distance_min_threshold",
+      common_param_ptr_->longitudinal_distance_min_threshold);
+  } catch (const rclcpp::exceptions::InvalidParameterTypeException & e) {
+    result.successful = false;
+    result.reason = e.what();
+  }
+
+  return result;
 }
 
 PathWithLaneId BehaviorPathPlannerNode::modifyPathForSmoothGoalConnection(

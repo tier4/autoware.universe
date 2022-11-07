@@ -25,10 +25,10 @@
 #include <lanelet2_extension/utility/utilities.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <autoware_auto_planning_msgs/msg/path.hpp>
 #include "tier4_planning_msgs/msg/detail/lane_change_debug_msg_array__struct.hpp"
 #include "tier4_planning_msgs/msg/lane_change_debug_msg.hpp"
 #include "tier4_planning_msgs/msg/lane_change_debug_msg_array.hpp"
+#include <autoware_auto_planning_msgs/msg/path.hpp>
 #include <autoware_auto_planning_msgs/msg/path_with_lane_id.hpp>
 #include <autoware_auto_vehicle_msgs/msg/turn_indicators_command.hpp>
 
@@ -51,7 +51,8 @@ class LaneChangeModule : public SceneModuleInterface
 {
 public:
   LaneChangeModule(
-    const std::string & name, rclcpp::Node & node, const LaneChangeParameters & parameters);
+    const std::string & name, rclcpp::Node & node,
+    std::shared_ptr<LaneChangeParameters> parameters);
 
   BehaviorModuleOutput run() override;
 
@@ -85,10 +86,8 @@ public:
     return false;
   }
 
-  void setParameters(const LaneChangeParameters & parameters);
-
 private:
-  LaneChangeParameters parameters_;
+  std::shared_ptr<LaneChangeParameters> parameters_;
   LaneChangeStatus status_;
   PathShifter path_shifter_;
   mutable LaneChangeDebugMsgArray lane_change_debug_msg_array_;

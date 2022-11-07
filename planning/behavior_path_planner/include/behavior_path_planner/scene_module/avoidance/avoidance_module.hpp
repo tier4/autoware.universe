@@ -77,7 +77,6 @@ public:
   void setParameters(const AvoidanceParameters & parameters);
   std::shared_ptr<AvoidanceDebugMsgArray> get_debug_msg_array() const;
 
-
 private:
   AvoidanceParameters parameters_;
 

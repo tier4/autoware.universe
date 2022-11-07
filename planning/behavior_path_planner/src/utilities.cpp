@@ -247,7 +247,7 @@ std::array<double, 4> getPathScope(
 }
 }  // namespace drivable_area_utils
 
-namespace behavior_path_planner :: util
+namespace behavior_path_planner ::util
 {
 using autoware_auto_perception_msgs::msg::ObjectClassification;
 using autoware_auto_perception_msgs::msg::Shape;
@@ -472,7 +472,6 @@ bool lerpByDistance(
   // ROS_ERROR_STREAM("Something failed in function: " << __func__);
   return false;
 }
-
 
 bool lerpByTimeStamp(const PredictedPath & path, const double t_query, Pose * lerped_pt)
 {
