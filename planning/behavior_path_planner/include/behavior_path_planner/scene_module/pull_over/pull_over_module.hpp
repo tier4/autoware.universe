@@ -163,6 +163,12 @@ public:
 
   void setParameters(const PullOverParameters & parameters);
 
+  void accept_visitor(
+    [[maybe_unused]] const std::shared_ptr<SceneModuleVisitor> & visitor) const override
+  {
+    std::cerr << "visited pull over module\n";
+  }
+
 private:
   PullOverParameters parameters_;
   ShiftParkingPath shift_parking_path_;

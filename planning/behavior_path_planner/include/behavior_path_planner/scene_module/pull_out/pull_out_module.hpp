@@ -98,6 +98,12 @@ public:
 
   void setParameters(const PullOutParameters & parameters);
 
+  void accept_visitor(
+    [[maybe_unused]] const std::shared_ptr<SceneModuleVisitor> & visitor) const override
+  {
+    std::cerr << "visited pull out module\n";
+  }
+
 private:
   PullOutParameters parameters_;
   PullOutStatus status_;

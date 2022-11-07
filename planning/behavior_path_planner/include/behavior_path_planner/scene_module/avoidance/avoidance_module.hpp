@@ -17,6 +17,7 @@
 
 #include "behavior_path_planner/scene_module/avoidance/avoidance_module_data.hpp"
 #include "behavior_path_planner/scene_module/scene_module_interface.hpp"
+#include "behavior_path_planner/scene_module/scene_module_visitor.hpp"
 #include "behavior_path_planner/scene_module/utils/path_shifter.hpp"
 
 #include <rclcpp/rclcpp.hpp>
@@ -54,6 +55,7 @@ public:
   void onEntry() override;
   void onExit() override;
   void updateData() override;
+  void accept_visitor(const std::shared_ptr<SceneModuleVisitor> & visitor) const override;
 
   void publishRTCStatus() override
   {
@@ -73,6 +75,8 @@ public:
   }
 
   void setParameters(const AvoidanceParameters & parameters);
+  std::shared_ptr<AvoidanceDebugMsgArray> get_debug_msg_array() const;
+
 
 private:
   AvoidanceParameters parameters_;
@@ -251,6 +255,7 @@ private:
 
   // debug
   mutable DebugData debug_data_;
+  mutable std::shared_ptr<AvoidanceDebugMsgArray> debug_msg_ptr_;
   void setDebugData(const PathShifter & shifter, const DebugData & debug);
   void updateAvoidanceDebugData(std::vector<AvoidanceDebugMsg> & avoidance_debug_msg_array) const;
   mutable std::vector<AvoidanceDebugMsg> debug_avoidance_initializer_for_shift_point_;

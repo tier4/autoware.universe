@@ -16,6 +16,7 @@
 #define BEHAVIOR_PATH_PLANNER__SCENE_MODULE__SCENE_MODULE_INTERFACE_HPP_
 
 #include "behavior_path_planner/data_manager.hpp"
+#include "behavior_path_planner/scene_module/scene_module_visitor.hpp"
 #include "behavior_path_planner/utilities.hpp"
 
 #include <rclcpp/rclcpp.hpp>
@@ -226,22 +227,16 @@ public:
   std::shared_ptr<const PlannerData> planner_data_;
 
   MarkerArray getDebugMarker() { return debug_marker_; }
-
-  AvoidanceDebugMsgArray::SharedPtr getAvoidanceDebugMsgArray()
-  {
-    if (debug_avoidance_msg_array_ptr_) {
-      debug_avoidance_msg_array_ptr_->header.stamp = clock_->now();
-    }
-    return debug_avoidance_msg_array_ptr_;
-  }
   bool isWaitingApproval() const { return is_waiting_approval_; }
+
+  virtual void accept_visitor(const std::shared_ptr<SceneModuleVisitor> & visitor) const = 0;
 
 private:
   std::string name_;
   rclcpp::Logger logger_;
 
 protected:
-  MarkerArray debug_marker_;
+  mutable MarkerArray debug_marker_;
   rclcpp::Clock::SharedPtr clock_;
   mutable AvoidanceDebugMsgArray::SharedPtr debug_avoidance_msg_array_ptr_{};
 

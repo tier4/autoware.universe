@@ -20,6 +20,9 @@
 #include <opencv2/opencv.hpp>
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 
+#include "autoware_auto_perception_msgs/msg/predicted_object.hpp"
+#include "autoware_auto_perception_msgs/msg/predicted_path.hpp"
+
 #include <algorithm>
 #include <limits>
 #include <memory>
@@ -244,13 +247,13 @@ std::array<double, 4> getPathScope(
 }
 }  // namespace drivable_area_utils
 
-namespace behavior_path_planner
-{
-namespace util
+namespace behavior_path_planner :: util
 {
 using autoware_auto_perception_msgs::msg::ObjectClassification;
 using autoware_auto_perception_msgs::msg::Shape;
 using geometry_msgs::msg::PoseWithCovarianceStamped;
+using tf2::fromMsg;
+using tier4_autoware_utils::Point2d;
 
 std::vector<Point> convertToPointArray(const PathWithLaneId & path)
 {
@@ -324,7 +327,7 @@ PoseArray convertToGeometryPoseArray(const PathWithLaneId & path)
 
 PredictedPath convertToPredictedPath(
   const PathWithLaneId & path, const Twist & vehicle_twist, const Pose & vehicle_pose,
-  const double duration, const double resolution, const double acceleration)
+  const double duration, const double resolution, const double acceleration, double min_speed)
 {
   PredictedPath predicted_path{};
   predicted_path.time_step = rclcpp::Duration::from_seconds(resolution);
@@ -339,7 +342,6 @@ PredictedPath convertToPredictedPath(
   auto clock{rclcpp::Clock{RCL_ROS_TIME}};
   rclcpp::Time start_time = clock.now();
   double vehicle_speed = std::abs(vehicle_twist.linear.x);
-  constexpr double min_speed = 1.0;
   if (vehicle_speed < min_speed) {
     vehicle_speed = min_speed;
     RCLCPP_DEBUG_STREAM_THROTTLE(
@@ -443,6 +445,35 @@ Point lerpByLength(const std::vector<Point> & point_array, const double length)
   return point_array.back();
 }
 
+bool lerpByDistance(
+  const behavior_path_planner::PullOutPath & path, const double & s, Pose * lerped_pt,
+  const lanelet::ConstLanelets & road_lanes)
+{
+  if (lerped_pt == nullptr) {
+    // ROS_WARN_STREAM_THROTTLE(1, "failed to lerp by distance due to nullptr pt");
+    return false;
+  }
+
+  for (size_t i = 1; i < path.path.points.size(); i++) {
+    const auto & pt = path.path.points.at(i).point.pose;
+    const auto & prev_pt = path.path.points.at(i - 1).point.pose;
+    if (
+      (s >= lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length) &&
+      (s < lanelet::utils::getArcCoordinates(road_lanes, pt).length)) {
+      const double distance = lanelet::utils::getArcCoordinates(road_lanes, pt).length -
+                              lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length;
+      const auto offset = s - lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length;
+      const auto ratio = offset / distance;
+      *lerped_pt = lerpByPose(prev_pt, pt, ratio);
+      return true;
+    }
+  }
+
+  // ROS_ERROR_STREAM("Something failed in function: " << __func__);
+  return false;
+}
+
+
 bool lerpByTimeStamp(const PredictedPath & path, const double t_query, Pose * lerped_pt)
 {
   const rclcpp::Duration time_step(path.time_step);
@@ -492,31 +523,43 @@ bool lerpByTimeStamp(const PredictedPath & path, const double t_query, Pose * le
   return false;
 }
 
-bool lerpByDistance(
-  const behavior_path_planner::PullOutPath & path, const double & s, Pose * lerped_pt,
-  const lanelet::ConstLanelets & road_lanes)
+bool lerpByTimeStamp(
+  const PredictedPath & path, const double t_query, Pose * lerped_pt, std::string & failed_reason)
 {
+  const rclcpp::Duration time_step(path.time_step);
+  auto clock{rclcpp::Clock{RCL_ROS_TIME}};
   if (lerped_pt == nullptr) {
-    // ROS_WARN_STREAM_THROTTLE(1, "failed to lerp by distance due to nullptr pt");
+    failed_reason = "nullptr_pt";
+    return false;
+  }
+  if (path.path.empty()) {
+    failed_reason = "empty_path";
     return false;
   }
 
-  for (size_t i = 1; i < path.path.points.size(); i++) {
-    const auto & pt = path.path.points.at(i).point.pose;
-    const auto & prev_pt = path.path.points.at(i - 1).point.pose;
-    if (
-      (s >= lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length) &&
-      (s < lanelet::utils::getArcCoordinates(road_lanes, pt).length)) {
-      const double distance = lanelet::utils::getArcCoordinates(road_lanes, pt).length -
-                              lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length;
-      const auto offset = s - lanelet::utils::getArcCoordinates(road_lanes, prev_pt).length;
-      const auto ratio = offset / distance;
+  const double t_final = time_step.seconds() * static_cast<double>(path.path.size() - 1);
+  if (t_query > t_final) {
+    failed_reason = "query_exceed_t_final";
+    *lerped_pt = path.path.back();
+
+    return false;
+  }
+
+  for (size_t i = 1; i < path.path.size(); i++) {
+    const auto & pt = path.path.at(i);
+    const auto & prev_pt = path.path.at(i - 1);
+    const double t = time_step.seconds() * static_cast<double>(i);
+    if (t_query <= t) {
+      const double prev_t = time_step.seconds() * static_cast<double>(i - 1);
+      const double duration = time_step.seconds();
+      const double offset = t_query - prev_t;
+      const double ratio = offset / duration;
       *lerped_pt = lerpByPose(prev_pt, pt, ratio);
       return true;
     }
   }
 
-  // ROS_ERROR_STREAM("Something failed in function: " << __func__);
+  failed_reason = "unknown_failure";
   return false;
 }
 
@@ -694,73 +737,45 @@ std::vector<size_t> filterObjectsByLanelets(
 
 bool calcObjectPolygon(const PredictedObject & object, Polygon2d * object_polygon)
 {
-  const double obj_x = object.kinematics.initial_pose_with_covariance.pose.position.x;
-  const double obj_y = object.kinematics.initial_pose_with_covariance.pose.position.y;
   if (object.shape.type == Shape::BOUNDING_BOX) {
-    const double len_x = object.shape.dimensions.x;
-    const double len_y = object.shape.dimensions.y;
-
-    tf2::Transform tf_map2obj;
-    tf2::fromMsg(object.kinematics.initial_pose_with_covariance.pose, tf_map2obj);
-
-    // set vertices at map coordinate
-    tf2::Vector3 p1_map, p2_map, p3_map, p4_map;
-
-    p1_map.setX(len_x / 2);
-    p1_map.setY(len_y / 2);
-    p1_map.setZ(0.0);
-    p1_map.setW(1.0);
-
-    p2_map.setX(-len_x / 2);
-    p2_map.setY(len_y / 2);
-    p2_map.setZ(0.0);
-    p2_map.setW(1.0);
-
-    p3_map.setX(-len_x / 2);
-    p3_map.setY(-len_y / 2);
-    p3_map.setZ(0.0);
-    p3_map.setW(1.0);
-
-    p4_map.setX(len_x / 2);
-    p4_map.setY(-len_y / 2);
-    p4_map.setZ(0.0);
-    p4_map.setW(1.0);
-
-    // transform vertices from map coordinate to object coordinate
-    tf2::Vector3 p1_obj, p2_obj, p3_obj, p4_obj;
-
-    p1_obj = tf_map2obj * p1_map;
-    p2_obj = tf_map2obj * p2_map;
-    p3_obj = tf_map2obj * p3_map;
-    p4_obj = tf_map2obj * p4_map;
-
-    object_polygon->outer().emplace_back(p1_obj.x(), p1_obj.y());
-    object_polygon->outer().emplace_back(p2_obj.x(), p2_obj.y());
-    object_polygon->outer().emplace_back(p3_obj.x(), p3_obj.y());
-    object_polygon->outer().emplace_back(p4_obj.x(), p4_obj.y());
+    const double & length_m = object.shape.dimensions.x / 2;
+    const double & width_m = object.shape.dimensions.y / 2;
+    *object_polygon = convertBoundingBoxObjectToGeometryPolygon(
+      object.kinematics.initial_pose_with_covariance.pose, length_m, length_m, width_m);
 
   } else if (object.shape.type == Shape::CYLINDER) {
-    const size_t N = 20;
-    const double r = object.shape.dimensions.x / 2;
-    for (size_t i = 0; i < N; ++i) {
-      object_polygon->outer().emplace_back(
-        obj_x + r * std::cos(2.0 * M_PI / N * i), obj_y + r * std::sin(2.0 * M_PI / N * i));
-    }
+    *object_polygon = convertCylindricalObjectToGeometryPolygon(
+      object.kinematics.initial_pose_with_covariance.pose, object.shape);
   } else if (object.shape.type == Shape::POLYGON) {
-    tf2::Transform tf_map2obj;
-    tf2::fromMsg(object.kinematics.initial_pose_with_covariance.pose, tf_map2obj);
-    const auto obj_points = object.shape.footprint.points;
-    for (const auto & obj_point : obj_points) {
-      tf2::Vector3 obj(obj_point.x, obj_point.y, obj_point.z);
-      tf2::Vector3 tf_obj = tf_map2obj * obj;
-      object_polygon->outer().emplace_back(tf_obj.x(), tf_obj.y());
-    }
+    *object_polygon = convertPolygonObjectToGeometryPolygon(
+      object.kinematics.initial_pose_with_covariance.pose, object.shape);
   } else {
     RCLCPP_WARN(
       rclcpp::get_logger("behavior_path_planner").get_child("utilities"), "Object shape unknown!");
     return false;
   }
-  object_polygon->outer().push_back(object_polygon->outer().front());
+
+  return true;
+}
+
+bool calcObjectPolygon(
+  const Shape & object_shape, const Pose & object_pose, Polygon2d * object_polygon)
+{
+  if (object_shape.type == Shape::BOUNDING_BOX) {
+    const double & length_m = object_shape.dimensions.x / 2;
+    const double & width_m = object_shape.dimensions.y / 2;
+    *object_polygon =
+      convertBoundingBoxObjectToGeometryPolygon(object_pose, length_m, length_m, width_m);
+
+  } else if (object_shape.type == Shape::CYLINDER) {
+    *object_polygon = convertCylindricalObjectToGeometryPolygon(object_pose, object_shape);
+  } else if (object_shape.type == Shape::POLYGON) {
+    *object_polygon = convertPolygonObjectToGeometryPolygon(object_pose, object_shape);
+  } else {
+    RCLCPP_WARN(
+      rclcpp::get_logger("behavior_path_planner").get_child("utilities"), "Object shape unknown!");
+    return false;
+  }
 
   return true;
 }
@@ -1919,7 +1934,7 @@ lanelet::ConstLanelets getCurrentLanes(const std::shared_ptr<const PlannerData> 
 {
   const auto & route_handler = planner_data->route_handler;
   const auto current_pose = planner_data->self_pose->pose;
-  const auto common_parameters = planner_data->parameters;
+  const auto & common_parameters = planner_data->parameters;
 
   lanelet::ConstLanelet current_lane;
   if (!route_handler->getClosestLaneletWithinRoute(current_pose, &current_lane)) {
@@ -1971,5 +1986,425 @@ lanelet::ConstLanelets getExtendedCurrentLanes(
   return current_lanes;
 }
 
-}  // namespace util
-}  // namespace behavior_path_planner
+lanelet::ConstLanelets calcLaneAroundPose(
+  const std::shared_ptr<RouteHandler> route_handler, const geometry_msgs::msg::Pose & pose,
+  const double forward_length, const double backward_length)
+{
+  lanelet::ConstLanelet current_lane;
+  if (!route_handler->getClosestLaneletWithinRoute(pose, &current_lane)) {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("behavior_path_planner").get_child("avoidance"),
+      "failed to find closest lanelet within route!!!");
+    return {};  // TODO(Horibe)
+  }
+
+  // For current_lanes with desired length
+  lanelet::ConstLanelets current_lanes =
+    route_handler->getLaneletSequence(current_lane, pose, backward_length, forward_length);
+
+  return current_lanes;
+}
+
+Polygon2d convertBoundingBoxObjectToGeometryPolygon(
+  const Pose & current_pose, const double & base_to_front, const double & base_to_rear,
+  const double & base_to_width)
+{
+  const auto mapped_point = [](const double & length_scalar, const double & width_scalar) {
+    tf2::Vector3 map;
+    map.setX(length_scalar);
+    map.setY(width_scalar);
+    map.setZ(0.0);
+    map.setW(1.0);
+    return map;
+  };
+
+  // set vertices at map coordinate
+  const tf2::Vector3 p1_map = std::invoke(mapped_point, base_to_front, -base_to_width);
+  const tf2::Vector3 p2_map = std::invoke(mapped_point, base_to_front, base_to_width);
+  const tf2::Vector3 p3_map = std::invoke(mapped_point, -base_to_rear, base_to_width);
+  const tf2::Vector3 p4_map = std::invoke(mapped_point, -base_to_rear, -base_to_width);
+
+  // transform vertices from map coordinate to object coordinate
+  tf2::Transform tf_map2obj;
+  tf2::fromMsg(current_pose, tf_map2obj);
+  const tf2::Vector3 p1_obj = tf_map2obj * p1_map;
+  const tf2::Vector3 p2_obj = tf_map2obj * p2_map;
+  const tf2::Vector3 p3_obj = tf_map2obj * p3_map;
+  const tf2::Vector3 p4_obj = tf_map2obj * p4_map;
+
+  Polygon2d object_polygon;
+  object_polygon.outer().reserve(5);
+  object_polygon.outer().emplace_back(p1_obj.x(), p1_obj.y());
+  object_polygon.outer().emplace_back(p2_obj.x(), p2_obj.y());
+  object_polygon.outer().emplace_back(p3_obj.x(), p3_obj.y());
+  object_polygon.outer().emplace_back(p4_obj.x(), p4_obj.y());
+
+  object_polygon.outer().push_back(object_polygon.outer().front());
+
+  return object_polygon;
+}
+
+Polygon2d convertCylindricalObjectToGeometryPolygon(
+  const Pose & current_pose, const Shape & obj_shape)
+{
+  Polygon2d object_polygon;
+
+  const double obj_x = current_pose.position.x;
+  const double obj_y = current_pose.position.y;
+
+  constexpr int N = 20;
+  const double r = obj_shape.dimensions.x / 2;
+  for (int i = 0; i < N; ++i) {
+    object_polygon.outer().emplace_back(
+      obj_x + r * std::cos(2.0 * M_PI / N * i), obj_y + r * std::sin(2.0 * M_PI / N * i));
+  }
+
+  object_polygon.outer().push_back(object_polygon.outer().front());
+
+  return object_polygon;
+}
+
+Polygon2d convertPolygonObjectToGeometryPolygon(const Pose & current_pose, const Shape & obj_shape)
+{
+  Polygon2d object_polygon;
+  tf2::Transform tf_map2obj;
+  fromMsg(current_pose, tf_map2obj);
+  const auto obj_points = obj_shape.footprint.points;
+  for (const auto & obj_point : obj_points) {
+    tf2::Vector3 obj(obj_point.x, obj_point.y, obj_point.z);
+    tf2::Vector3 tf_obj = tf_map2obj * obj;
+    object_polygon.outer().emplace_back(tf_obj.x(), tf_obj.y());
+  }
+  object_polygon.outer().push_back(object_polygon.outer().front());
+
+  return object_polygon;
+}
+
+std::string getUuidStr(const PredictedObject & obj)
+{
+  std::stringstream hex_value;
+  for (const auto & uuid : obj.object_id.uuid) {
+    hex_value << std::hex << std::setfill('0') << std::setw(2) << +uuid;
+  }
+  return hex_value.str();
+}
+
+template <typename Pythagoras>
+ProjectedDistancePoint pointToSegment(
+  const Point2d & reference_point, const Point2d & point_from_ego,
+  const Point2d & point_from_object)
+{
+  auto copied_point_from_object = point_from_object;
+  auto copied_point_from_reference = reference_point;
+  bg::subtract_point(copied_point_from_object, point_from_ego);
+  bg::subtract_point(copied_point_from_reference, point_from_ego);
+
+  const auto c1 = bg::dot_product(copied_point_from_reference, copied_point_from_object);
+  if (!(c1 > 0)) {
+    return {point_from_ego, Pythagoras::apply(reference_point, point_from_ego)};
+  }
+
+  const auto c2 = bg::dot_product(copied_point_from_object, copied_point_from_object);
+  if (!(c2 > c1)) {
+    return {point_from_object, Pythagoras::apply(reference_point, point_from_object)};
+  }
+
+  Point2d projected = point_from_ego;
+  bg::multiply_value(copied_point_from_object, c1 / c2);
+  bg::add_point(projected, copied_point_from_object);
+
+  return {projected, Pythagoras::apply(reference_point, projected)};
+}
+
+void getProjectedDistancePointFromPolygons(
+  const Polygon2d & ego_polygon, const Polygon2d & object_polygon, Pose & point_on_ego,
+  Pose & point_on_object)
+{
+  ProjectedDistancePoint nearest;
+  std::unique_ptr<Point2d> current_point;
+
+  bool points_in_ego{false};
+
+  const auto findPoints = [&nearest, &current_point, &points_in_ego](
+                            const Polygon2d & polygon_for_segment,
+                            const Polygon2d & polygon_for_points, const bool & ego_is_points) {
+    const auto segments = boost::make_iterator_range(
+      bg::segments_begin(polygon_for_segment), bg::segments_end(polygon_for_segment));
+    const auto points = boost::make_iterator_range(
+      bg::points_begin(polygon_for_points), bg::points_end(polygon_for_points));
+
+    for (auto && segment : segments) {
+      for (auto && point : points) {
+        const auto projected = pointToSegment(point, *segment.first, *segment.second);
+        if (!current_point || projected.distance < nearest.distance) {
+          current_point = std::make_unique<Point2d>(point);
+          nearest = projected;
+          points_in_ego = ego_is_points;
+        }
+      }
+    }
+  };
+
+  std::invoke(findPoints, ego_polygon, object_polygon, false);
+  std::invoke(findPoints, object_polygon, ego_polygon, true);
+
+  if (!points_in_ego) {
+    point_on_object.position.x = current_point->x();
+    point_on_object.position.y = current_point->y();
+    point_on_ego.position.x = nearest.projected_point.x();
+    point_on_ego.position.y = nearest.projected_point.y();
+  } else {
+    point_on_ego.position.x = current_point->x();
+    point_on_ego.position.y = current_point->y();
+    point_on_object.position.x = nearest.projected_point.x();
+    point_on_object.position.y = nearest.projected_point.y();
+  }
+}
+
+bool getEgoExpectedPoseAndConvertToPolygon(
+  const Pose & current_pose, const PredictedPath & pred_path,
+  tier4_autoware_utils::Polygon2d & ego_polygon, const double & check_current_time,
+  const VehicleInfo & ego_info, Pose & expected_pose, std::string & failed_reason)
+{
+  bool is_lerped =
+    util::lerpByTimeStamp(pred_path, check_current_time, &expected_pose, failed_reason);
+  expected_pose.orientation = current_pose.orientation;
+
+  const auto & i = ego_info;
+  const auto & front_m = i.max_longitudinal_offset_m;
+  const auto & width_m = i.vehicle_width_m / 2.0;
+  const auto & back_m = i.rear_overhang_m;
+
+  ego_polygon =
+    util::convertBoundingBoxObjectToGeometryPolygon(expected_pose, front_m, back_m, width_m);
+
+  return is_lerped;
+}
+
+bool getObjectExpectedPoseAndConvertToPolygon(
+  const PredictedPath & pred_path, const PredictedObject & object, Polygon2d & obj_polygon,
+  const double & check_current_time, Pose & expected_pose, std::string & failed_reason)
+{
+  bool is_lerped =
+    util::lerpByTimeStamp(pred_path, check_current_time, &expected_pose, failed_reason);
+  expected_pose.orientation = object.kinematics.initial_pose_with_covariance.pose.orientation;
+
+  is_lerped = util::calcObjectPolygon(object.shape, expected_pose, &obj_polygon);
+  return is_lerped;
+}
+
+std::vector<PredictedPath> getPredictedPathFromObj(
+  const PredictedObject & obj, const bool & is_use_all_predicted_path)
+{
+  std::vector<PredictedPath> predicted_path_vec;
+  if (is_use_all_predicted_path) {
+    std::copy_if(
+      obj.kinematics.predicted_paths.cbegin(), obj.kinematics.predicted_paths.cend(),
+      std::back_inserter(predicted_path_vec),
+      [](const PredictedPath & path) { return !path.path.empty(); });
+  } else {
+    const auto max_confidence_path = std::max_element(
+      obj.kinematics.predicted_paths.begin(), obj.kinematics.predicted_paths.end(),
+      [](const auto & path1, const auto & path2) { return path1.confidence > path2.confidence; });
+    if (max_confidence_path != obj.kinematics.predicted_paths.end()) {
+      predicted_path_vec.push_back(*max_confidence_path);
+    }
+  }
+  return predicted_path_vec;
+}
+
+Pose projectCurrentPoseToTarget(const Pose & desired_object, const Pose & target_object)
+{
+  tf2::Transform tf_map_desired_to_global{};
+  tf2::Transform tf_map_target_to_global{};
+
+  tf2::fromMsg(desired_object, tf_map_desired_to_global);
+  tf2::fromMsg(target_object, tf_map_target_to_global);
+
+  Pose desired_obj_pose_projected_to_target{};
+  tf2::toMsg(
+    tf_map_desired_to_global.inverse() * tf_map_target_to_global,
+    desired_obj_pose_projected_to_target);
+
+  return desired_obj_pose_projected_to_target;
+}
+
+bool isObjectFront(const Pose & ego_pose, const Pose & obj_pose)
+{
+  const auto obj_from_ego = projectCurrentPoseToTarget(ego_pose, obj_pose);
+  return obj_from_ego.position.x > -1e-3;
+}
+
+bool isObjectFront(const Pose & projected_ego_pose)
+{
+  return projected_ego_pose.position.x > -1e-3;
+}
+
+double stoppingDistance(const double & vehicle_velocity, const double & vehicle_accel)
+{
+  const auto deceleration = (vehicle_accel < -1e-3) ? vehicle_accel : -1.0;
+  return -std::pow(vehicle_velocity, 2) / (2.0 * deceleration);
+}
+
+double frontVehicleStopDistance(
+  const double & front_vehicle_velocity, const double & front_vehicle_accel,
+  const double & distance_to_collision)
+{
+  return stoppingDistance(front_vehicle_velocity, front_vehicle_accel) + distance_to_collision;
+}
+
+double rearVehicleStopDistance(
+  const double & rear_vehicle_velocity, const double & rear_vehicle_accel,
+  const double & rear_vehicle_reaction_time, const double & rear_vehicle_safety_time_margin)
+{
+  return rear_vehicle_velocity * rear_vehicle_reaction_time +
+         stoppingDistance(rear_vehicle_velocity, rear_vehicle_accel) +
+         rear_vehicle_velocity * rear_vehicle_safety_time_margin;
+}
+
+bool isLongitudinalDistanceEnough(
+  const double & rear_vehicle_stop_threshold, const double & front_vehicle_stop_threshold)
+{
+  return rear_vehicle_stop_threshold <= front_vehicle_stop_threshold;
+}
+
+bool hasEnoughDistance(
+  const Pose & expected_ego_pose, const Twist & ego_current_twist,
+  const Pose & expected_object_pose, const Twist & object_current_twist,
+  const BehaviorPathPlannerParameters & param, CollisionCheckDebug & debug)
+{
+  const auto front_vehicle_pose =
+    projectCurrentPoseToTarget(expected_ego_pose, expected_object_pose);
+  debug.relative_to_ego = front_vehicle_pose;
+
+  if (isLateralDistanceEnough(
+        front_vehicle_pose.position.y, param.lateral_distance_max_threshold)) {
+    return true;
+  }
+
+  const auto is_obj_in_front = isObjectFront(front_vehicle_pose);
+  debug.is_front = is_obj_in_front;
+
+  const auto front_vehicle_velocity =
+    (is_obj_in_front) ? object_current_twist.linear : ego_current_twist.linear;
+
+  const auto rear_vehicle_velocity =
+    (is_obj_in_front) ? ego_current_twist.linear : object_current_twist.linear;
+  debug.object_twist.linear = (is_obj_in_front) ? front_vehicle_velocity : rear_vehicle_velocity;
+
+  const auto front_vehicle_accel = param.expected_front_deceleration;
+  const auto rear_vehicle_accel = param.expected_rear_deceleration;
+
+  const auto front_vehicle_stop_threshold = frontVehicleStopDistance(
+    util::l2Norm(front_vehicle_velocity), front_vehicle_accel,
+    std::fabs(front_vehicle_pose.position.x));
+
+  const auto rear_vehicle_stop_threshold = std::max(
+    rearVehicleStopDistance(
+      util::l2Norm(rear_vehicle_velocity), rear_vehicle_accel, param.rear_vehicle_reaction_time,
+      param.rear_vehicle_safety_time_margin),
+    param.longitudinal_distance_min_threshold);
+
+  return isLongitudinalDistanceEnough(rear_vehicle_stop_threshold, front_vehicle_stop_threshold);
+}
+
+bool isLateralDistanceEnough(
+  const double & relative_lateral_distance, const double & lateral_distance_threshold)
+{
+  return std::fabs(relative_lateral_distance) > lateral_distance_threshold;
+}
+
+bool isSafeInLaneletCollisionCheck(
+  const Pose & ego_current_pose, const Twist & ego_current_twist,
+  const PredictedPath & ego_predicted_path, const VehicleInfo & ego_info,
+  const double & check_start_time, const double & check_end_time,
+  const double & check_time_resolution, const PredictedObject & target_object,
+  const PredictedPath & target_object_path, const BehaviorPathPlannerParameters & common_parameters,
+  CollisionCheckDebug & debug)
+{
+  const auto lerp_path_reserve = (check_end_time - check_start_time) / check_time_resolution;
+  if (lerp_path_reserve > 1e-3) {
+    debug.lerped_path.reserve(static_cast<size_t>(lerp_path_reserve));
+  }
+
+  Pose expected_obj_pose = target_object.kinematics.initial_pose_with_covariance.pose;
+  Pose expected_ego_pose = ego_current_pose;
+  for (double t = check_start_time; t < check_end_time; t += check_time_resolution) {
+    tier4_autoware_utils::Polygon2d obj_polygon;
+    [[maybe_unused]] const auto get_obj_info = util::getObjectExpectedPoseAndConvertToPolygon(
+      target_object_path, target_object, obj_polygon, t, expected_obj_pose, debug.failed_reason);
+
+    tier4_autoware_utils::Polygon2d ego_polygon;
+    [[maybe_unused]] const auto get_ego_info = util::getEgoExpectedPoseAndConvertToPolygon(
+      ego_current_pose, ego_predicted_path, ego_polygon, t, ego_info, expected_ego_pose,
+      debug.failed_reason);
+
+    debug.ego_polygon = ego_polygon;
+    debug.obj_polygon = obj_polygon;
+    if (boost::geometry::overlaps(ego_polygon, obj_polygon)) {
+      debug.failed_reason = "overlap_polygon";
+      return false;
+    }
+
+    debug.lerped_path.push_back(expected_ego_pose);
+
+    util::getProjectedDistancePointFromPolygons(
+      ego_polygon, obj_polygon, expected_ego_pose, expected_obj_pose);
+    debug.expected_ego_pose = expected_ego_pose;
+    debug.expected_obj_pose = expected_obj_pose;
+
+    const auto & object_twist = target_object.kinematics.initial_twist_with_covariance.twist;
+    if (!util::hasEnoughDistance(
+          expected_ego_pose, ego_current_twist, expected_obj_pose, object_twist, common_parameters,
+          debug)) {
+      debug.failed_reason = "not_enough_longitudinal";
+      return false;
+    }
+  }
+  return true;
+}
+
+bool isSafeInFreeSpaceCollisionCheck(
+  const Pose & ego_current_pose, const Twist & ego_current_twist,
+  const PredictedPath & ego_predicted_path, const VehicleInfo & ego_info,
+  const double & check_start_time, const double & check_end_time,
+  const double & check_time_resolution, const PredictedObject & target_object,
+  const BehaviorPathPlannerParameters & common_parameters, CollisionCheckDebug & debug)
+{
+  tier4_autoware_utils::Polygon2d obj_polygon;
+  if (!util::calcObjectPolygon(target_object, &obj_polygon)) {
+    return false;
+  }
+  Pose expected_ego_pose = ego_current_pose;
+  for (double t = check_start_time; t < check_end_time; t += check_time_resolution) {
+    tier4_autoware_utils::Polygon2d ego_polygon;
+    [[maybe_unused]] const auto get_ego_info = util::getEgoExpectedPoseAndConvertToPolygon(
+      ego_current_pose, ego_predicted_path, ego_polygon, t, ego_info, expected_ego_pose,
+      debug.failed_reason);
+
+    debug.ego_polygon = ego_polygon;
+    debug.obj_polygon = obj_polygon;
+    if (boost::geometry::overlaps(ego_polygon, obj_polygon)) {
+      debug.failed_reason = "overlap_polygon";
+      return false;
+    }
+
+    auto expected_obj_pose = target_object.kinematics.initial_pose_with_covariance.pose;
+    util::getProjectedDistancePointFromPolygons(
+      ego_polygon, obj_polygon, expected_ego_pose, expected_obj_pose);
+
+    debug.expected_ego_pose = expected_ego_pose;
+    debug.expected_obj_pose = expected_obj_pose;
+
+    const auto object_twist = target_object.kinematics.initial_twist_with_covariance.twist;
+    if (!util::hasEnoughDistance(
+          expected_ego_pose, ego_current_twist,
+          target_object.kinematics.initial_pose_with_covariance.pose, object_twist,
+          common_parameters, debug)) {
+      debug.failed_reason = "not_enough_longitudinal";
+      return false;
+    }
+  }
+  return true;
+}
+}  // namespace behavior_path_planner::util
