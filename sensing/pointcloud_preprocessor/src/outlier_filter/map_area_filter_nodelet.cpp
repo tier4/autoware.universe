@@ -24,6 +24,8 @@ using std::placeholders::_1;
 MapAreaFilterComponent::MapAreaFilterComponent(const rclcpp::NodeOptions & options)
 : Filter("MapAreaFilter", options)
 {
+  pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
+
   // set initial parameters
   std::string map_area_csv;
 
@@ -38,8 +40,13 @@ MapAreaFilterComponent::MapAreaFilterComponent(const rclcpp::NodeOptions & optio
     "input/pose_topic", rclcpp::QoS(1),
     std::bind(&MapAreaFilterComponent::pose_callback, this, _1));
   objects_cloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-    "input/objects_cloud", rclcpp::QoS(1),
+    "input/objects_cloud", rclcpp::SensorDataQoS(),
     std::bind(&MapAreaFilterComponent::objects_cloud_callback, this, _1));
+  objects_sub_ = this->create_subscription<PredictedObjects>(
+    "input/objects", rclcpp::QoS(10),
+    std::bind(&MapAreaFilterComponent::objects_callback, this, _1));
+  filtered_objects_pub_ =
+    this->create_publisher<PredictedObjects>("output/objects", rclcpp::QoS(10));
   area_markers_pub_ =
     this->create_publisher<visualization_msgs::msg::MarkerArray>("output/debug", rclcpp::QoS(1));
 
@@ -75,16 +82,21 @@ void MapAreaFilterComponent::publish_area_markers()
     area.header.frame_id = map_frame_;
     area.id = i;
 
-    if (!delete_all_area_[i]) {
-      area.color.r = 3. / 255.;
-      area.color.g = 169. / 255.;
-      area.color.g = 252. / 255.;
-      area.color.a = 0.99;
-    } else {
+    if (area_types_[i] == AreaType::DELETE_ALL) {
       area.color.r = 1.;
       area.color.g = 0.;
+      area.color.b = 0.;
+      area.color.a = 0.5;
+    } else if (area_types_[i] == AreaType::DELETE_STATIC) {
+      area.color.r = 0.;
+      area.color.g = 1.;
+      area.color.b = 0.;
+      area.color.a = 0.5;
+    } else if (area_types_[i] == AreaType::DELETE_OBJECT) {
+      area.color.r = 0.;
       area.color.g = 0.;
-      area.color.a = 0.99;
+      area.color.b = 1.;
+      area.color.a = 0.5;
     }
 
     area.scale.x = 0.1;
@@ -109,17 +121,23 @@ void MapAreaFilterComponent::publish_area_markers()
 }
 
 void MapAreaFilterComponent::pose_callback(
-  const geometry_msgs::msg::PoseStamped::ConstSharedPtr & pose_msg)
+  const geometry_msgs::msg::PoseStamped::ConstSharedPtr & msg)
 {
   std::scoped_lock lock(mutex_);
-  current_pose_ = *pose_msg;
+  current_pose_ = *msg;
 }
 
 void MapAreaFilterComponent::objects_cloud_callback(
-  const sensor_msgs::msg::PointCloud2::ConstSharedPtr & cloud_msg)
+  const sensor_msgs::msg::PointCloud2::ConstSharedPtr & msg)
 {
   std::scoped_lock lock(mutex_);
-  objects_cloud_ptr_ = cloud_msg;
+  objects_cloud_ptr_ = msg;
+}
+
+void MapAreaFilterComponent::objects_callback(const PredictedObjects::ConstSharedPtr & msg)
+{
+  std::scoped_lock lock(mutex_);
+  objects_ptr_ = msg;
 }
 
 bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
@@ -136,10 +154,16 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
     float current_x = 0.f;
     for (csv::CSVField & field : row) {
       if (i == 0) {  // first column contains type of area.
-        if (field.get<int>() == 1) {
-          delete_all_area_.push_back(true);
+        if (field.get<int>() == 0) {
+          area_types_.emplace_back(AreaType::DELETE_STATIC);
+        } else if (field.get<int>() == 1) {
+          area_types_.emplace_back(AreaType::DELETE_ALL);
+        } else if (field.get<int>() == 2) {
+          area_types_.emplace_back(AreaType::DELETE_OBJECT);
         } else {
-          delete_all_area_.push_back(false);
+          RCLCPP_WARN_STREAM(
+            this->get_logger(),
+            "Invalid area type specified: " << field.get<int>() << " in CSV:" << row.to_json());
         }
         i++;
         j++;
@@ -157,7 +181,7 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
       if (!boost::geometry::is_valid(current_polygon)) {
         boost::geometry::correct(current_polygon);
       }
-      RCLCPP_INFO_STREAM(
+      RCLCPP_INFO_STREAM(  // Verbose output
         this->get_logger(), "Polygon in row: " << boost::geometry::dsv(current_polygon)
                                                << " has an area of "
                                                << boost::geometry::area(current_polygon));
@@ -202,8 +226,7 @@ bool MapAreaFilterComponent::transformPointcloud(
 }
 
 void MapAreaFilterComponent::filter_points_by_area(
-  const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input,
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr output)
+  const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input, pcl::PointCloud<pcl::PointXYZ>::Ptr output)
 {
   int area_i = 0;
 
@@ -221,26 +244,53 @@ void MapAreaFilterComponent::filter_points_by_area(
   }  // for polygons
 
   for (const auto & point : input->points) {
-    bool found = false;
+    bool within = false;
     area_i = 0;
     for (const auto & check : area_check) {
       if (check) {
-        PointXY bpoint(point.x, point.y);
-        if (boost::geometry::within(bpoint, area_polygons_[area_i])) {
-          if (delete_all_area_[area_i]) {
-            found = true;
-          } else if (!point.r && !point.g && !point.b) {  // if black (no class)
-            found = true;
+        if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
+          if (area_types_[area_i] == AreaType::DELETE_ALL) {
+            within = true;
+            break;
+          } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
+            if (!point.r && !point.g && !point.b) {
+              within = true;
+            }
           }
-          break;
         }
       }
       area_i++;
     }  // for areas
-    if (!found) {
-      output->points.emplace_back(point);
+    if (!within) {
+      output->points.emplace_back(pcl::PointXYZ(point.x, point.y, point.z));
     }
   }  // for points in cloud
+}
+
+void MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
+{
+  PredictedObjects in_objects;
+  if (!objects_ptr_) {
+    return;
+  }
+  in_objects = *objects_ptr_;
+  out_objects.header = in_objects.header;
+
+  for (const auto & object : in_objects.objects) {
+    const auto pos = object.kinematics.initial_pose_with_covariance.pose.position;
+
+    bool within = false;
+    for (std::size_t area_i = 0, size = area_polygons_.size(); area_i < size; ++area_i) {
+      if (area_types_[area_i] != AreaType::DELETE_OBJECT) continue;
+
+      if ((boost::geometry::within(PointXY(pos.x, pos.y), area_polygons_[area_i]))) {
+        within = true;
+      }
+    }
+    if (!within) {
+      out_objects.objects.emplace_back(object);
+    }
+  }
 }
 
 void MapAreaFilterComponent::filter(
@@ -282,19 +332,22 @@ void MapAreaFilterComponent::filter(
                                              << " not filtering. Not including object cloud");
     }
   }
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl);
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl_temp(
+    new pcl::PointCloud<pcl::PointXYZRGB>);
+  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl_temp);
 
   // if known object cloud contains points add to the filtered cloud
-  if (!objects_cloud_pcl->points.empty()) {
+  if (!objects_cloud_pcl_temp->points.empty()) {
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
+    for (const auto & point : objects_cloud_pcl_temp->points) {
+      objects_cloud_pcl->emplace_back(pcl::PointXYZRGB(point.x, point.y, point.z, 255, 255, 255));
+    }
     *map_frame_cloud_pcl += *objects_cloud_pcl;
   }
 
   // create filtered cloud container
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr map_frame_cloud_pcl_filtered(
-    new pcl::PointCloud<pcl::PointXYZRGB>);
-  map_frame_cloud_pcl_filtered->points.clear();
-
+  pcl::PointCloud<pcl::PointXYZ>::Ptr map_frame_cloud_pcl_filtered(
+    new pcl::PointCloud<pcl::PointXYZ>);
   filter_points_by_area(map_frame_cloud_pcl, map_frame_cloud_pcl_filtered);
 
   pcl::toROSMsg(*map_frame_cloud_pcl_filtered, output);
@@ -309,6 +362,10 @@ void MapAreaFilterComponent::filter(
     return;
   }
   output.header = input->header;
+
+  PredictedObjects out_objects;
+  filter_objects_by_area(out_objects);
+  filtered_objects_pub_->publish(out_objects);
 }
 
 rcl_interfaces::msg::SetParametersResult MapAreaFilterComponent::paramCallback(
@@ -330,7 +387,7 @@ rcl_interfaces::msg::SetParametersResult MapAreaFilterComponent::paramCallback(
   }
   if (get_param(p, "area_distance_check", area_distance_check_)) {
     RCLCPP_DEBUG(
-      this->get_logger(), "Setting new area distance check to: %.2lf.", area_distance_check_);
+      this->get_logger(), "Setting new area check distance to: %.2lf.", area_distance_check_);
   }
 
   rcl_interfaces::msg::SetParametersResult result;

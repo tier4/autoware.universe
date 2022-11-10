@@ -23,6 +23,7 @@
 #include <pcl_ros/transforms.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 
+#include <autoware_auto_perception_msgs/msg/predicted_objects.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -39,6 +40,14 @@
 
 namespace pointcloud_preprocessor
 {
+
+enum class AreaType {
+  DELETE_STATIC,  // Delete only static cloud
+  DELETE_ALL,     // Delete static and dynamic cloud
+  DELETE_OBJECT,  // Delete detected object bbox
+};
+
+using autoware_auto_perception_msgs::msg::PredictedObjects;
 
 class MapAreaFilterComponent : public pointcloud_preprocessor::Filter
 {
@@ -58,8 +67,10 @@ protected:
   rcl_interfaces::msg::SetParametersResult paramCallback(const std::vector<rclcpp::Parameter> & p);
 
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr area_markers_pub_;
+  rclcpp::Publisher<PredictedObjects>::SharedPtr filtered_objects_pub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr objects_cloud_sub_;
+  rclcpp::Subscription<PredictedObjects>::SharedPtr objects_sub_;
 
 private:
   std::shared_ptr<tf2_ros::Buffer> tf2_;
@@ -70,12 +81,13 @@ private:
   typedef boost::geometry::model::d2::point_xy<float> PointXY;
   typedef boost::geometry::model::polygon<PointXY> Polygon2D;
 
-  std::vector<bool> delete_all_area_;
+  std::vector<AreaType> area_types_;
   std::vector<Polygon2D> area_polygons_;
   std::vector<PointXY> centroid_polygons_;
 
   geometry_msgs::msg::PoseStamped current_pose_;
   sensor_msgs::msg::PointCloud2::ConstSharedPtr objects_cloud_ptr_;
+  PredictedObjects::ConstSharedPtr objects_ptr_;
 
   double area_distance_check_;
 
@@ -88,10 +100,13 @@ private:
 
   void filter_points_by_area(
     const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input,
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr output);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr output);
+
+  void filter_objects_by_area(PredictedObjects & out_objects);
 
   void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr & pose_msg);
   void objects_cloud_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr & cloud_msg);
+  void objects_callback(const PredictedObjects::ConstSharedPtr & cloud_msg);
 
   void publish_area_markers();
 
