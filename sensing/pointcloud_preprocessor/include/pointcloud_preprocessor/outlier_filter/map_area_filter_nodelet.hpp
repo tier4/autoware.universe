@@ -85,9 +85,13 @@ private:
   std::vector<Polygon2D> area_polygons_;
   std::vector<PointXY> centroid_polygons_;
 
+  visualization_msgs::msg::MarkerArray area_markers_msg_;
+
   geometry_msgs::msg::PoseStamped current_pose_;
   sensor_msgs::msg::PointCloud2::ConstSharedPtr objects_cloud_ptr_;
   PredictedObjects::ConstSharedPtr objects_ptr_;
+
+  rclcpp::TimerBase::SharedPtr timer_;
 
   double area_distance_check_;
 
@@ -104,13 +108,14 @@ private:
 
   void filter_objects_by_area(PredictedObjects & out_objects);
 
+  void timer_callback();
   void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr & pose_msg);
   void objects_cloud_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr & cloud_msg);
   void objects_callback(const PredictedObjects::ConstSharedPtr & cloud_msg);
 
-  void publish_area_markers();
+  void create_area_marker_msg();
 
-  static bool transformPointcloud(
+  static bool transform_pointcloud(
     const sensor_msgs::msg::PointCloud2 & input, const tf2_ros::Buffer & tf2,
     const std::string & target_frame, sensor_msgs::msg::PointCloud2 & output);
 

@@ -64,6 +64,9 @@ MapAreaFilterComponent::MapAreaFilterComponent(const rclcpp::NodeOptions & optio
   tf2_.reset(new tf2_ros::Buffer(clock));
   tf2_listener_.reset(new tf2_ros::TransformListener(*tf2_));
 
+  using namespace std::chrono_literals;
+  timer_ = this->create_wall_timer(1s, std::bind(&MapAreaFilterComponent::timer_callback, this));
+
   do_filter_ = true;
 }
 
@@ -71,9 +74,8 @@ void MapAreaFilterComponent::subscribe() { Filter::subscribe(); }
 
 void MapAreaFilterComponent::unsubscribe() { Filter::unsubscribe(); }
 
-void MapAreaFilterComponent::publish_area_markers()
+void MapAreaFilterComponent::create_area_marker_msg()
 {
-  visualization_msgs::msg::MarkerArray area_markers;
   size_t i = 0;
 
   for (const auto & polygon : area_polygons_) {
@@ -113,11 +115,14 @@ void MapAreaFilterComponent::publish_area_markers()
       point.y = it->y();
       area.points.emplace_back(point);
     }
-    area_markers.markers.emplace_back(area);
+    area_markers_msg_.markers.emplace_back(area);
     i++;
   }
+}
 
-  area_markers_pub_->publish(area_markers);
+void MapAreaFilterComponent::timer_callback()
+{
+  area_markers_pub_->publish(area_markers_msg_);
 }
 
 void MapAreaFilterComponent::pose_callback(
@@ -200,12 +205,12 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
     }
   }
   csv_loaded_ = true;
-  publish_area_markers();
+  create_area_marker_msg();
 
   return !area_polygons_.empty();
 }
 
-bool MapAreaFilterComponent::transformPointcloud(
+bool MapAreaFilterComponent::transform_pointcloud(
   const sensor_msgs::msg::PointCloud2 & input, const tf2_ros::Buffer & tf2,
   const std::string & target_frame, sensor_msgs::msg::PointCloud2 & output)
 {
@@ -312,7 +317,7 @@ void MapAreaFilterComponent::filter(
 
   // transform cloud to filter to map frame
   sensor_msgs::msg::PointCloud2 map_frame_cloud;
-  if (!transformPointcloud(*input, *tf2_, map_frame_, map_frame_cloud)) {
+  if (!transform_pointcloud(*input, *tf2_, map_frame_, map_frame_cloud)) {
     RCLCPP_ERROR_STREAM_THROTTLE(
       this->get_logger(), *this->get_clock(), 1,
       "Cannot transform cloud to " << map_frame_ << " not filtering.");
@@ -325,7 +330,7 @@ void MapAreaFilterComponent::filter(
   // transform known object cloud to map frame
   sensor_msgs::msg::PointCloud2 objects_frame_cloud;
   if (objects_cloud_ptr_ != nullptr) {
-    if (!transformPointcloud(*objects_cloud_ptr_, *tf2_, map_frame_, objects_frame_cloud)) {
+    if (!transform_pointcloud(*objects_cloud_ptr_, *tf2_, map_frame_, objects_frame_cloud)) {
       RCLCPP_ERROR_STREAM_THROTTLE(
         this->get_logger(), *this->get_clock(), 1,
         "Cannot transform objects cloud to " << map_frame_
@@ -354,7 +359,7 @@ void MapAreaFilterComponent::filter(
   output.header = input->header;
   output.header.frame_id = map_frame_;
 
-  if (!transformPointcloud(output, *tf2_, input->header.frame_id, output)) {
+  if (!transform_pointcloud(output, *tf2_, input->header.frame_id, output)) {
     RCLCPP_ERROR_STREAM_THROTTLE(
       this->get_logger(), *this->get_clock(), 1,
       "Cannot transform back cloud to " << input->header.frame_id << " not filtering.");
