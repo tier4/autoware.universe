@@ -1,0 +1,25 @@
+<launch>
+
+    <arg name="sysid_param_path"
+         default="$(find-pkg-share system_identification)/param/system_identification.param.yaml"/>
+
+    <!-- System Identification Package Launch -->
+    <!--launch-prefix="valgrind \-leak-check=full or xterm -e" -->
+    <!--          launch-prefix="valgrind &#45;&#45;tool=callgrind"-->
+
+    <node pkg="system_identification"
+          exec="system_identification_node_exe"
+          name="system_identification_node_exe"
+          output="screen">
+
+        <param from="$(var sysid_param_path)"/>
+
+        <!--  Inputs -->
+        <!--        <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/trajectory"/>-->
+
+        <!--  Outputs -->
+        <!--        <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd"/>-->
+
+
+    </node>
+</launch>

@@ -1,0 +1,17 @@
+#include "builtin_interfaces/msg/Time.idl"
+
+module system_identification
+{
+  module msg
+  {
+    @verbatim(
+      language = "comment",
+      text = "The error terms estimated by the controllers ") struct SysIDSteeringVars
+    {
+      builtin_interfaces::msg::Time stamp;
+
+      @verbatim(language = "comment", text = "Input signal sent")
+        @ default(value = 0.0) double sysid_steering_input;
+    };
+  };
+};

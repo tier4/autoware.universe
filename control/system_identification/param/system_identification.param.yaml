@@ -1,0 +1,6 @@
+/**:
+  ros__parameters:
+    # -- Experiment Parameters --
+    identification_frequency: 100.          # Hertz
+
+
