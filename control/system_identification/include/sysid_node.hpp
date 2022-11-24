@@ -148,6 +148,9 @@ class SystemIdentificationNode : public rclcpp::Node
    */
   void onTimer();
 
+  InputType getInputType(int const &input_id);
+  void loadParams(InputType const &input_type);
+
   void onTrajectory(const autoware_auto_planning_msgs::msg::Trajectory::SharedPtr msg);
   void onVelocity(const nav_msgs::msg::Odometry::SharedPtr msg);
   void onSteering(const autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr msg);
@@ -155,7 +158,6 @@ class SystemIdentificationNode : public rclcpp::Node
   /**
    * @brief Publish message.
    * */
-
   void publishSysIDCommand();
 };
 

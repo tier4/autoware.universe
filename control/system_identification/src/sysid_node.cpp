@@ -22,7 +22,14 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
 {
   using std::placeholders::_1;
 
+  auto const &sys_id_frequency_hz = declare_parameter<double>("identification_frequency", 100.);
+  common_input_lib_params_.sysid_dt = 1. / sys_id_frequency_hz;
   initTimer(common_input_lib_params_.sysid_dt);
+
+  // Define input type
+  int input_type_id = declare_parameter<int>("default_input_class", 0);
+  auto input_type = getInputType(input_type_id);
+  loadParams(input_type);
 
   // Publishers
   // Initialize the publishers.
@@ -149,6 +156,132 @@ void SystemIdentificationNode::onSteering(autoware_auto_vehicle_msgs::msg::Steer
   // ns_utils::print("In on Steering ....");
   RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onSteering ....");
   current_steering_ptr_ = msg;
+}
+void SystemIdentificationNode::loadParams(InputType const &input_type)
+{
+
+  // Load common parameters.
+  common_input_lib_params_.maximum_amplitude = declare_parameter<double>("common_variables.signal_magnitude", 0.);
+
+  auto const &vstart = declare_parameter<double>("common_variables.min_speed", 0.);
+  auto const &vmax = declare_parameter<double>("common_variables.max_speed", 0.);
+
+  common_input_lib_params_.minimum_speed = sysid::kmh2ms(vstart);
+  common_input_lib_params_.maximum_speed = sysid::kmh2ms(vmax);
+
+  common_input_lib_params_.tstart = declare_parameter<double>("common_variables.time_start_after", 0.);
+  auto const &ctrl_period = common_input_lib_params_.sysid_dt;
+
+  if (input_type == InputType::STEP)
+  {
+    sysid::sStepParameters step_params;
+    step_params.start_time = common_input_lib_params_.tstart;
+    step_params.max_amplitude = common_input_lib_params_.maximum_amplitude;
+
+    step_params.step_period = declare_parameter<double>("step_input_params.step_period", 1.);
+    step_params.step_direction_flag = declare_parameter<int8_t>("step_input_params.step_direction", 0);
+
+    sysid::InpStepUpDown step_up_down_input_type(common_input_lib_params_.minimum_speed,
+                                                 common_input_lib_params_.maximum_speed,
+                                                 step_params);
+    // Change the input wrapper class.
+    input_wrapper_ = sysid::InputWrapper{step_up_down_input_type};
+    return;
+  }
+
+  if (input_type == InputType::PRBS)
+  {
+    // const size_t prbs_n = static_cast<size_t>( node_->declare_parameter<int>("prbs_input_params.prbs_type_n", 8));
+    const double estimated_rise_time = declare_parameter<double>("prbs_input_params.estimated_rise_time", 0.5);
+
+    sysid::sPRBSparams prbs_params(common_input_lib_params_.tstart,
+                                   estimated_rise_time,
+                                   ctrl_period,
+                                   PRBS_N);
+
+    prbs_params.max_amplitude = common_input_lib_params_.maximum_amplitude;
+
+    sysid::InpPRBS<PRBS_N> prbs_input_type(common_input_lib_params_.minimum_speed,
+                                           common_input_lib_params_.maximum_speed,
+                                           prbs_params);
+
+    // Change the input wrapper class.
+    input_wrapper_ = sysid::InputWrapper{prbs_input_type};
+    return;
+  }
+  if (input_type == InputType::FWNOISE)
+  {
+
+    auto const &lowpass_filter_cutoff_hz = declare_parameter<double>("fwnoise_input_params"".noise_cutoff_frq_hz", 5.);
+
+    auto const &lowpass_filter_order = declare_parameter<int>("fwnoise_input_params.lowpass_filter_order", 3);
+    auto const &noise_mean = declare_parameter<double>("fwnoise_input_params.noise_mean", 0.);
+    auto const &noise_std = declare_parameter<double>("fwnoise_input_params.noise_std", 0.1);
+
+    sysid::sFilteredWhiteNoiseParameters params{};
+    params.start_time = common_input_lib_params_.tstart;
+    params.cutoff_frequency_hz = lowpass_filter_cutoff_hz;
+    params.sampling_frequency_hz = 1. / ctrl_period;
+    params.max_amplitude = common_input_lib_params_.maximum_amplitude;
+    params.filter_order = static_cast<int>(lowpass_filter_order);
+    params.noise_mean = noise_mean;
+    params.noise_stddev = noise_std;
+
+    sysid::InpFilteredWhiteNoise filtered_white_noise_input_type(common_input_lib_params_.minimum_speed,
+                                                                 common_input_lib_params_.maximum_speed,
+                                                                 params);
+
+    // Change the input wrapper class.
+    input_wrapper_ = sysid::InputWrapper{filtered_white_noise_input_type};
+    return;
+  }
+
+  if (input_type == InputType::SUMSINs)
+  {
+    sysid::sSumOfSinParameters params;
+    params.start_time = common_input_lib_params_.tstart;
+    auto const &temp_frequency_band = declare_parameter<std::vector<double>>("sumof_sinusoids_params"
+                                                                             ".frequency_band_hz",
+                                                                             std::vector<double>{1., 10.});
+
+    params.frequency_band = std::array<double, 2>{temp_frequency_band[0], temp_frequency_band[1]};
+    params.num_of_sins = declare_parameter<int>("sumof_sinusoids_params.num_of_sinuses", 5);
+
+
+    // noise definitions
+    params.add_noise = declare_parameter<bool>("sumof_sinusoids_params.add_noise", false);
+    params.noise_mean = declare_parameter<double>("sumof_sinusoids_params.noise_mean", 0.);
+    params.noise_stddev = declare_parameter<double>("sumof_sinusoids_params.noise_std", 0.01);
+
+    params.max_amplitude = common_input_lib_params_.maximum_amplitude;
+
+    sysid::InpSumOfSinusoids inp_sum_of_sinusoids_type(common_input_lib_params_.minimum_speed,
+                                                       common_input_lib_params_.maximum_speed,
+                                                       params);
+
+    // Change the input wrapper class.
+    input_wrapper_ = sysid::InputWrapper{inp_sum_of_sinusoids_type};
+  }
+
+}
+InputType SystemIdentificationNode::getInputType(int const &input_id)
+{
+  if (input_id == 0)
+  { return InputType::IDENTITY; }
+
+  if (input_id == 1)
+  { return InputType::STEP; }
+
+  if (input_id == 2)
+  { return InputType::PRBS; }
+
+  if (input_id == 3)
+  { return InputType::FWNOISE; }
+
+  if (input_id == 4)
+  { return InputType::SUMSINs; }
+
+  return InputType::IDENTITY;
 }
 
 }  // namespace sysid

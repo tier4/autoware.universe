@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     # -- Experiment Parameters --
-    identification_frequency: 100.          # Hertz
+    identification_frequency: 10.          # Hertz
 
     # inputs: 0-zero, 1-step, 2-prbs, 3-filtered noise, 4-sum of sinusoids
     default_input_class: 4
@@ -9,7 +9,7 @@
     common_variables:
       signal_magnitude: 0.1   # maximum signal amplitude
       min_speed: 1.           # signal start after this speed km/h
-      max_speed: 5.         # signal zeroed after this speed  km/h
+      max_speed: 5.           # signal zeroed after this speed  km/h
       time_start_after: 0.5   # signal starts after min-speed activated [sec]
 
 
@@ -17,7 +17,7 @@
     # STEP INPUTS.
     step_input_params:
       step_direction: 2 # Up: 1, Down: -1, Up and Down : 2, Down and Up : 3
-      step_period: 1.0 # step durations
+      step_period: 1.0  # step durations
 
     prbs_input_params:
       prbs_type_n: 8  # type of prbs signal <3 ... 31> : please set in prbs header.
