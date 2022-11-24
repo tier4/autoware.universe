@@ -57,8 +57,10 @@ void SystemIdentificationNode::initTimer(double period_s)
  */
 void SystemIdentificationNode::onTimer()
 {
-  RCLCPP_INFO(this->get_logger(), "%s", "in onTimer ....");
-  ns_utils::print("In on Timer ....");
+  // RCLCPP_INFO(this->get_logger(), "%s", "in onTimer ....");
+  // ns_utils::print("In on Timer ....");
+
+  RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onTimer ....");
 
   /** Publish input message*/
   SysIDSteeringVars sysid_vars_msg;
@@ -110,8 +112,8 @@ bool SystemIdentificationNode::updateCurrentPose()
       m_tf_buffer_.lookupTransform(current_trajectory_ptr_->header.frame_id, "base_link", tf2::TimePointZero);
   } catch (tf2::TransformException &ex)
   {
-    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 5000 /*ms*/, "%s", ex.what());
-    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 5000 /*ms*/,
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "%s", ex.what());
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/,
                                    "%s", m_tf_buffer_.allFramesAsString().c_str());
     return false;
   }
@@ -128,17 +130,19 @@ bool SystemIdentificationNode::updateCurrentPose()
 }
 void SystemIdentificationNode::onTrajectory(autoware_auto_planning_msgs::msg::Trajectory::SharedPtr const msg)
 {
-  ns_utils::print("In on Trajectory ....");
+  RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onTrajectory ....");
   current_trajectory_ptr_ = msg;
 }
 void SystemIdentificationNode::onVelocity(nav_msgs::msg::Odometry::SharedPtr const msg)
 {
-  ns_utils::print("In on Velocity ....");
+  RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onVelocity ....");
+  // ns_utils::print("In on Velocity ....");
   current_velocity_ptr_ = msg;
 }
 void SystemIdentificationNode::onSteering(autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr const msg)
 {
-  ns_utils::print("In on Steering ....");
+  // ns_utils::print("In on Steering ....");
+  RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onSteering ....");
   current_steering_ptr_ = msg;
 }
 

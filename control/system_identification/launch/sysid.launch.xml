@@ -13,13 +13,13 @@
 
         <!--  Inputs -->
         <param from="$(var sysid_param_path)"/>
-        <!--        <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/trajectory"/>-->
-        <!--        <remap from="~/input/current_velocity" to="/localization/kinematic_state"/>-->
-        <!--        <remap from="~/input/current_steering" to="/vehicle/status/steering_status"/>-->
+        <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/trajectory"/>
+        <remap from="~/input/current_velocity" to="/localization/kinematic_state"/>
+        <remap from="~/input/current_steering" to="/vehicle/status/steering_status"/>
 
         <!--  Outputs -->
-        <!--        <remap from="~/output/control_cmd" to="~/control_cmd "/>-->
-        <!--        <remap from="~/output/system_identification_vars" to="system_identification_vars"/>-->
+        <remap from="~/output/control_cmd" to="/control/command/control_cmd"/>
+        <remap from="~/output/system_identification_vars" to="system_identification_vars"/>
 
 
     </node>
