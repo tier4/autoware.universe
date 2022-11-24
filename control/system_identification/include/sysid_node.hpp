@@ -129,6 +129,7 @@ class SystemIdentificationNode : public rclcpp::Node
   // Publishers
   rclcpp::Publisher<ControlCommand>::SharedPtr pub_control_cmd_;
   rclcpp::Publisher<SysIDSteeringVars>::SharedPtr pub_sysid_debug_vars_;
+  rclcpp::Publisher<Trajectory>::SharedPtr pub_predicted_traj_;
 
   /**
    * Node storage

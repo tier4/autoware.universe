@@ -38,6 +38,8 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
   pub_sysid_debug_vars_ =
     create_publisher<SysIDSteeringVars>("~/output/system_identification_vars", 1);
 
+  pub_predicted_traj_ = create_publisher<Trajectory>("~/output/predicted_trajectory", 1);
+
   // Subscribers
   sub_trajectory_ = create_subscription<Trajectory>("~/input/reference_trajectory", rclcpp::QoS{1},
                                                     std::bind(&SystemIdentificationNode::onTrajectory, this, _1));
@@ -97,7 +99,9 @@ void SystemIdentificationNode::publishSysIDCommand()
   // publish messages.
   pub_control_cmd_->publish(*current_sysid_cmd_);
   pub_sysid_debug_vars_->publish(*current_sysid_vars_);
+  pub_predicted_traj_->publish(*current_trajectory_ptr_);
 }
+
 bool SystemIdentificationNode::isDataReady()
 {
   if (!current_velocity_ptr_)
