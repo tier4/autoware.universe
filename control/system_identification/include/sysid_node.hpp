@@ -66,6 +66,7 @@ enum class InputType : int
 using ControlCommand = autoware_auto_control_msgs::msg::AckermannControlCommand;
 using VelocityMsg = nav_msgs::msg::Odometry;
 using autoware_auto_vehicle_msgs::msg::SteeringReport;
+using autoware_auto_planning_msgs::msg::Trajectory;
 using system_identification::msg::SysIDSteeringVars;
 using vehicle_info_util::VehicleInfoUtil;
 
@@ -110,13 +111,13 @@ class SystemIdentificationNode : public rclcpp::Node
   // rclcpp::Subscription<ControlCommand>::SharedPtr sub_control_cmds_;
 
   //!< @brief subscription for current velocity
-  rclcpp::Subscription<VelocityMsg>::SharedPtr sub_current_velocity_ptr_;
+  rclcpp::Subscription<VelocityMsg>::SharedPtr sub_velocity_;
 
-  //!< @brief subscription for current velocity
-  rclcpp::Subscription<SteeringReport>::SharedPtr sub_current_steering_ptr_;
+  //!< @brief subscription for current steering
+  rclcpp::Subscription<SteeringReport>::SharedPtr sub_vehicle_steering_;
 
   //!< @brief subscription for current trajectory
-  rclcpp::Subscription<SteeringReport>::SharedPtr sub_current_traj_ptr_;
+  rclcpp::Subscription<Trajectory>::SharedPtr sub_trajectory_;
 
   // Publishers
   rclcpp::Publisher<ControlCommand>::SharedPtr pub_control_cmd_;

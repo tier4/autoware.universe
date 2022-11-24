@@ -24,11 +24,23 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
 
   initTimer(common_input_lib_params_.sysid_dt);
 
-  // Subscribers
-
   // Publishers
+  // Initialize the publishers.
+  pub_control_cmd_ = create_publisher<ControlCommand>("~/output/control_cmd", 1);
+
   pub_sysid_debug_vars_ =
     create_publisher<SysIDSteeringVars>("~/output/system_identification/lateral_cmd", 1);
+
+  // Subscribers
+  sub_trajectory_ = create_subscription<Trajectory>("~/input/reference_trajectory", rclcpp::QoS{1},
+                                                    std::bind(&SystemIdentificationNode::onTrajectory, this, _1));
+
+  sub_velocity_ = create_subscription<VelocityMsg>("~/input/current_velocity", rclcpp::QoS{1},
+                                                   std::bind(&SystemIdentificationNode::onVelocity, this, _1));
+
+  sub_vehicle_steering_ = create_subscription<SteeringReport>("~/input/current_steering", rclcpp::QoS{1},
+                                                              std::bind(&SystemIdentificationNode::onSteering,
+                                                                        this, _1));
 }
 
 void SystemIdentificationNode::initTimer(double period_s)
