@@ -62,7 +62,26 @@ void SystemIdentificationNode::publishSysIDCommand()
 }
 bool SystemIdentificationNode::isDataReady() const
 {
-  return false;
+  if (!current_velocity_ptr_)
+  {
+    RCLCPP_DEBUG(get_logger(), "Waiting for the  current_velocity = %d",
+                 current_velocity_ptr_ != nullptr);
+    return false;
+  }
+
+  if (!current_steering_ptr_)
+  {
+    RCLCPP_DEBUG(get_logger(), "Waiting for the current_steering = %d", current_steering_ptr_ != nullptr);
+    return false;
+  }
+
+  if (!current_trajectory_ptr_)
+  {
+    RCLCPP_DEBUG(get_logger(), " Waiting for the current trajectory = %d", current_trajectory_ptr_ != nullptr);
+    return false;
+  }
+
+  return true;
 }
 bool SystemIdentificationNode::updateCurrentPose()
 {
