@@ -140,6 +140,10 @@ class SystemIdentificationNode : public rclcpp::Node
    */
   void onTimer();
 
+  void onTrajectory(const autoware_auto_planning_msgs::msg::Trajectory::SharedPtr msg);
+  void onVelocity(const nav_msgs::msg::Odometry::SharedPtr msg);
+  void onSteering(const autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr msg);
+
   /**
    * @brief Publish message.
    * */

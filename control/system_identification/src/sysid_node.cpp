@@ -39,10 +39,10 @@ void SystemIdentificationNode::initTimer(double period_s)
   timer_ = rclcpp::create_timer(
     this, get_clock(), period_ns, std::bind(&SystemIdentificationNode::onTimer, this));
 }
+
 /***
  * @brief timer callback.
  */
-
 void SystemIdentificationNode::onTimer()
 {
   RCLCPP_INFO(this->get_logger(), "%s", "in onTimer ....");
@@ -66,7 +66,44 @@ bool SystemIdentificationNode::isDataReady() const
 }
 bool SystemIdentificationNode::updateCurrentPose()
 {
-  return false;
+  geometry_msgs::msg::TransformStamped transform;
+  try
+  {
+    transform =
+      m_tf_buffer_.lookupTransform(current_trajectory_ptr_->header.frame_id, "base_link", tf2::TimePointZero);
+  } catch (tf2::TransformException &ex)
+  {
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 5000 /*ms*/, "%s", ex.what());
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 5000 /*ms*/,
+                                   "%s", m_tf_buffer_.allFramesAsString().c_str());
+    return false;
+  }
+  geometry_msgs::msg::PoseStamped ps;
+  ps.header = transform.header;
+  ps.pose.position.x = transform.transform.translation.x;
+  ps.pose.position.y = transform.transform.translation.y;
+  ps.pose.position.z = transform.transform.translation.z;
+  ps.pose.orientation = transform.transform.rotation;
+  current_pose_ptr_ = std::make_shared<geometry_msgs::msg::PoseStamped>(ps);
+
+  return true;
+
+}
+void SystemIdentificationNode::onTrajectory(autoware_auto_planning_msgs::msg::Trajectory::SharedPtr const msg)
+{
+
+  ns_utils::print("In on Trajectory ....");
+  current_trajectory_ptr_ = msg;
+}
+void SystemIdentificationNode::onVelocity(nav_msgs::msg::Odometry::SharedPtr const msg)
+{
+  ns_utils::print("In on Velocity ....");
+  current_velocity_ptr_ = msg;
+}
+void SystemIdentificationNode::onSteering(autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr const msg)
+{
+  ns_utils::print("In on Steering ....");
+  current_steering_ptr_ = msg;
 }
 
 }  // namespace sysid
