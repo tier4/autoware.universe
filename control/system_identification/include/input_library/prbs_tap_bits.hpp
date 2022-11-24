@@ -26,6 +26,7 @@
  * London: Springer.
  * */
 
+constexpr size_t PRBS_N = 8;
 std::vector<size_t> tapbits_vectors(size_t const &prbs_type = 8);
 
 template<size_t N>

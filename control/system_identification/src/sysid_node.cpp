@@ -71,12 +71,17 @@ void SystemIdentificationNode::onTimer()
   sysid_cmd_msg.lateral.steering_tire_angle = 0.1;
   current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
 
+  // auto sysid_input = input_wrapper_.generateInput(2.);
+  // ns_utils::print("Current sysid input ... ", sysid_input);
+
   publishSysIDCommand();
 }
 void SystemIdentificationNode::publishSysIDCommand()
 {
   current_sysid_vars_->stamp = this->now();
   current_sysid_cmd_->stamp = this->now();
+
+  // publish messages.
   pub_control_cmd_->publish(*current_sysid_cmd_);
   pub_sysid_debug_vars_->publish(*current_sysid_vars_);
 }

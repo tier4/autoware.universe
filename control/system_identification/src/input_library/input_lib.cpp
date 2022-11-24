@@ -48,6 +48,7 @@ InpSumOfSinusoids::InpSumOfSinusoids(const double &activation_vx,
   frequency_band_hz_{params.frequency_band},
   num_sins_{params.num_of_sins},
   max_amplitude_{params.max_amplitude},
+  add_noise_{params.add_noise},
   noise_mean_{params.noise_mean},
   noise_stddev_{params.noise_stddev}
 {
@@ -77,7 +78,7 @@ double InpSumOfSinusoids::generateInput(double const &vx)
   if (t_ms < Ts_ * 1000)
   {
     // ns_utils::print("Time after experiment regime reached : ", t_ms);
-    return 0;
+    return 0.;
   }
 
   // Compute the generator output.
@@ -86,18 +87,20 @@ double InpSumOfSinusoids::generateInput(double const &vx)
   for (auto const &wt_hz : sin_frequencies_hz_)
   {
     auto &&current_sin_time = (t_ms / 1000 - Ts_);
-    auto &&arg = wt_hz * 2. * M_PI * current_sin_time;
+    auto &&arg = wt_hz * 2. * M_PI * current_sin_time;  // w = 2*9i*f
     input_val_at_t += std::sin(arg);
   }
 
-  ns_utils::print("In Sum of Sinusoids ... and current time ", t_ms);
+  // ns_utils::print("In Sum of Sinusoids ... and current time ", t_ms);
 
   // Generate noise
-  auto const &additive_noise = normal_distribution_(random_engine_);
-  auto const &clean_signal = max_amplitude_ * input_val_at_t / static_cast<double>(num_sins_);
-  auto const &noisy_signal = clean_signal + additive_noise;
+  if (add_noise_)
+  {
+    auto const &additive_noise = normal_distribution_(random_engine_);
+    input_val_at_t += additive_noise;
+  }
 
-  return noisy_signal;
+  return max_amplitude_ * input_val_at_t / static_cast<double>(num_sins_);
 }
 
 /**
@@ -117,12 +120,27 @@ InpFilteredWhiteNoise::InpFilteredWhiteNoise(double const &activation_vx,
     noise_stddev_{params.noise_stddev}
 {
 
-  // Design filter here calling the Butterworth and set b_, a_.
-  auto b = std::vector<double>{0.002898194633721, 0.008694583901164,
-                               0.008694583901164, 0.002898194633721};
+  ButterworthFilter butterworth_filter;
+  butterworth_filter.setOrder(filter_order_);
+  butterworth_filter.setCutOffFrequency(fc_hz_, fs_hz_);
 
-  auto a = std::vector<double>{1.0, -2.374094743709352,
-                               1.929355669091215, -0.532075368312092};
+  bool use_sampling_frequency{true};
+  butterworth_filter.computeContinuousTimeTF(use_sampling_frequency);
+  butterworth_filter.computeDiscreteTimeTF(use_sampling_frequency);
+
+  //  butterworth_filter.printFilterContinuousTimeRoots();
+  //  butterworth_filter.printContinuousTimeTF();
+
+  // Get filter numerator and denominator
+  auto const &a = butterworth_filter.getAn();
+  auto const &b = butterworth_filter.getBn();
+
+  // Design filter here calling the Butterworth and set b_, a_.
+  //   auto b = std::vector<double>{0.002898194633721, 0.008694583901164,
+  //                                0.008694583901164, 0.002898194633721};
+  //
+  //   auto a = std::vector<double>{1.0, -2.374094743709352,
+  //                                1.929355669091215, -0.532075368312092};
 
   low_pass_filter_ = LowPassFilter(b, a);
 
@@ -145,7 +163,7 @@ double InpFilteredWhiteNoise::generateInput(double const &vx)
   if (auto const &t_ms = time_tracker_();t_ms < Ts_ * 1000)
   {
     ns_utils::print("Time after experiment regime reached : ", t_ms);
-    return 0;
+    return 0.;
   }
 
   // Compute the generator output.
@@ -172,17 +190,24 @@ InpStepUpDown::InpStepUpDown(double const &activation_vx,
     step_direction_flag_{params.step_direction_flag}
 {
 
-  if (step_direction_flag_ == 1)
+  switch (step_direction_flag_)
   {
-    input_set_ = std::vector<double>{1., 0.};
-  } else if (step_direction_flag_ == -1)
-  {
-    input_set_ = std::vector<double>{-1., 0.};
-  } else
-  {
-    input_set_ = std::vector<double>{-1., 0., 1., 0.};
-  }
 
+    case 1:input_set_ = std::vector<double>{1., 0.};  // step up
+      break;
+
+    case -1:input_set_ = std::vector<double>{-1., 0.};   // step down
+      break;
+
+    case 2:input_set_ = std::vector<double>{1., 0., -1., 0.};  // step up down
+      break;
+
+    case 3:input_set_ = std::vector<double>{-1., 0., 1., 0.}; // step down up
+      break;
+
+    default:input_set_ = std::vector<double>{1., 0.};
+      break;
+  }
 }
 
 double InpStepUpDown::generateInput(double const &vx)
@@ -198,7 +223,7 @@ double InpStepUpDown::generateInput(double const &vx)
   if (auto const &t_ms = time_tracker_(); t_ms < Ts_ * 1000)
   {
     ns_utils::print("Time after experiment regime reached : ", t_ms);
-    return 0;
+    return 0.;
   }
 
   // Compute the generator output.
@@ -221,5 +246,4 @@ double InpStepUpDown::generateInput(double const &vx)
 }
 
 } // namespace sysid
-
 

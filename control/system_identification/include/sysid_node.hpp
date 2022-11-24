@@ -40,6 +40,9 @@
 #include "autoware_auto_planning_msgs/msg/trajectory.hpp"
 
 #include "utils_act/act_utils.hpp"
+#include "utils_act/act_utils_eigen.hpp"
+#include "signal_processing/lowpass_filter.hpp"
+#include "input_library/input_lib.hpp"
 
 namespace sysid
 {
@@ -106,6 +109,9 @@ class SystemIdentificationNode : public rclcpp::Node
 
   //!< @brief timer to update after a given interval
   rclcpp::TimerBase::SharedPtr timer_;
+
+  //!< @brief input class wrapper with a default identity input 0.
+  sysid::InputWrapper input_wrapper_{sysid::InputIdentity{}};
 
   // Subscribers
   // rclcpp::Subscription<ControlCommand>::SharedPtr sub_control_cmds_;
