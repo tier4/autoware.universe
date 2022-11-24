@@ -64,8 +64,6 @@ void SystemIdentificationNode::initTimer(double period_s)
  */
 void SystemIdentificationNode::onTimer()
 {
-  // RCLCPP_INFO(this->get_logger(), "%s", "in onTimer ....");
-  // ns_utils::print("In on Timer ....");
 
   RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onTimer ....");
 
@@ -75,10 +73,12 @@ void SystemIdentificationNode::onTimer()
   current_sysid_vars_ = std::make_shared<SysIDSteeringVars>(sysid_vars_msg);
 
   ControlCommand sysid_cmd_msg;
-  sysid_cmd_msg.lateral.steering_tire_angle = 0.1;
+  auto sysid_input = input_wrapper_.generateInput(current_vx_);
+
+  sysid_cmd_msg.lateral.steering_tire_angle = static_cast<float >(sysid_input);
   current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
 
-  // auto sysid_input = input_wrapper_.generateInput(2.);
+
   // ns_utils::print("Current sysid input ... ", sysid_input);
 
   publishSysIDCommand();

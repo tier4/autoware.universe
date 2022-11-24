@@ -96,6 +96,7 @@ class SystemIdentificationNode : public rclcpp::Node
 
   //!< @brief measured velocity
   nav_msgs::msg::Odometry::SharedPtr current_velocity_ptr_;
+  double current_vx_{};
 
   //!< @brief measured steering
   autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr current_steering_ptr_;

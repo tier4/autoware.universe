@@ -8,7 +8,7 @@
 
     common_variables:
       signal_magnitude: 0.1   # maximum signal amplitude
-      min_speed: 1.           # signal start after this speed km/h
+      min_speed: 0.           # signal start after this speed km/h
       max_speed: 5.           # signal zeroed after this speed  km/h
       time_start_after: 0.5   # signal starts after min-speed activated [sec]
 
