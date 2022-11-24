@@ -29,7 +29,7 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
   pub_control_cmd_ = create_publisher<ControlCommand>("~/output/control_cmd", 1);
 
   pub_sysid_debug_vars_ =
-    create_publisher<SysIDSteeringVars>("~/output/system_identification/lateral_cmd", 1);
+    create_publisher<SysIDSteeringVars>("~/output/system_identification_vars", 1);
 
   // Subscribers
   sub_trajectory_ = create_subscription<Trajectory>("~/input/reference_trajectory", rclcpp::QoS{1},
@@ -61,16 +61,22 @@ void SystemIdentificationNode::onTimer()
   ns_utils::print("In on Timer ....");
 
   /** Publish input message*/
-  SysIDSteeringVars msg;
-  msg.sysid_steering_input = 1.;
+  SysIDSteeringVars sysid_vars_msg;
+  sysid_vars_msg.sysid_steering_input = 1.;
+  current_sysid_vars_ = std::make_shared<SysIDSteeringVars>(sysid_vars_msg);
 
-  current_sysid_input_cmd_ = std::make_shared<SysIDSteeringVars>(msg);
+  ControlCommand sysid_cmd_msg;
+  sysid_cmd_msg.lateral.steering_tire_angle = 0.1;
+  current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
+
   publishSysIDCommand();
 }
 void SystemIdentificationNode::publishSysIDCommand()
 {
-  current_sysid_input_cmd_->stamp = this->now();
-  pub_sysid_debug_vars_->publish(*current_sysid_input_cmd_);
+  current_sysid_vars_->stamp = this->now();
+  current_sysid_cmd_->stamp = this->now();
+  pub_control_cmd_->publish(*current_sysid_cmd_);
+  pub_sysid_debug_vars_->publish(*current_sysid_vars_);
 }
 bool SystemIdentificationNode::isDataReady() const
 {
@@ -122,7 +128,6 @@ bool SystemIdentificationNode::updateCurrentPose()
 }
 void SystemIdentificationNode::onTrajectory(autoware_auto_planning_msgs::msg::Trajectory::SharedPtr const msg)
 {
-
   ns_utils::print("In on Trajectory ....");
   current_trajectory_ptr_ = msg;
 }

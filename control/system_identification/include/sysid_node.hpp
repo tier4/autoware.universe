@@ -127,7 +127,8 @@ class SystemIdentificationNode : public rclcpp::Node
    * Node storage
    * */
   // Input messages
-  std::shared_ptr<SysIDSteeringVars> current_sysid_input_cmd_{nullptr};
+  std::shared_ptr<SysIDSteeringVars> current_sysid_vars_{nullptr};
+  std::shared_ptr<ControlCommand> current_sysid_cmd_{nullptr};
 
   // Node Methods
   //!< initialize timer to work in real, simulation, and replay
