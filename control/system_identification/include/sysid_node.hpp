@@ -18,7 +18,15 @@
 // ROS headers
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "tf2/utils.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 #include "rclcpp_components/register_node_macro.hpp"
+
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "tf2_msgs/msg/tf_message.hpp"
 
 // Autoware Headers
 #include "common/types.hpp"
@@ -29,19 +37,32 @@
 #include "autoware_auto_control_msgs/msg/ackermann_control_command.hpp"
 #include "autoware_auto_vehicle_msgs/msg/steering_report.hpp"
 #include "autoware_auto_vehicle_msgs/msg/vehicle_odometry.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav_msgs/msg/odometry.hpp"
+#include "autoware_auto_planning_msgs/msg/trajectory.hpp"
+
 #include "utils_act/act_utils.hpp"
 
 namespace sysid
 {
 
-struct sParameters
+struct sCommonParametersInputLib
 {
   double sysid_dt{0.01};
+  double maximum_amplitude{0.1};
+  double minimum_speed{1.};  // signal activated after this speed
+  double maximum_speed{3.};  // signal zeroed after this speed
+  double tstart{0.5};  // signal started to generate after this amount of time.
 };
 
-// Using declerations
+enum class InputType : int
+{
+  IDENTITY = 0,
+  STEP = 1,
+  PRBS = 2,
+  FWNOISE = 3,
+  SUMSINs = 4,
+};
+
+// Using declarations
 using ControlCommand = autoware_auto_control_msgs::msg::AckermannControlCommand;
 using VelocityMsg = nav_msgs::msg::Odometry;
 using autoware_auto_vehicle_msgs::msg::SteeringReport;
@@ -62,13 +83,31 @@ class SystemIdentificationNode : public rclcpp::Node
   ~SystemIdentificationNode() override = default;
 
  private:
-  sParameters params_node_{};
+  //!< @brief input library common parameters.
+  sCommonParametersInputLib common_input_lib_params_{};
+
+  // DATA MEMBERS
+  //!< @brief measured pose
+  geometry_msgs::msg::PoseStamped::SharedPtr current_pose_ptr_;
+
+  //!< @brief measured velocity
+  nav_msgs::msg::Odometry::SharedPtr current_velocity_ptr_;
+
+  //!< @brief measured steering
+  autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr current_steering_ptr_;
+
+  //!< @brief reference trajectory
+  autoware_auto_planning_msgs::msg::Trajectory::SharedPtr current_trajectory_ptr_;
+
+  //!< @brief buffer for transforms
+  tf2::BufferCore m_tf_buffer_{tf2::BUFFER_CORE_DEFAULT_CACHE_TIME};
+  tf2_ros::TransformListener m_tf_listener_{m_tf_buffer_};
 
   //!< @brief timer to update after a given interval
   rclcpp::TimerBase::SharedPtr timer_;
 
   // Subscribers
-  rclcpp::Subscription<ControlCommand>::SharedPtr sub_control_cmds_;
+  // rclcpp::Subscription<ControlCommand>::SharedPtr sub_control_cmds_;
 
   //!< @brief subscription for current velocity
   rclcpp::Subscription<VelocityMsg>::SharedPtr sub_current_velocity_ptr_;
@@ -76,8 +115,12 @@ class SystemIdentificationNode : public rclcpp::Node
   //!< @brief subscription for current velocity
   rclcpp::Subscription<SteeringReport>::SharedPtr sub_current_steering_ptr_;
 
+  //!< @brief subscription for current trajectory
+  rclcpp::Subscription<SteeringReport>::SharedPtr sub_current_traj_ptr_;
+
   // Publishers
-  rclcpp::Publisher<SysIDSteeringVars>::SharedPtr pub_sysid_input_;
+  rclcpp::Publisher<ControlCommand>::SharedPtr pub_control_cmd_;
+  rclcpp::Publisher<SysIDSteeringVars>::SharedPtr pub_sysid_debug_vars_;
 
   /**
    * Node storage
@@ -88,6 +131,9 @@ class SystemIdentificationNode : public rclcpp::Node
   // Node Methods
   //!< initialize timer to work in real, simulation, and replay
   void initTimer(double period_s);
+
+  bool isDataReady() const;
+  bool updateCurrentPose();
 
   /**
    * @brief compute and publish the sysid input signals with a constant control period

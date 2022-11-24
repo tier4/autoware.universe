@@ -22,12 +22,12 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
 {
   using std::placeholders::_1;
 
-  initTimer(params_node_.sysid_dt);
+  initTimer(common_input_lib_params_.sysid_dt);
 
   // Subscribers
 
   // Publishers
-  pub_sysid_input_ =
+  pub_sysid_debug_vars_ =
     create_publisher<SysIDSteeringVars>("~/output/system_identification/lateral_cmd", 1);
 }
 
@@ -58,7 +58,15 @@ void SystemIdentificationNode::onTimer()
 void SystemIdentificationNode::publishSysIDCommand()
 {
   current_sysid_input_cmd_->stamp = this->now();
-  pub_sysid_input_->publish(*current_sysid_input_cmd_);
+  pub_sysid_debug_vars_->publish(*current_sysid_input_cmd_);
+}
+bool SystemIdentificationNode::isDataReady() const
+{
+  return false;
+}
+bool SystemIdentificationNode::updateCurrentPose()
+{
+  return false;
 }
 
 }  // namespace sysid

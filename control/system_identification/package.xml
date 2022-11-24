@@ -14,12 +14,19 @@
 
     <depend>rclcpp</depend>
     <depend>builtin_interfaces</depend>
+    <depend>std_msgs</depend>
+    <depend>tf2</depend>
+    <depend>tf2_ros</depend>
 
     <depend>autoware_auto_common</depend>
     <depend>autoware_auto_control_msgs</depend>
+    <depend>autoware_auto_geometry</depend>
     <depend>autoware_auto_planning_msgs</depend>
     <depend>autoware_auto_system_msgs</depend>
     <depend>autoware_auto_vehicle_msgs</depend>
+
+    <depend>eigen</depend>
+    <depend>geometry_msgs</depend>
     <depend>signal_processing</depend>
 
 
