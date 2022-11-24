@@ -141,7 +141,7 @@ class SystemIdentificationNode : public rclcpp::Node
   //!< initialize timer to work in real, simulation, and replay
   void initTimer(double period_s);
 
-  bool isDataReady() const;
+  bool isDataReady();
   bool updateCurrentPose();
 
   /**

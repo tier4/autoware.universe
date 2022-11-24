@@ -67,6 +67,12 @@ void SystemIdentificationNode::onTimer()
 
   RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onTimer ....");
 
+  if (!isDataReady() || !updateCurrentPose())
+  {
+    // ns_utils::print("Data is not ready ");
+    return;
+  }
+
   /** Publish input message*/
   SysIDSteeringVars sysid_vars_msg;
   sysid_vars_msg.sysid_steering_input = 1.;
@@ -92,24 +98,36 @@ void SystemIdentificationNode::publishSysIDCommand()
   pub_control_cmd_->publish(*current_sysid_cmd_);
   pub_sysid_debug_vars_->publish(*current_sysid_vars_);
 }
-bool SystemIdentificationNode::isDataReady() const
+bool SystemIdentificationNode::isDataReady()
 {
   if (!current_velocity_ptr_)
   {
-    RCLCPP_DEBUG(get_logger(), "Waiting for the  current_velocity = %d",
-                 current_velocity_ptr_ != nullptr);
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(),
+                                   *this->get_clock(),
+                                   1000 /*ms*/,
+                                   "Waiting for the  current_velocity = %d",
+                                   current_velocity_ptr_ != nullptr);
+
     return false;
   }
 
   if (!current_steering_ptr_)
   {
-    RCLCPP_DEBUG(get_logger(), "Waiting for the current_steering = %d", current_steering_ptr_ != nullptr);
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(),
+                                   *this->get_clock(),
+                                   1000 /*ms*/,
+                                   "Waiting for the current_steering = %d",
+                                   current_steering_ptr_ != nullptr);
     return false;
   }
 
   if (!current_trajectory_ptr_)
   {
-    RCLCPP_DEBUG(get_logger(), " Waiting for the current trajectory = %d", current_trajectory_ptr_ != nullptr);
+    RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(),
+                                   *this->get_clock(),
+                                   1000 /*ms*/,
+                                   " Waiting for the current trajectory = %d",
+                                   current_trajectory_ptr_ != nullptr);
     return false;
   }
 

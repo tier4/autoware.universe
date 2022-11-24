@@ -4,7 +4,7 @@
     identification_frequency: 10.          # Hertz
 
     # inputs: 0-zero, 1-step, 2-prbs, 3-filtered noise, 4-sum of sinusoids
-    default_input_class: 4
+    default_input_class: 1
 
     common_variables:
       signal_magnitude: 0.1   # maximum signal amplitude
