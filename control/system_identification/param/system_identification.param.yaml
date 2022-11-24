@@ -3,4 +3,35 @@
     # -- Experiment Parameters --
     identification_frequency: 100.          # Hertz
 
+    # inputs: 0-zero, 1-step, 2-prbs, 3-filtered noise, 4-sum of sinusoids
+    default_input_class: 4
 
+    common_variables:
+      signal_magnitude: 0.1   # maximum signal amplitude
+      min_speed: 1.           # signal start after this speed km/h
+      max_speed: 5.         # signal zeroed after this speed  km/h
+      time_start_after: 0.5   # signal starts after min-speed activated [sec]
+
+
+    # individual class parameters:
+    # STEP INPUTS.
+    step_input_params:
+      step_direction: 2 # Up: 1, Down: -1, Up and Down : 2, Down and Up : 3
+      step_period: 1.0 # step durations
+
+    prbs_input_params:
+      prbs_type_n: 8  # type of prbs signal <3 ... 31> : please set in prbs header.
+      estimate_rise_time: 0.5 # estimated rise time for a step input to the system [sec].
+
+    fwnoise_input_params:
+      noise_cutoff_frq_hz: 10.  # low-pass filter noise cut-off frequency Hz
+      lowpass_filter_order: 3  # low-pass filter order
+      noise_mean: 0. # mean value of Gaussian noise
+      noise_std: 0.08 # std deviation of Gaussian noise
+
+    sumof_sinusoids_params:
+      frequency_band_hz: [ 1.0, 15.0 ]  # the frequency range of the sinus signals in Hz
+      num_of_sinuses: 5
+      add_noise: false
+      noise_mean: 0. # mean value of Gaussian noise
+      noise_std: 0.08 # std deviation of Gaussian noise
