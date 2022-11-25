@@ -2,6 +2,8 @@
   ros__parameters:
     # -- Experiment Parameters --
     identification_frequency: 10.          # Hertz
+    target_speed: 2. # km/h
+    pcontrol_coeff: 0.1 # P of PID.
 
     # inputs: 0-zero, 1-step, 2-prbs, 3-filtered noise, 4-sum of sinusoids
     default_input_class: 1

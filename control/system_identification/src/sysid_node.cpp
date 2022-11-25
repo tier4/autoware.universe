@@ -27,7 +27,7 @@ sysid::SystemIdentificationNode::SystemIdentificationNode(const rclcpp::NodeOpti
   initTimer(common_input_lib_params_.sysid_dt);
 
   // Define input type
-  int input_type_id = declare_parameter<int>("default_input_class", 0);
+  int input_type_id = static_cast<int>(declare_parameter<long>("default_input_class", 0));
   auto input_type = getInputType(input_type_id);
   loadParams(input_type);
 
@@ -75,20 +75,23 @@ void SystemIdentificationNode::onTimer()
     return;
   }
 
-  /** Publish input message*/
+  /* Publish input messages - for sysid analysis */
   SysIDSteeringVars sysid_vars_msg;
   sysid_vars_msg.sysid_steering_input = 1.;
   current_sysid_vars_ = std::make_shared<SysIDSteeringVars>(sysid_vars_msg);
 
+  // Compute the control signals.
   ControlCommand sysid_cmd_msg;
-  auto sysid_input = input_wrapper_.generateInput(current_vx_);
 
-  sysid_cmd_msg.lateral.steering_tire_angle = static_cast<float >(sysid_input);
+  auto const &sysid_steering_input = input_wrapper_.generateInput(current_vx_);
+  auto const &sysid_acc_input = getLongitudinalControl();
+
+  sysid_cmd_msg.lateral.steering_tire_angle = static_cast<float >(sysid_steering_input);
+  sysid_cmd_msg.longitudinal.acceleration = static_cast<float>(sysid_acc_input);
+
   current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
 
-
-  // ns_utils::print("Current sysid input ... ", sysid_input);
-
+  // ns_utils::print("Current sysid input ... ", sysid_steering_input);
   publishSysIDCommand();
 }
 void SystemIdentificationNode::publishSysIDCommand()
@@ -172,7 +175,9 @@ void SystemIdentificationNode::onVelocity(nav_msgs::msg::Odometry::SharedPtr con
   RCLCPP_WARN_SKIPFIRST_THROTTLE(get_logger(), *this->get_clock(), 1000 /*ms*/, "In SYSID onVelocity ....");
   // ns_utils::print("In on Velocity ....");
   current_velocity_ptr_ = msg;
+  current_vx_ = static_cast<double>(current_velocity_ptr_->twist.twist.linear.x);
 }
+
 void SystemIdentificationNode::onSteering(autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr const msg)
 {
   // ns_utils::print("In on Steering ....");
@@ -193,6 +198,10 @@ void SystemIdentificationNode::loadParams(InputType const &input_type)
 
   common_input_lib_params_.tstart = declare_parameter<double>("common_variables.time_start_after", 0.);
   auto const &ctrl_period = common_input_lib_params_.sysid_dt;
+
+  // Longitudinal control parameters.
+  common_input_lib_params_.target_speed = declare_parameter<double>("target_speed", 1.) / 3.6;  // [m/s]
+  common_input_lib_params_.p_of_pid = declare_parameter<double>("pcontrol_coeff", 0.1); // [km/h]
 
   if (input_type == InputType::STEP)
   {
@@ -234,7 +243,7 @@ void SystemIdentificationNode::loadParams(InputType const &input_type)
   if (input_type == InputType::FWNOISE)
   {
 
-    auto const &lowpass_filter_cutoff_hz = declare_parameter<double>("fwnoise_input_params"".noise_cutoff_frq_hz", 5.);
+    auto const &lowpass_filter_cutoff_hz = declare_parameter<double>("fwnoise_input_params.noise_cutoff_frq_hz", 5.);
 
     auto const &lowpass_filter_order = declare_parameter<int>("fwnoise_input_params.lowpass_filter_order", 3);
     auto const &noise_mean = declare_parameter<double>("fwnoise_input_params.noise_mean", 0.);
@@ -304,6 +313,17 @@ InputType SystemIdentificationNode::getInputType(int const &input_id)
   { return InputType::SUMSINs; }
 
   return InputType::IDENTITY;
+}
+
+/**
+ * @brief Longitudinal control signal.
+ * */
+double SystemIdentificationNode::getLongitudinalControl() const
+{
+  auto const &target_vx_ms = common_input_lib_params_.target_speed;
+  auto const &error_vx = current_vx_ - target_vx_ms;
+  auto const &K = common_input_lib_params_.p_of_pid;
+  return -K * error_vx;
 }
 
 }  // namespace sysid

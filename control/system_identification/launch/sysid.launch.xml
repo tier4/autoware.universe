@@ -18,7 +18,7 @@
         <remap from="~/input/current_steering" to="/vehicle/status/steering_status"/>
 
         <!--  Outputs -->
-        <remap from="~/output/control_cmd" to="/control/command/control_cmd"/>
+        <!--        <remap from="~/output/control_cmd" to="/control/command/control_cmd"/>-->
         <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd"/>
         <remap from="~/output/system_identification_vars" to="system_identification_vars"/>
         <remap from="~/output/predicted_trajectory" to="/control/trajectory_follower/lateral/predicted_trajectory"/>

@@ -54,6 +54,10 @@ struct sCommonParametersInputLib
   double minimum_speed{1.};  // signal activated after this speed
   double maximum_speed{3.};  // signal zeroed after this speed
   double tstart{0.5};  // signal started to generate after this amount of time.
+
+  // longitudinal control
+  double target_speed{};  // [m/s]
+  double p_of_pid{0.1};
 };
 
 enum class InputType : int
@@ -156,6 +160,8 @@ class SystemIdentificationNode : public rclcpp::Node
   void onTrajectory(const autoware_auto_planning_msgs::msg::Trajectory::SharedPtr msg);
   void onVelocity(const nav_msgs::msg::Odometry::SharedPtr msg);
   void onSteering(const autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr msg);
+
+  double getLongitudinalControl() const;
 
   /**
    * @brief Publish message.
