@@ -88,6 +88,7 @@ void SystemIdentificationNode::onTimer()
 
   sysid_cmd_msg.lateral.steering_tire_angle = static_cast<float >(sysid_steering_input);
   sysid_cmd_msg.longitudinal.acceleration = static_cast<float>(sysid_acc_input);
+  sysid_cmd_msg.longitudinal.speed = static_cast<float>(sysid_acc_input);
 
   current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
 

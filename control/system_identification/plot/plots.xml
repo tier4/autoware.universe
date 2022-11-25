@@ -1,25 +1,16 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <root>
- <tabbed_widget name="Main Window" parent="main_window">
-  <Tab containers="1" tab_name="Input and Speed">
+ <tabbed_widget parent="main_window" name="Main Window">
+  <Tab tab_name="tab1" containers="1">
    <Container>
-    <DockSplitter count="1" orientation="-" sizes="1">
-     <DockSplitter count="2" orientation="|" sizes="0.5;0.5">
-      <DockArea name="...">
-       <plot style="Lines" flip_x="false" mode="TimeSeries" flip_y="false">
-        <range right="19.499967" top="0.061481" bottom="-0.067650" left="14.499995"/>
-        <limitY/>
-        <curve color="#1f77b4" name="/control/command/control_cmd/lateral/steering_tire_angle"/>
-       </plot>
-      </DockArea>
-      <DockArea name="...">
-       <plot style="Lines" flip_x="false" mode="TimeSeries" flip_y="false">
-        <range right="19.499967" top="0.100000" bottom="-0.100000" left="14.499995"/>
-        <limitY/>
-        <curve color="#d62728" name="/control/command/control_cmd/longitudinal/speed"/>
-       </plot>
-      </DockArea>
-     </DockSplitter>
+    <DockSplitter sizes="1" orientation="-" count="1">
+     <DockArea name="...">
+      <plot flip_y="false" style="Lines" flip_x="false" mode="TimeSeries">
+       <range right="33.900882" bottom="-0.105000" top="0.105000" left="29.000296"/>
+       <limitY/>
+       <curve name="/control/command/control_cmd/lateral/steering_tire_angle" color="#1f77b4"/>
+      </plot>
+     </DockArea>
     </DockSplitter>
    </Container>
   </Tab>
@@ -30,7 +21,7 @@
  <!-- - - - - - - - - - - - - - - -->
  <Plugins>
   <plugin ID="DataLoad CSV">
-   <default delimiter="0" time_axis=""/>
+   <default time_axis="" delimiter="0"/>
   </plugin>
   <plugin ID="DataLoad ROS2 bags">
    <use_header_stamp value="false"/>
