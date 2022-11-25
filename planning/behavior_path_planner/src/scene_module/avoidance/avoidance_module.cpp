@@ -2217,7 +2217,7 @@ boost::optional<AvoidPointArray> AvoidanceModule::findNewShiftPoint(
     }
 
     // new shift points must exist in front of Ego
-    if (candidate.start_longitudinal < 0.0) {
+    if (candidate.start_longitudinal < -0.01) {
       continue;
     }
 
