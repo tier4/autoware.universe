@@ -162,7 +162,7 @@ double InpFilteredWhiteNoise::generateInput(double const &vx)
   // current time in milliseconds
   if (auto const &t_ms = time_tracker_();t_ms < Ts_ * 1000)
   {
-    ns_utils::print("Time after experiment regime reached : ", t_ms);
+    // ns_utils::print("Time after experiment regime reached : ", t_ms);
     return 0.;
   }
 
@@ -222,7 +222,7 @@ double InpStepUpDown::generateInput(double const &vx)
   // current time in milliseconds
   if (auto const &t_ms = time_tracker_(); t_ms < Ts_ * 1000)
   {
-    ns_utils::print("Time after experiment regime reached : ", t_ms);
+    //ns_utils::print("Time after experiment regime reached : ", t_ms);
     return 0.;
   }
 
