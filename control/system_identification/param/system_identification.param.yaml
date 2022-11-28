@@ -6,7 +6,7 @@
     pcontrol_coeff: 0.8 # P of PID.
 
     # inputs: 0-zero, 1-step, 2-prbs, 3-filtered noise, 4-sum of sinusoids
-    default_input_class: 4
+    default_input_class: 3
 
     common_variables:
       signal_magnitude: 0.1   # maximum signal amplitude

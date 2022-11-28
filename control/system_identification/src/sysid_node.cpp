@@ -71,16 +71,12 @@ void SystemIdentificationNode::onTimer()
 
   if (!isDataReady() || !updateCurrentPose())
   {
-    // ns_utils::print("Data is not ready ");
     return;
   }
 
-  /* Publish input messages - for sysid analysis */
-  SysIDSteeringVars sysid_vars_msg;
-  sysid_vars_msg.sysid_steering_input = 1.;
-  current_sysid_vars_ = std::make_shared<SysIDSteeringVars>(sysid_vars_msg);
-
-  // Compute the control signals.
+  /**
+   * @brief compute and assign control sysid control commands.
+   * */
   ControlCommand sysid_cmd_msg;
 
   auto const &sysid_steering_input = input_wrapper_.generateInput(current_vx_);
@@ -92,7 +88,12 @@ void SystemIdentificationNode::onTimer()
 
   current_sysid_cmd_ = std::make_shared<ControlCommand>(sysid_cmd_msg);
 
-  // ns_utils::print("Current sysid input ... ", sysid_steering_input);
+  /* Publish input messages - for sysid analysis */
+  SysIDSteeringVars sysid_vars_msg;
+  gatherSysIDvars(sysid_vars_msg);
+
+  current_sysid_vars_ = std::make_shared<SysIDSteeringVars>(sysid_vars_msg);
+
   publishSysIDCommand();
 }
 void SystemIdentificationNode::publishSysIDCommand()
@@ -325,6 +326,16 @@ double SystemIdentificationNode::getLongitudinalControl() const
   auto const &error_vx = current_vx_ - target_vx_ms;
   auto const &K = common_input_lib_params_.p_of_pid;
   return -K * error_vx;
+}
+void SystemIdentificationNode::gatherSysIDvars(SysIDSteeringVars &sys_id_steering_vars) const
+{
+
+  sys_id_steering_vars.sysid_steering_input = current_sysid_cmd_->lateral.steering_tire_angle;
+  sys_id_steering_vars.sysid_acc_input = current_sysid_cmd_->longitudinal.acceleration;
+
+  sys_id_steering_vars.measured_steering = current_steering_ptr_->steering_tire_angle;
+  sys_id_steering_vars.longitudinal_speed = current_vx_;
+
 }
 
 }  // namespace sysid

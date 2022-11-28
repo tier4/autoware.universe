@@ -162,6 +162,7 @@ class SystemIdentificationNode : public rclcpp::Node
   void onSteering(const autoware_auto_vehicle_msgs::msg::SteeringReport::SharedPtr msg);
 
   double getLongitudinalControl() const;
+  void gatherSysIDvars(SysIDSteeringVars &sys_id_steering_vars) const;
 
   /**
    * @brief Publish message.

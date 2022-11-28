@@ -14,12 +14,10 @@ set(CMAKE_CXX_STANDARD 17)
 ## ----------------- Library headers and sources -------------------------------
 set(SYSID_LIB system_identification_lib)
 set(SYSID_LIB_HEADERS
-        include/sysid_core.hpp
         include/input_library/prbs_tap_bits.hpp
         include/input_library/input_lib.hpp)
 
 set(SYSID_LIB_SOURCE
-        src/sysid_core.cpp
         src/input_library/prbs_tap_bits.cpp
         src/input_library/input_lib.cpp)
 

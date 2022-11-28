@@ -1,14 +1,29 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <root>
  <tabbed_widget parent="main_window" name="Main Window">
-  <Tab tab_name="tab1" containers="1">
+  <Tab tab_name="lateral" containers="1">
    <Container>
-    <DockSplitter sizes="1" orientation="-" count="1">
+    <DockSplitter count="1" orientation="-" sizes="1">
      <DockArea name="...">
-      <plot flip_y="false" style="Lines" flip_x="false" mode="TimeSeries">
-       <range right="33.900882" bottom="-0.105000" top="0.105000" left="29.000296"/>
+      <plot style="Lines" flip_x="false" mode="TimeSeries" flip_y="false">
+       <range top="0.097059" left="32.900690" right="37.890133" bottom="-0.104806"/>
        <limitY/>
-       <curve name="/control/command/control_cmd/lateral/steering_tire_angle" color="#1f77b4"/>
+       <curve color="#1ac938" name="/sysid_vars/sysid_steering_input"/>
+       <curve color="#ff7f0e" name="/sysid_vars/measured_steering"/>
+      </plot>
+     </DockArea>
+    </DockSplitter>
+   </Container>
+  </Tab>
+  <Tab tab_name="longitudinal" containers="1">
+   <Container>
+    <DockSplitter count="1" orientation="-" sizes="1">
+     <DockArea name="...">
+      <plot style="Lines" flip_x="false" mode="TimeSeries" flip_y="false">
+       <range top="0.569444" left="32.900690" right="37.890133" bottom="-0.013889"/>
+       <limitY/>
+       <curve color="#1f77b4" name="/sysid_vars/longitudinal_speed"/>
+       <curve color="#d62728" name="/sysid_vars/sysid_acc_input"/>
       </plot>
      </DockArea>
     </DockSplitter>
@@ -21,7 +36,7 @@
  <!-- - - - - - - - - - - - - - - -->
  <Plugins>
   <plugin ID="DataLoad CSV">
-   <default time_axis="" delimiter="0"/>
+   <default delimiter="0" time_axis=""/>
   </plugin>
   <plugin ID="DataLoad ROS2 bags">
    <use_header_stamp value="false"/>
@@ -35,6 +50,7 @@
    <max_array_size value="true"/>
    <selected_topics>
     <topic name="/control/command/control_cmd"/>
+    <topic name="/sysid_vars"/>
    </selected_topics>
   </plugin>
   <plugin ID="UDP Server"/>
