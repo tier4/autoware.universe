@@ -18,10 +18,17 @@
     intersection_search_distance: 30.0
 
     visualize_drivable_area_for_shared_linestrings_lanelet: true
+    ego_nearest_dist_threshold: 3.0 # [m]
+    ego_nearest_yaw_threshold: 1.046 # [rad] = 60 [deg]
 
-    lateral_distance_max_threshold: 5.0
+    lateral_distance_max_threshold: 2.0
     longitudinal_distance_min_threshold: 3.0
+
     expected_front_deceleration: -1.0
     expected_rear_deceleration: -1.0
+
+    expected_front_deceleration_for_abort: -2.0
+    expected_rear_deceleration_for_abort: -2.5
+
     rear_vehicle_reaction_time: 2.0
     rear_vehicle_safety_time_margin: 2.0
