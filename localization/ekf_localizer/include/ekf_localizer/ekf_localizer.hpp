@@ -313,6 +313,8 @@ private:
 
   void updateSimple1DFilters(const geometry_msgs::msg::PoseWithCovarianceStamped & pose);
 
+  void initSimple1DFilters(const geometry_msgs::msg::PoseWithCovarianceStamped & pose);
+
   tier4_autoware_utils::StopWatch<std::chrono::milliseconds> stop_watch_;
 
   friend class EKFLocalizerTestSuite;  // for test code

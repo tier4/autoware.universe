@@ -326,7 +326,7 @@ void EKFLocalizer::callbackInitialPose(
 
   ekf_.init(X, P, extend_state_step_);
 
-  updateSimple1DFilters(*initialpose);
+  initSimple1DFilters(*initialpose);
 
   while (!current_pose_info_queue_.empty()) current_pose_info_queue_.pop();
 }
@@ -771,4 +771,22 @@ void EKFLocalizer::updateSimple1DFilters(const geometry_msgs::msg::PoseWithCovar
   z_filter_.update(z, z_stddev, pose.header.stamp);
   roll_filter_.update(roll, roll_stddev, pose.header.stamp);
   pitch_filter_.update(pitch, pitch_stddev, pose.header.stamp);
+}
+
+void EKFLocalizer::initSimple1DFilters(const geometry_msgs::msg::PoseWithCovarianceStamped & pose)
+{
+  double z = pose.pose.pose.position.z;
+  double roll = 0.0, pitch = 0.0, yaw_tmp = 0.0;
+
+  tf2::Quaternion q_tf;
+  tf2::fromMsg(pose.pose.pose.orientation, q_tf);
+  tf2::Matrix3x3(q_tf).getRPY(roll, pitch, yaw_tmp);
+
+  double z_stddev = std::sqrt(pose.pose.covariance[2 * 6 + 2]);
+  double roll_stddev = std::sqrt(pose.pose.covariance[3 * 6 + 3]);
+  double pitch_stddev = std::sqrt(pose.pose.covariance[4 * 6 + 4]);
+
+  z_filter_.init(z, z_dev, pose.header.stamp);
+  roll_filter_.init(roll, roll_dev, pose.header.stamp);
+  pitch_filter_.init(pitch, pitch_dev, pose.header.stamp);
 }
