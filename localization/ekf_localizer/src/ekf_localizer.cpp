@@ -328,7 +328,7 @@ void EKFLocalizer::callbackInitialPose(
 
   initSimple1DFilters(*initialpose);
 
-  while (!current_pose_info_queue_.empty()) current_pose_info_queue_.pop();
+  while (!current_pose_info_queue_.empty()) {current_pose_info_queue_.pop();}
 }
 
 /*
@@ -412,7 +412,7 @@ void EKFLocalizer::predictKinematicsModel()
   /* Update for latest state */
   X_next(IDX::X) = X_curr(IDX::X) + vx * cos(yaw + yaw_bias) * dt;  // dx = v * cos(yaw)
   X_next(IDX::Y) = X_curr(IDX::Y) + vx * sin(yaw + yaw_bias) * dt;  // dy = v * sin(yaw)
-  X_next(IDX::YAW) = X_curr(IDX::YAW) + (wz)*dt;                    // dyaw = omega + omega_bias
+  X_next(IDX::YAW) = X_curr(IDX::YAW) + (wz) * dt;                    // dyaw = omega + omega_bias
   X_next(IDX::YAWB) = yaw_bias;
   X_next(IDX::VX) = vx;
   X_next(IDX::WZ) = wz;
@@ -786,7 +786,7 @@ void EKFLocalizer::initSimple1DFilters(const geometry_msgs::msg::PoseWithCovaria
   double roll_stddev = std::sqrt(pose.pose.covariance[3 * 6 + 3]);
   double pitch_stddev = std::sqrt(pose.pose.covariance[4 * 6 + 4]);
 
-  z_filter_.init(z, z_dev, pose.header.stamp);
-  roll_filter_.init(roll, roll_dev, pose.header.stamp);
-  pitch_filter_.init(pitch, pitch_dev, pose.header.stamp);
+  z_filter_.init(z, z_stddev, pose.header.stamp);
+  roll_filter_.init(roll, roll_stddev, pose.header.stamp);
+  pitch_filter_.init(pitch, pitch_stddev, pose.header.stamp);
 }
