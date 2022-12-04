@@ -184,7 +184,8 @@ private:
   BT::NodeStatus getState(const LaneChangeStatus & status) const;
   BehaviorModuleOutput getOutput(const LaneChangeStatus & status);
 
-  void updateLaneChangeStatus(LaneChangeStatus * status) const;
+  void updateLaneChangeStatusLeft();
+  void updateLaneChangeStatusRight();
   void generateExtendedDrivableArea(PathWithLaneId & path, const LaneChangeStatus & status);
   void updateOutputTurnSignal(BehaviorModuleOutput & output, const LaneChangeStatus & status);
   void updateSteeringFactorPtr(

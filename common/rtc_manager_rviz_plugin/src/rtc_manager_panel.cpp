@@ -75,6 +75,12 @@ std::string getModuleName(const uint8_t module_type)
     case Module::LANE_CHANGE_RIGHT: {
       return "lane_change_right";
     }
+    case Module::EXT_REQUEST_LANE_CHANGE_LEFT: {
+      return "ext_request_lane_change_left";
+    }
+    case Module::EXT_REQUEST_LANE_CHANGE_RIGHT: {
+      return "ext_request_lane_change_right";
+    }
     case Module::AVOIDANCE_LEFT: {
       return "avoidance_left";
     }
