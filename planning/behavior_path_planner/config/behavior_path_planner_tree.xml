@@ -16,6 +16,10 @@
                 <Action ID="SideShift_Plan" output="{output}"/>
             </ReactiveSequence>
             <ReactiveSequence>
+                <Condition ID="ExternalRequestLaneChange_Request"/>
+                <Action ID="ExternalRequestLaneChange_Plan" output="{output}"/>
+            </ReactiveSequence>
+            <ReactiveSequence>
                 <Condition ID="LaneChange_Request"/>
                 <Action ID="LaneChange_Plan" output="{output}"/>
             </ReactiveSequence>
@@ -45,6 +49,15 @@
         </ReactiveFallback>
     </BehaviorTree>
     <!-- ////////// -->
+    <BehaviorTree ID="c">
+        <ReactiveFallback>
+            <Condition ID="ExternalRequestLaneChange_CheckApproval"/>
+            <KeepRunningUntilFailure>
+                <Action ID="ExternalRequestLaneChange_PlanCandidate" output="{output}"/>
+            </KeepRunningUntilFailure>
+        </ReactiveFallback>
+    </BehaviorTree>
+    <!-- ////////// -->
     <TreeNodesModel>
         <Condition ID="Avoidance_CheckApproval"/>
         <Action ID="Avoidance_Plan">
@@ -55,6 +68,14 @@
         </Action>
         <Condition ID="Avoidance_Request"/>
         <Condition ID="ExternalApproval"/>
+        <Condition ID="ExternalRequestLaneChange_CheckApproval"/>
+        <Action ID="ExternalRequestLaneChange_Plan">
+            <output_port name="output" type="behavior_path_planner::BehaviorModuleOutput">desc</output_port>
+        </Action>
+        <Action ID="ExternalRequestLaneChange_PlanCandidate">
+            <output_port name="output" type="behavior_path_planner::BehaviorModuleOutput">desc</output_port>
+        </Action>
+        <Condition ID="LaneChange_Request"/>
         <Condition ID="LaneChange_CheckApproval"/>
         <Action ID="LaneChange_Plan">
             <output_port name="output" type="behavior_path_planner::BehaviorModuleOutput">desc</output_port>

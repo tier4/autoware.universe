@@ -402,9 +402,8 @@ std::pair<bool, bool> LaneChangeModule::getSafePath(
 
     // select valid path
     const LaneChangePaths valid_paths = lane_change_utils::selectValidPaths(
-      lane_change_paths, current_lanes, check_lanes, *route_handler->getOverallGraphPtr(),
-      current_pose, route_handler->isInGoalRouteSection(current_lanes.back()),
-      route_handler->getGoalPose());
+      lane_change_paths, current_lanes, check_lanes, *route_handler, current_pose,
+      route_handler->getGoalPose(), common_parameters.minimum_lane_change_length);
 
     if (valid_paths.empty()) {
       return std::make_pair(false, false);

@@ -28,6 +28,7 @@ namespace behavior_path_planner
 // Forward Declaration
 class AvoidanceModule;
 class LaneChangeModule;
+class ExternalRequestLaneChangeModule;
 class LaneFollowingModule;
 class PullOutModule;
 class PullOverModule;
@@ -55,6 +56,7 @@ public:
 
 protected:
   mutable std::shared_ptr<LaneChangeDebugMsgArray> lane_change_visitor_;
+  mutable std::shared_ptr<LaneChangeDebugMsgArray> ext_request_lane_change_visitor_;
   mutable std::shared_ptr<AvoidanceDebugMsgArray> avoidance_visitor_;
 };
 

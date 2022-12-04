@@ -146,6 +146,10 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
       std::make_shared<LaneFollowingModule>("LaneFollowing", *this, getLaneFollowingParam());
     bt_manager_->registerSceneModule(lane_following_module);
 
+    auto ext_request_lane_change_module = std::make_shared<ExternalRequestLaneChangeModule>(
+      "ExternalRequestLaneChange", *this, lane_change_param_ptr);
+    bt_manager_->registerSceneModule(ext_request_lane_change_module);
+
     auto lane_change_module =
       std::make_shared<LaneChangeModule>("LaneChange", *this, lane_change_param_ptr);
     bt_manager_->registerSceneModule(lane_change_module);
