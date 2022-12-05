@@ -39,9 +39,6 @@ struct BehaviorPathPlannerParameters
   double turn_light_on_threshold_dis_long;
   double turn_light_on_threshold_time;
 
-  double ego_nearest_dist_threshold;
-  double ego_nearest_yaw_threshold;
-
   // vehicle info
   vehicle_info_util::VehicleInfo vehicle_info;
   double wheel_base;
@@ -61,13 +58,8 @@ struct BehaviorPathPlannerParameters
   // collision check
   double lateral_distance_max_threshold;
   double longitudinal_distance_min_threshold;
-
-  double expected_front_deceleration;  // brake parameter under normal lane change
-  double expected_rear_deceleration;   // brake parameter under normal lane change
-
-  double expected_front_deceleration_for_abort;  // hard brake parameter for abort
-  double expected_rear_deceleration_for_abort;   // hard brake parameter for abort
-
+  double expected_front_deceleration;
+  double expected_rear_deceleration;
   double rear_vehicle_reaction_time;
   double rear_vehicle_safety_time_margin;
 };

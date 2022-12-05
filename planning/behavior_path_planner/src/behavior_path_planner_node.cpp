@@ -233,8 +233,6 @@ BehaviorPathPlannerParameters BehaviorPathPlannerNode::getCommonParam()
   p.turn_light_on_threshold_time = declare_parameter("turn_light_on_threshold_time", 3.0);
   p.visualize_drivable_area_for_shared_linestrings_lanelet =
     declare_parameter("visualize_drivable_area_for_shared_linestrings_lanelet", true);
-  p.ego_nearest_dist_threshold = declare_parameter<double>("ego_nearest_dist_threshold");
-  p.ego_nearest_yaw_threshold = declare_parameter<double>("ego_nearest_yaw_threshold");
 
   p.lateral_distance_max_threshold = declare_parameter("lateral_distance_max_threshold", 3.0);
   p.longitudinal_distance_min_threshold =
@@ -242,12 +240,6 @@ BehaviorPathPlannerParameters BehaviorPathPlannerNode::getCommonParam()
   p.expected_front_deceleration = declare_parameter("expected_front_deceleration", -1.0);
   p.expected_rear_deceleration = declare_parameter("expected_rear_deceleration", -1.0);
   p.rear_vehicle_reaction_time = declare_parameter("rear_vehicle_reaction_time", 2.0);
-
-  p.expected_front_deceleration_for_abort =
-    declare_parameter("expected_front_deceleration_for_abort", -2.0);
-  p.expected_rear_deceleration_for_abort =
-    declare_parameter("expected_rear_deceleration_for_abort", -2.5);
-
   p.rear_vehicle_safety_time_margin = declare_parameter("rear_vehicle_safety_time_margin", 2.0);
   return p;
 }
@@ -352,44 +344,22 @@ LaneChangeParameters BehaviorPathPlannerNode::getLaneChangeParam()
   };
 
   LaneChangeParameters p{};
-  // trajectory generation
   p.lane_change_prepare_duration = dp("lane_change_prepare_duration", 2.0);
   p.lane_changing_duration = dp("lane_changing_duration", 4.0);
   p.minimum_lane_change_prepare_distance = dp("minimum_lane_change_prepare_distance", 4.0);
   p.lane_change_finish_judge_buffer = dp("lane_change_finish_judge_buffer", 3.0);
-  p.minimum_lane_change_velocity = dp("minimum_lane_change_velocity", 5.6);
+  p.minimum_lane_change_velocity = dp("minimum_lane_change_velocity", 8.3);
   p.prediction_time_resolution = dp("prediction_time_resolution", 0.5);
   p.maximum_deceleration = dp("maximum_deceleration", 1.0);
   p.lane_change_sampling_num = dp("lane_change_sampling_num", 10);
-
-  // collision check
-  p.enable_collision_check_at_prepare_phase = dp("enable_collision_check_at_prepare_phase", true);
-  p.prepare_phase_ignore_target_speed_thresh = dp("prepare_phase_ignore_target_speed_thresh", 0.1);
-  p.use_predicted_path_outside_lanelet = dp("use_predicted_path_outside_lanelet", true);
-  p.use_all_predicted_path = dp("use_all_predicted_path", true);
-
-  // abort
-  p.enable_cancel_lane_change = dp("enable_cancel_lane_change", true);
-  p.enable_abort_lane_change = dp("enable_abort_lane_change", false);
-
   p.abort_lane_change_velocity_thresh = dp("abort_lane_change_velocity_thresh", 0.5);
   p.abort_lane_change_angle_thresh =
     dp("abort_lane_change_angle_thresh", tier4_autoware_utils::deg2rad(10.0));
   p.abort_lane_change_distance_thresh = dp("abort_lane_change_distance_thresh", 0.3);
-
-  p.abort_begin_min_longitudinal_thresh = dp("abort_begin_min_longitudinal_thresh", 4.0);
-  p.abort_begin_max_longitudinal_thresh = dp("abort_begin_max_longitudinal_thresh", 6.0);
-  p.abort_begin_duration = dp("abort_begin_duration", 3.0);
-
-  p.abort_return_min_longitudinal_thresh = dp("abort_return_min_longitudinal_thresh", 12.0);
-  p.abort_return_max_longitudinal_thresh = dp("abort_return_max_longitudinal_thresh", 16.0);
-  p.abort_return_duration = dp("abort_return_duration", 6.0);
-
-  p.abort_expected_deceleration = dp("abort_expected_deceleration", 0.1);
-  p.abort_longitudinal_jerk = dp("abort_longitudinal_jerk", 0.5);
-
-  p.abort_max_lateral_jerk = dp("abort_max_lateral_jerk", 5.0);
-
+  p.enable_abort_lane_change = dp("enable_abort_lane_change", true);
+  p.enable_collision_check_at_prepare_phase = dp("enable_collision_check_at_prepare_phase", true);
+  p.use_predicted_path_outside_lanelet = dp("use_predicted_path_outside_lanelet", true);
+  p.use_all_predicted_path = dp("use_all_predicted_path", true);
   p.publish_debug_marker = dp("publish_debug_marker", false);
 
   // validation of parameters

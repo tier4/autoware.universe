@@ -247,7 +247,7 @@ std::array<double, 4> getPathScope(
 }
 }  // namespace drivable_area_utils
 
-namespace behavior_path_planner::util
+namespace behavior_path_planner ::util
 {
 using autoware_auto_perception_msgs::msg::ObjectClassification;
 using autoware_auto_perception_msgs::msg::Shape;
@@ -2270,8 +2270,7 @@ bool isLongitudinalDistanceEnough(
 bool hasEnoughDistance(
   const Pose & expected_ego_pose, const Twist & ego_current_twist,
   const Pose & expected_object_pose, const Twist & object_current_twist,
-  const BehaviorPathPlannerParameters & param, const double front_decel, const double rear_decel,
-  CollisionCheckDebug & debug)
+  const BehaviorPathPlannerParameters & param, CollisionCheckDebug & debug)
 {
   const auto front_vehicle_pose =
     projectCurrentPoseToTarget(expected_ego_pose, expected_object_pose);
@@ -2292,8 +2291,8 @@ bool hasEnoughDistance(
     (is_obj_in_front) ? ego_current_twist.linear : object_current_twist.linear;
   debug.object_twist.linear = (is_obj_in_front) ? front_vehicle_velocity : rear_vehicle_velocity;
 
-  const auto front_vehicle_accel = front_decel;
-  const auto rear_vehicle_accel = rear_decel;
+  const auto front_vehicle_accel = param.expected_front_deceleration;
+  const auto rear_vehicle_accel = param.expected_rear_deceleration;
 
   const auto front_vehicle_stop_threshold = frontVehicleStopDistance(
     util::l2Norm(front_vehicle_velocity), front_vehicle_accel,
@@ -2320,8 +2319,7 @@ bool isSafeInLaneletCollisionCheck(
   const double & check_start_time, const double & check_end_time,
   const double & check_time_resolution, const PredictedObject & target_object,
   const PredictedPath & target_object_path, const BehaviorPathPlannerParameters & common_parameters,
-  const double front_decel, const double rear_decel, Pose & ego_pose_before_collision,
-  CollisionCheckDebug & debug)
+  Pose & ego_pose_before_collision, CollisionCheckDebug & debug)
 {
   const auto lerp_path_reserve = (check_end_time - check_start_time) / check_time_resolution;
   if (lerp_path_reserve > 1e-3) {
@@ -2357,7 +2355,7 @@ bool isSafeInLaneletCollisionCheck(
     const auto & object_twist = target_object.kinematics.initial_twist_with_covariance.twist;
     if (!util::hasEnoughDistance(
           expected_ego_pose, ego_current_twist, expected_obj_pose, object_twist, common_parameters,
-          front_decel, rear_decel, debug)) {
+          debug)) {
       debug.failed_reason = "not_enough_longitudinal";
       return false;
     }
@@ -2371,8 +2369,7 @@ bool isSafeInFreeSpaceCollisionCheck(
   const PredictedPath & ego_predicted_path, const VehicleInfo & ego_info,
   const double & check_start_time, const double & check_end_time,
   const double & check_time_resolution, const PredictedObject & target_object,
-  const BehaviorPathPlannerParameters & common_parameters, const double front_decel,
-  const double rear_decel, CollisionCheckDebug & debug)
+  const BehaviorPathPlannerParameters & common_parameters, CollisionCheckDebug & debug)
 {
   tier4_autoware_utils::Polygon2d obj_polygon;
   if (!util::calcObjectPolygon(target_object, &obj_polygon)) {
@@ -2403,12 +2400,11 @@ bool isSafeInFreeSpaceCollisionCheck(
     if (!util::hasEnoughDistance(
           expected_ego_pose, ego_current_twist,
           target_object.kinematics.initial_pose_with_covariance.pose, object_twist,
-          common_parameters, front_decel, rear_decel, debug)) {
+          common_parameters, debug)) {
       debug.failed_reason = "not_enough_longitudinal";
       return false;
     }
   }
   return true;
 }
-
 }  // namespace behavior_path_planner::util
