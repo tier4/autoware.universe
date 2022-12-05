@@ -323,11 +323,12 @@ PathWithLaneId LaneChangeModule::getReferencePath() const
       *route_handler, current_lanes, current_pose, common_parameters.backward_path_length,
       common_parameters.forward_path_length, common_parameters, optional_lengths);
   }
-
+  const double & buffer =
+    common_parameters.backward_length_buffer_for_end_of_lane;  // buffer for min_lane_change_length
   const int num_lane_change =
     std::abs(route_handler->getNumLaneToPreferredLane(current_lanes.back()));
   const double lane_change_buffer =
-    util::calcLaneChangeBuffer(common_parameters, num_lane_change, optional_lengths);
+    num_lane_change * (common_parameters.minimum_lane_change_length + buffer);
 
   reference_path = util::setDecelerationVelocity(
     *route_handler, reference_path, current_lanes, parameters_->lane_change_prepare_duration,
@@ -435,7 +436,9 @@ bool LaneChangeModule::isSafe() const { return status_.is_safe; }
 bool LaneChangeModule::isNearEndOfLane() const
 {
   const auto & current_pose = getEgoPose();
-  const double threshold = util::calcTotalLaneChangeDistanceWithBuffer(planner_data_->parameters);
+  const auto minimum_lane_change_length = planner_data_->parameters.minimum_lane_change_length;
+  const auto end_of_lane_buffer = planner_data_->parameters.backward_length_buffer_for_end_of_lane;
+  const double threshold = end_of_lane_buffer + minimum_lane_change_length;
 
   return std::max(0.0, util::getDistanceToEndOfLane(current_pose, status_.current_lanes)) <
          threshold;

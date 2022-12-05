@@ -391,12 +391,6 @@ bool isSafeInFreeSpaceCollisionCheck(
   const double & check_time_resolution, const PredictedObject & target_object,
   const BehaviorPathPlannerParameters & common_parameters, const double front_decel,
   const double rear_decel, CollisionCheckDebug & debug);
-
-double calcTotalLaneChangeDistanceWithBuffer(const BehaviorPathPlannerParameters & common_param);
-
-double calcLaneChangeBuffer(
-  const BehaviorPathPlannerParameters & common_param, const int num_lane_change,
-  const double length_to_intersection);
 }  // namespace behavior_path_planner::util
 
 #endif  // BEHAVIOR_PATH_PLANNER__UTILITIES_HPP_
