@@ -14,7 +14,6 @@
 
 #include "behavior_path_planner/scene_module/lane_change/util.hpp"
 
-#include "behavior_path_planner/path_utilities.hpp"
 #include "behavior_path_planner/scene_module/utils/path_shifter.hpp"
 #include "behavior_path_planner/utilities.hpp"
 
@@ -109,8 +108,6 @@ std::optional<LaneChangePath> constructCandidatePath(
   candidate_path.preparation_length = prepare_distance;
   candidate_path.lane_change_length = lane_change_distance;
   candidate_path.shift_point = shift_point;
-  candidate_path.reference_lanelets = original_lanelets;
-  candidate_path.target_lanelets = target_lanelets;
 
   const PathPointWithLaneId & lane_changing_start_point = prepare_segment.points.back();
   const PathPointWithLaneId & lane_changing_end_point = lane_changing_segment.points.front();
@@ -287,12 +284,10 @@ bool selectSafePath(
   const LaneChangeParameters & ros_parameters, LaneChangePath * selected_path,
   std::unordered_map<std::string, CollisionCheckDebug> & debug_data)
 {
-  debug_data.clear();
   for (const auto & path : paths) {
-    Pose ego_pose_before_collision;
     if (isLaneChangePathSafe(
           path.path, current_lanes, target_lanes, dynamic_objects, current_pose, current_twist,
-          common_parameters, ros_parameters, ego_pose_before_collision, debug_data, true, path.acceleration)) {
+          common_parameters, ros_parameters, debug_data, true, path.acceleration)) {
       *selected_path = path;
       return true;
     }
@@ -358,7 +353,7 @@ bool isLaneChangePathSafe(
   const lanelet::ConstLanelets & target_lanes,
   const PredictedObjects::ConstSharedPtr dynamic_objects, const Pose & current_pose,
   const Twist & current_twist, const BehaviorPathPlannerParameters & common_parameters,
-  const LaneChangeParameters & lane_change_parameters, Pose & ego_pose_before_collision,
+  const LaneChangeParameters & lane_change_parameters,
   std::unordered_map<std::string, CollisionCheckDebug> & debug_data, const bool use_buffer,
   const double acceleration)
 {
@@ -435,7 +430,7 @@ bool isLaneChangePathSafe(
     for (const auto & obj_path : predicted_paths) {
       if (!util::isSafeInLaneletCollisionCheck(
             current_pose, current_twist, vehicle_predicted_path, vehicle_info, check_start_time,
-            check_end_time, time_resolution, obj, obj_path, common_parameters, ego_pose_before_collision,
+            check_end_time, time_resolution, obj, obj_path, common_parameters,
             current_debug_data.second)) {
         appendDebugInfo(current_debug_data, false);
         return false;
@@ -472,7 +467,7 @@ bool isLaneChangePathSafe(
       for (const auto & obj_path : predicted_paths) {
         if (!util::isSafeInLaneletCollisionCheck(
               current_pose, current_twist, vehicle_predicted_path, vehicle_info, check_start_time,
-              check_end_time, time_resolution, obj, obj_path, common_parameters, ego_pose_before_collision,
+              check_end_time, time_resolution, obj, obj_path, common_parameters,
               current_debug_data.second)) {
           appendDebugInfo(current_debug_data, false);
           return false;
@@ -622,167 +617,5 @@ PathWithLaneId getLaneChangePathLaneChangingSegment(
 
   return lane_changing_segment;
 }
-bool isEgoWithinOriginalLane(
-  const lanelet::ConstLanelets & current_lanes, const Pose & current_pose,
-  const BehaviorPathPlannerParameters & common_param)
-{
-  const auto lane_length = lanelet::utils::getLaneletLength2d(current_lanes);
-  const auto lane_poly = lanelet::utils::getPolygonFromArcLength(current_lanes, 0, lane_length);
-  const auto vehicle_poly =
-    util::getVehiclePolygon(current_pose, common_param.vehicle_width, common_param.base_link2front);
-  return boost::geometry::within(
-    lanelet::utils::to2D(vehicle_poly).basicPolygon(),
-    lanelet::utils::to2D(lane_poly).basicPolygon());
-}
 
-bool isEgoDistanceNearToCenterline(
-  const lanelet::ConstLanelet & closest_lanelet, const Pose & current_pose,
-  const LaneChangeParameters & lane_change_param)
-{
-  const auto centerline2d = lanelet::utils::to2D(closest_lanelet.centerline()).basicLineString();
-  lanelet::BasicPoint2d vehicle_pose2d(current_pose.position.x, current_pose.position.y);
-  const double distance = lanelet::geometry::distance2d(centerline2d, vehicle_pose2d);
-  return distance < lane_change_param.abort_lane_change_distance_thresh;
-}
-
-bool isEgoHeadingAngleLessThanThreshold(
-  const lanelet::ConstLanelet & closest_lanelet, const Pose & current_pose,
-  const LaneChangeParameters & lane_change_param)
-{
-  const double lane_angle = lanelet::utils::getLaneletAngle(closest_lanelet, current_pose.position);
-  const double vehicle_yaw = tf2::getYaw(current_pose.orientation);
-  const double yaw_diff = tier4_autoware_utils::normalizeRadian(lane_angle - vehicle_yaw);
-  return std::abs(yaw_diff) < lane_change_param.abort_lane_change_angle_thresh;
-}
-inline double abort_point(
-  const double starting_velocity, const double param_accel, const double param_jerk,
-  const double param_time)
-{
-  return starting_velocity * param_time + param_accel * std::pow(param_time, 2) / 2 -
-         param_jerk * std::pow(param_jerk, 3) / 6;
-}
-
-std::optional<LaneChangeAbortPath> get_abort_paths(
-  const std::shared_ptr<const PlannerData> & planner_data, const LaneChangePath & selected_path,
-  [[maybe_unused]] const Pose & ego_pose_before_collision, ShiftPoint & shift)
-{
-  // return get_abort_paths(planner_data, selected_path, shift);
-  const auto & route_handler = planner_data->route_handler;
-  const auto current_speed = util::l2Norm(planner_data->self_odometry->twist.twist.linear);
-  const auto current_pose = planner_data->self_pose->pose;
-
-  const auto abort_point_dist =
-    [&](const double param_accel, const double param_jerk, const double param_time) {
-      return std::max(1.0, current_speed) * param_time +
-             param_accel * std::pow(param_time, 2) / 2. - param_jerk * std::pow(param_jerk, 3) / 6.;
-    };
-
-  const auto ego_nearest_dist_threshold = 3.0;
-  const auto ego_nearest_yaw_threshold = 1.046;
-
-  constexpr double resample_path{1.0};
-  auto resampled_selected_path = util::resamplePathWithSpline(selected_path.path, resample_path);
-
-  const auto ego_pose_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
-    resampled_selected_path.points, current_pose, ego_nearest_dist_threshold,
-    ego_nearest_yaw_threshold);
-  const auto ego_pose_before_collision_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
-    resampled_selected_path.points, ego_pose_before_collision, ego_nearest_dist_threshold,
-    ego_nearest_yaw_threshold);
-
-  [[maybe_unused]] const auto pose_idx_min =
-    [&](const double accel, const double jerk, const double param_time, const double min_dist) {
-      if (ego_pose_idx > ego_pose_before_collision_idx) {
-        return ego_pose_idx;
-      }
-      const double turning_point_dist =
-        std::min(std::invoke(abort_point_dist, accel, jerk, param_time), min_dist);
-      const auto & points = resampled_selected_path.points;
-      double sum{0.0};
-      size_t idx{0};
-      for (idx = ego_pose_idx; idx < ego_pose_before_collision_idx; ++idx) {
-        sum += tier4_autoware_utils::calcDistance2d(points.at(idx), points.at(idx + 1));
-        if (sum > turning_point_dist) {
-          break;
-        }
-      }
-      return idx;
-    };
-
-  [[maybe_unused]] const auto pose_idx_max =
-    [&](const double accel, const double jerk, const double param_time, const double min_dist) {
-      if (ego_pose_idx > ego_pose_before_collision_idx) {
-        return ego_pose_idx;
-      }
-      const double turning_point_dist =
-        std::max(std::invoke(abort_point_dist, accel, jerk, param_time), min_dist);
-      const auto & points = resampled_selected_path.points;
-      double sum{0.0};
-      size_t idx{0};
-      for (idx = ego_pose_idx; idx < ego_pose_before_collision_idx; ++idx) {
-        sum += tier4_autoware_utils::calcDistance2d(points.at(idx), points.at(idx + 1));
-        if (sum > turning_point_dist) {
-          break;
-        }
-      }
-      return idx;
-    };
-  const auto abort_start_idx = pose_idx_min(0.0, 0.5, 3.0, 6.0);
-  const auto abort_end_idx = pose_idx_max(0.0, 0.5, 6.0, 12.0);
-  if (abort_start_idx >= abort_end_idx) {
-    return std::nullopt;
-  }
-
-  const auto reference_lanelets = selected_path.reference_lanelets;
-  const auto abort_start_pose = resampled_selected_path.points.at(abort_start_idx).point.pose;
-  const auto abort_end_pose = resampled_selected_path.points.at(abort_end_idx).point.pose;
-  const auto arc_position = lanelet::utils::getArcCoordinates(reference_lanelets, abort_end_pose);
-  const PathWithLaneId reference_lane_segment = std::invoke([&]() {
-    constexpr double minimum_lane_change_length{17.0};
-
-    double s_start = arc_position.length;
-    double s_end =
-      lanelet::utils::getLaneletLength2d(reference_lanelets) - minimum_lane_change_length;
-
-    PathWithLaneId ref = route_handler->getCenterLinePath(reference_lanelets, s_start, s_end);
-    ref.points.back().point.longitudinal_velocity_mps =
-      std::min(ref.points.back().point.longitudinal_velocity_mps, 5.6f);
-    return ref;
-  });
-
-  ShiftPoint shift_point;
-  shift_point.start = abort_start_pose;
-  shift_point.end = abort_end_pose;
-  shift_point.length = -arc_position.distance;
-  shift_point.start_idx = abort_start_idx;
-  shift_point.end_idx = abort_end_idx;
-  shift = shift_point;
-
-  PathShifter path_shifter;
-  path_shifter.setPath(resampled_selected_path);
-  path_shifter.addShiftPoint(shift_point);
-
-  ShiftedPath shifted_path;
-  // offset front side
-  // bool offset_back = false;
-  if (!path_shifter.generate(&shifted_path)) {
-    RCLCPP_ERROR_STREAM(
-      rclcpp::get_logger("behavior_path_planner").get_child("lane_change").get_child("util"),
-      "failed to generate shifted path.");
-  }
-
-  PathWithLaneId start_to_abort_end_pose;
-  start_to_abort_end_pose.points.insert(
-    start_to_abort_end_pose.points.end(), shifted_path.path.points.begin(),
-    shifted_path.path.points.begin() + abort_end_idx);
-  start_to_abort_end_pose.points.insert(
-    start_to_abort_end_pose.points.end(), reference_lane_segment.points.begin(),
-    reference_lane_segment.points.end());
-
-  LaneChangeAbortPath abort_path(selected_path);
-  abort_path.shifted_path = shifted_path;
-  abort_path.path = start_to_abort_end_pose;
-  abort_path.shift_point = shift_point;
-  return std::optional<LaneChangeAbortPath>{abort_path};
-}
 }  // namespace behavior_path_planner::lane_change_utils

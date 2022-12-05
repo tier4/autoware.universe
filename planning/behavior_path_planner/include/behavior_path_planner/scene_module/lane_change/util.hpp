@@ -90,7 +90,6 @@ bool isLaneChangePathSafe(
   const PredictedObjects::ConstSharedPtr dynamic_objects, const Pose & current_pose,
   const Twist & current_twist, const BehaviorPathPlannerParameters & common_parameters,
   const behavior_path_planner::LaneChangeParameters & lane_change_parameters,
-  Pose & ego_pose_before_collision,
   std::unordered_map<std::string, CollisionCheckDebug> & debug_data, const bool use_buffer = true,
   const double acceleration = 0.0);
 
@@ -124,21 +123,7 @@ PathWithLaneId getLaneChangePathLaneChangingSegment(
   const double & lane_change_distance, const double & minimum_lane_change_length,
   const double & lane_change_distance_buffer, const double & lane_changing_duration,
   const double & minimum_lane_change_velocity);
-bool isEgoWithinOriginalLane(
-  const lanelet::ConstLanelets & current_lanes, const Pose & current_pose,
-  const BehaviorPathPlannerParameters & common_param);
-bool isEgoDistanceNearToCenterline(
-  const lanelet::ConstLanelet & closest_lanelet, const Pose & current_pose,
-  const LaneChangeParameters & lane_change_param);
-bool isEgoHeadingAngleLessThanThreshold(
-  const lanelet::ConstLanelet & closest_lanelet, const Pose & current_pose,
-  const LaneChangeParameters & lane_change_param);
-void get_turn_signal_info(
-  const LaneChangePath & lane_change_path, TurnSignalInfo * turn_signal_info);
 
-std::optional<LaneChangeAbortPath> get_abort_paths(
-  const std::shared_ptr<const PlannerData> & planner_data, const LaneChangePath & selected_path,
-  const Pose & ego_lerp_pose_before_collision, ShiftPoint & shift);
 }  // namespace behavior_path_planner::lane_change_utils
 
 #endif  // BEHAVIOR_PATH_PLANNER__SCENE_MODULE__LANE_CHANGE__UTIL_HPP_

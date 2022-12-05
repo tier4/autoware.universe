@@ -165,9 +165,6 @@ bool calcObjectPolygon(const PredictedObject & object, Polygon2d * object_polygo
 bool calcObjectPolygon(
   const Shape & object_shape, const Pose & object_pose, Polygon2d * object_polygon);
 
-bool calcObjectPolygon(
-  const Shape & object_shape, const Pose & object_pose, Polygon2d * object_polygon);
-
 PredictedPath resamplePredictedPath(
   const PredictedPath & input_path, const double resolution, const double duration);
 
@@ -380,7 +377,7 @@ bool isSafeInLaneletCollisionCheck(
   const double & check_start_time, const double & check_end_time,
   const double & check_time_resolution, const PredictedObject & target_object,
   const PredictedPath & target_object_path, const BehaviorPathPlannerParameters & common_parameters,
-  Pose & ego_pose_before_collision, CollisionCheckDebug & debug);
+  CollisionCheckDebug & debug);
 
 bool isSafeInFreeSpaceCollisionCheck(
   const Pose & ego_current_pose, const Twist & ego_current_twist,

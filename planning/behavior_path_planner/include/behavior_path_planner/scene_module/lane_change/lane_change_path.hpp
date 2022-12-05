@@ -27,8 +27,6 @@ using autoware_auto_planning_msgs::msg::PathWithLaneId;
 struct LaneChangePath
 {
   PathWithLaneId path;
-  lanelet::ConstLanelets reference_lanelets;
-  lanelet::ConstLanelets target_lanelets;
   ShiftedPath shifted_path;
   ShiftPoint shift_point;
   double acceleration{0.0};
@@ -36,16 +34,6 @@ struct LaneChangePath
   double lane_change_length{0.0};
 };
 using LaneChangePaths = std::vector<LaneChangePath>;
-
-struct LaneChangeAbortPath : LaneChangePath
-{
-  LaneChangeAbortPath() = default;
-  explicit LaneChangeAbortPath(const LaneChangePath & path)
-  : LaneChangePath(path), prev_path(path.path)
-  {
-  }
-  PathWithLaneId prev_path;
-};
 
 }  // namespace behavior_path_planner
 #endif  // BEHAVIOR_PATH_PLANNER__SCENE_MODULE__LANE_CHANGE__LANE_CHANGE_PATH_HPP_
