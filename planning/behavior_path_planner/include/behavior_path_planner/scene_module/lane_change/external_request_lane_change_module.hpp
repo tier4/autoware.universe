@@ -66,8 +66,12 @@ public:
   void onExit() override;
 
   std::shared_ptr<LaneChangeDebugMsgArray> get_debug_msg_array() const;
-  void acceptVisitor(
-    [[maybe_unused]] const std::shared_ptr<SceneModuleVisitor> & visitor) const override;
+  
+  void accept_visitor(
+    [[maybe_unused]] const std::shared_ptr<SceneModuleVisitor> & visitor) const override
+  {
+    std::cerr << "visited external request lane change module\n";
+  }
 
   void publishRTCStatus() override
   {
@@ -102,18 +106,6 @@ public:
     return false;
   }
 
-  void lockRTCCommand() override
-  {
-    rtc_interface_left_.lockCommandUpdate();
-    rtc_interface_right_.lockCommandUpdate();
-  }
-
-  void unlockRTCCommand() override
-  {
-    rtc_interface_left_.unlockCommandUpdate();
-    rtc_interface_right_.unlockCommandUpdate();
-  }
-
 private:
   std::shared_ptr<LaneChangeParameters> parameters_;
   LaneChangeStatus status_left_;
@@ -130,19 +122,19 @@ private:
   UUID uuid_right_;
 
   bool is_activated_ = false;
-  bool is_proper_ = false;
+  bool is_proper_ = true;
 
-  void waitApprovalLeft(const double start_distance, const double finish_distance)
+  void waitApprovalLeft(const double distance)
   {
     rtc_interface_left_.updateCooperateStatus(
-      uuid_left_, isExecutionReady(), start_distance, finish_distance, clock_->now());
+      uuid_left_, isExecutionReady(), distance, clock_->now());
     is_waiting_approval_ = true;
   }
 
-  void waitApprovalRight(const double start_distance, const double finish_distance)
+  void waitApprovalRight(const double distance)
   {
     rtc_interface_right_.updateCooperateStatus(
-      uuid_right_, isExecutionReady(), start_distance, finish_distance, clock_->now());
+      uuid_right_, isExecutionReady(), distance, clock_->now());
     is_waiting_approval_ = true;
   }
 
@@ -150,20 +142,18 @@ private:
   {
     if (candidate.lateral_shift > 0.0) {
       rtc_interface_left_.updateCooperateStatus(
-        uuid_left_, isExecutionReady(), candidate.start_distance_to_path_change,
-        candidate.finish_distance_to_path_change, clock_->now());
+        uuid_left_, isExecutionReady(), candidate.distance_to_path_change, clock_->now());
       return;
     }
     if (candidate.lateral_shift < 0.0) {
       rtc_interface_right_.updateCooperateStatus(
-        uuid_right_, isExecutionReady(), candidate.start_distance_to_path_change,
-        candidate.finish_distance_to_path_change, clock_->now());
+        uuid_right_, isExecutionReady(), candidate.distance_to_path_change, clock_->now());
       return;
     }
 
     RCLCPP_WARN_STREAM(
       getLogger(),
-      "Direction is UNKNOWN, start_distance = " << candidate.start_distance_to_path_change);
+      "Direction is UNKNOWN, start_distance = " << candidate.distance_to_path_change);
   }
 
   void removeRTCStatus() override
@@ -188,13 +178,8 @@ private:
   void updateLaneChangeStatusRight();
   void generateExtendedDrivableArea(PathWithLaneId & path, const LaneChangeStatus & status);
   void updateOutputTurnSignal(BehaviorModuleOutput & output, const LaneChangeStatus & status);
-  void updateSteeringFactorPtr(
-    const BehaviorModuleOutput & output, const LaneChangeStatus & status);
 
-  void updateSteeringFactorPtr(
-    const CandidateOutput & output, const LaneChangePath & selected_path) const;
   bool isProper() const;
-  bool isValidPath(const PathWithLaneId & path, const LaneChangeStatus & status) const;
   bool isNearEndOfLane(const LaneChangeStatus & status) const;
   bool isCurrentSpeedLow() const;
   bool isAbortConditionSatisfied(const LaneChangeStatus & status) const;

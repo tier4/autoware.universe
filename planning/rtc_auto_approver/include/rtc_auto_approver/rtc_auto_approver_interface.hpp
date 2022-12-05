@@ -59,6 +59,10 @@ private:
   rclcpp::Client<CooperateCommands>::SharedPtr command_cli_;
   rclcpp::Service<AutoMode>::SharedPtr enable_srv_;
 
+  std::string cooperate_status_namespace_ = "/planning/cooperate_status";
+  std::string cooperate_commands_namespace_ = "/planning/cooperate_commands";
+  std::string enable_auto_mode_namespace_ = "/planning/enable_auto_mode";
+
   bool enabled_;
 };
 }  // namespace rtc_auto_approver

@@ -25,16 +25,16 @@ RTCAutoApproverInterface::RTCAutoApproverInterface(
 
   // Subscriber
   status_sub_ = node->create_subscription<CooperateStatusArray>(
-    name + "/cooperate_status", rclcpp::QoS(1),
+    cooperate_status_namespace_ + "/" + name, rclcpp::QoS(1),
     std::bind(&RTCAutoApproverInterface::onStatus, this, _1));
 
   // Service client
   command_cli_ = node->create_client<CooperateCommands>(
-    name + "/cooperate_commands", rmw_qos_profile_services_default);
+    cooperate_commands_namespace_ + "/" + name, rmw_qos_profile_services_default);
 
   // Service
   enable_srv_ = node->create_service<AutoMode>(
-    name + "/enable_auto_mode",
+    enable_auto_mode_namespace_ + "/" + name,
     std::bind(&RTCAutoApproverInterface::onEnableService, this, _1, _2));
 }
 
