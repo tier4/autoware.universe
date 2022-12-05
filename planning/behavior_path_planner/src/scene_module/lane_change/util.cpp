@@ -175,7 +175,7 @@ LaneChangePaths getLaneChangePaths(
   const auto & lane_change_prepare_duration = parameter.lane_change_prepare_duration;
   const auto & lane_changing_duration = parameter.lane_changing_duration;
   const auto & minimum_lane_change_prepare_distance =
-    parameter.minimum_lane_change_prepare_distance;
+    common_parameter.minimum_lane_change_prepare_distance;
   const auto & minimum_lane_change_length = common_parameter.minimum_lane_change_length;
   const auto & minimum_lane_change_velocity = parameter.minimum_lane_change_velocity;
   const auto & maximum_deceleration = parameter.maximum_deceleration;
@@ -712,8 +712,7 @@ std::optional<LaneChangePath> getAbortPaths(
   }
 
   if (!hasEnoughDistanceToLaneChangeAfterAbort(
-        *route_handler, current_lanes, current_pose, abort_return_dist, common_param,
-        lane_change_param)) {
+        *route_handler, current_lanes, current_pose, abort_return_dist, common_param)) {
     return std::nullopt;
   }
 
@@ -780,12 +779,10 @@ double getLateralShift(const LaneChangePath & path)
 bool hasEnoughDistanceToLaneChangeAfterAbort(
   const RouteHandler & route_handler, const lanelet::ConstLanelets & current_lanes,
   const Pose & current_pose, const double abort_return_dist,
-  const BehaviorPathPlannerParameters & common_param,
-  const LaneChangeParameters & lane_change_param)
+  const BehaviorPathPlannerParameters & common_param)
 {
-  const auto minimum_lane_change_distance = lane_change_param.minimum_lane_change_prepare_distance +
-                                            common_param.minimum_lane_change_length +
-                                            common_param.backward_length_buffer_for_end_of_lane;
+  const auto minimum_lane_change_distance =
+    util::calcTotalLaneChangeDistanceWithBuffer(common_param);
   const auto abort_plus_lane_change_distance = abort_return_dist + minimum_lane_change_distance;
   if (abort_plus_lane_change_distance > util::getDistanceToEndOfLane(current_pose, current_lanes)) {
     return false;
