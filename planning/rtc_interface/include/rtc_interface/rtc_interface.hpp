@@ -67,6 +67,9 @@ private:
   rclcpp::Logger logger_;
   Module module_;
   CooperateStatusArray registered_status_;
+  
+  std::string cooperate_status_namespace_ = "/planning/cooperate_status";
+  std::string cooperate_commands_namespace_ = "/planning/cooperate_commands";
 };
 
 }  // namespace rtc_interface

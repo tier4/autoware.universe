@@ -476,7 +476,10 @@ std::pair<bool, bool> ExternalRequestLaneChangeModule::getSafePath(
     // select valid path
     const LaneChangePaths valid_paths = lane_change_utils::selectValidPaths(
       lane_change_paths, current_lanes, check_lanes, *route_handler, current_pose,
-      route_handler->getGoalPose(), common_parameters.minimum_lane_change_length);
+      route_handler->getGoalPose(),
+      common_parameters.minimum_lane_change_length +
+        common_parameters.backward_length_buffer_for_end_of_lane +
+        parameters_->lane_change_finish_judge_buffer);
 
     if (valid_paths.empty()) {
       return std::make_pair(false, false);

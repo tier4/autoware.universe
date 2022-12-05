@@ -180,6 +180,10 @@ LaneChangePaths getLaneChangePaths(
   const auto & minimum_lane_change_velocity = parameter.minimum_lane_change_velocity;
   const auto & maximum_deceleration = parameter.maximum_deceleration;
   const auto & lane_change_sampling_num = parameter.lane_change_sampling_num;
+  const auto & backward_length_buffer = common_parameter.backward_length_buffer_for_end_of_lane;
+
+  const int num_to_preferred_lane =
+    std::abs(route_handler.getNumLaneToPreferredLane(target_lanelets.back()));
 
   // get velocity
   const double current_velocity = util::l2Norm(twist.linear);
@@ -235,7 +239,8 @@ LaneChangePaths getLaneChangePaths(
 
     const PathWithLaneId target_lane_reference_path = getReferencePathFromTargetLane(
       route_handler, target_lanelets, lane_changing_start_pose, prepare_distance,
-      lane_changing_distance, forward_path_length);
+      lane_changing_distance, forward_path_length, num_to_preferred_lane,
+      minimum_lane_change_length + backward_length_buffer);
 
     const ShiftPoint shift_point = getLaneChangeShiftPoint(
       prepare_segment_reference, lane_changing_segment_reference, target_lanelets,
@@ -314,27 +319,30 @@ bool hasEnoughDistance(
   const int num = std::abs(route_handler.getNumLaneToPreferredLane(target_lanes.back()));
   const auto overall_graphs = route_handler.getOverallGraphPtr();
 
-  const double lane_change_required_distace = static_cast<double>(num) * minimum_lane_change_length;
+  const double lane_change_required_distance =
+    static_cast<double>(num) * minimum_lane_change_length;
 
   if (
-    lane_change_total_distance + lane_change_required_distace >
+    lane_change_total_distance + lane_change_required_distance >
     util::getDistanceToEndOfLane(current_pose, current_lanes)) {
     return false;
   }
 
   if (
-    lane_change_total_distance > util::getDistanceToNextIntersection(current_pose, current_lanes)) {
+    lane_change_total_distance + lane_change_required_distance >
+    util::getDistanceToNextIntersection(current_pose, current_lanes)) {
     return false;
   }
 
   if (
     route_handler.isInGoalRouteSection(current_lanes.back()) &&
-    lane_change_total_distance > util::getSignedDistance(current_pose, goal_pose, current_lanes)) {
+    lane_change_total_distance + lane_change_required_distance >
+      util::getSignedDistance(current_pose, goal_pose, current_lanes)) {
     return false;
   }
 
   if (
-    lane_change_total_distance >
+    lane_change_total_distance + lane_change_required_distance >
     util::getDistanceToCrosswalk(current_pose, current_lanes, *overall_graphs)) {
     return false;
   }
@@ -490,12 +498,29 @@ bool isLaneChangePathSafe(
 PathWithLaneId getReferencePathFromTargetLane(
   const RouteHandler & route_handler, const lanelet::ConstLanelets & target_lanes,
   const Pose & lane_changing_start_pose, const double & prepare_distance,
-  const double & lane_changing_distance, const double & forward_path_length)
+  const double & lane_changing_distance, const double & forward_path_length,
+  const int & num_to_preferred_lane, const double & minimum_lane_change_length)
 {
   const ArcCoordinates lane_change_start_arc_position =
     lanelet::utils::getArcCoordinates(target_lanes, lane_changing_start_pose);
+
+  const double total_minimum_lane_change_length =
+    static_cast<double>(num_to_preferred_lane) * minimum_lane_change_length;
   const double & s_start = lane_change_start_arc_position.length;
-  const double s_end = s_start + prepare_distance + lane_changing_distance + forward_path_length;
+  double s_end = s_start;
+
+  if (num_to_preferred_lane == 0) {
+    s_end += prepare_distance + lane_changing_distance + forward_path_length;
+  } else {
+    s_end += util::getDistanceToEndOfLane(lane_changing_start_pose, target_lanes) -
+             total_minimum_lane_change_length;
+  }
+
+  if (route_handler.isInGoalRouteSection(target_lanes.back())) {
+    const auto goal_arc_coordinates =
+      lanelet::utils::getArcCoordinates(target_lanes, route_handler.getGoalPose());
+    s_end = std::min(s_end, goal_arc_coordinates.length - total_minimum_lane_change_length);
+  }
   return route_handler.getCenterLinePath(target_lanes, s_start, s_end);
 }
 
