@@ -34,6 +34,7 @@
 #include <boost/geometry/algorithms/assign.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
+#include <boost/optional.hpp>
 
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -89,7 +90,7 @@ private:
 
   geometry_msgs::msg::PoseStamped current_pose_;
   sensor_msgs::msg::PointCloud2::ConstSharedPtr objects_cloud_ptr_;
-  PredictedObjects::ConstSharedPtr objects_ptr_;
+  boost::optional<PredictedObjects::ConstSharedPtr> objects_ptr_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 
@@ -106,7 +107,7 @@ private:
     const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input,
     pcl::PointCloud<pcl::PointXYZ>::Ptr output);
 
-  void filter_objects_by_area(PredictedObjects & out_objects);
+  bool filter_objects_by_area(PredictedObjects & out_objects);
 
   void timer_callback();
   void pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr & pose_msg);

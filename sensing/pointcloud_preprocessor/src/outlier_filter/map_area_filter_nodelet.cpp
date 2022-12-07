@@ -120,10 +120,7 @@ void MapAreaFilterComponent::create_area_marker_msg()
   }
 }
 
-void MapAreaFilterComponent::timer_callback()
-{
-  area_markers_pub_->publish(area_markers_msg_);
-}
+void MapAreaFilterComponent::timer_callback() { area_markers_pub_->publish(area_markers_msg_); }
 
 void MapAreaFilterComponent::pose_callback(
   const geometry_msgs::msg::PoseStamped::ConstSharedPtr & msg)
@@ -272,13 +269,18 @@ void MapAreaFilterComponent::filter_points_by_area(
   }  // for points in cloud
 }
 
-void MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
+bool MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
 {
-  PredictedObjects in_objects;
   if (!objects_ptr_) {
-    return;
+    return false;
   }
-  in_objects = *objects_ptr_;
+
+  if (objects_ptr_.get() == nullptr) {
+    return false;
+  }
+
+  PredictedObjects in_objects;
+  in_objects = *objects_ptr_.get();
   out_objects.header = in_objects.header;
 
   for (const auto & object : in_objects.objects) {
@@ -296,6 +298,10 @@ void MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objec
       out_objects.objects.emplace_back(object);
     }
   }
+
+  objects_ptr_ = boost::none;
+
+  return true;
 }
 
 void MapAreaFilterComponent::filter(
@@ -369,8 +375,7 @@ void MapAreaFilterComponent::filter(
   output.header = input->header;
 
   PredictedObjects out_objects;
-  filter_objects_by_area(out_objects);
-  filtered_objects_pub_->publish(out_objects);
+  if (filter_objects_by_area(out_objects)) filtered_objects_pub_->publish(out_objects);
 }
 
 rcl_interfaces::msg::SetParametersResult MapAreaFilterComponent::paramCallback(
