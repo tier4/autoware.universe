@@ -2097,7 +2097,7 @@ BehaviorModuleOutput AvoidanceModule::planWaitingApproval()
     clearWaitingApproval();
     removeCandidateRTCStatus();
   }
-  out.path_candidate = std::make_shared<PathWithLaneId>(candidate.path_candidate);
+  publishPathCandidate(candidate);
   return out;
 }
 
@@ -2482,6 +2482,7 @@ void AvoidanceModule::onExit()
 void AvoidanceModule::setParameters(const AvoidanceParameters & parameters)
 {
   parameters_ = parameters;
+  publishPathCandidate();
 }
 
 void AvoidanceModule::initVariables()

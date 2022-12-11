@@ -146,6 +146,11 @@ void PullOverModule::onExit()
   RCLCPP_DEBUG(getLogger(), "PULL_OVER onExit");
   clearWaitingApproval();
   removeRTCStatus();
+<<<<<<< HEAD
+=======
+  publishPathCandidate();
+  steering_factor_interface_ptr_->clearSteeringFactors();
+>>>>>>> 8c1cbea51 (feat(behavior_path_planner): output multiple candidate paths)
 
   // A child node must never return IDLE
   // https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/include/behaviortree_cpp_v3/basic_types.h#L34

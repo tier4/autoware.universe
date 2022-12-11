@@ -82,7 +82,8 @@ void LaneChangeModule::onExit()
   clearWaitingApproval();
   removeRTCStatus();
   debug_marker_.markers.clear();
-  current_state_ = BT::NodeStatus::IDLE;
+  publishPathCandidate();
+  current_state_ = BT::NodeStatus::SUCCESS;
   RCLCPP_DEBUG(getLogger(), "LANE_CHANGE onExit");
 }
 
@@ -211,7 +212,7 @@ BehaviorModuleOutput LaneChangeModule::planWaitingApproval()
   BehaviorModuleOutput out;
   out.path = std::make_shared<PathWithLaneId>(getReferencePath());
   const auto candidate = planCandidate();
-  out.path_candidate = std::make_shared<PathWithLaneId>(candidate.path_candidate);
+  publishPathCandidate(candidate);
   updateRTCStatus(candidate);
   waitApproval();
   return out;

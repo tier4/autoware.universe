@@ -66,7 +66,7 @@ BT::NodeStatus SceneModuleBTNodeInterface::tick()
         scene_module_->getLogger(), "behavior module has failed with exception: " << e.what());
       // std::exit(EXIT_FAILURE);  // TODO(Horibe) do appropriate handing
     }
-    return BT::NodeStatus::SUCCESS;
+    return BT::NodeStatus::FAILURE;
   }
 
   while (rclcpp::ok()) {

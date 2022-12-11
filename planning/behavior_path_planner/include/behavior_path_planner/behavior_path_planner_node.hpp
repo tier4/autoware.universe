@@ -111,10 +111,6 @@ private:
   rclcpp::Subscription<ApprovalMsg>::SharedPtr external_approval_subscriber_;
   rclcpp::Subscription<PathChangeModule>::SharedPtr force_approval_subscriber_;
   rclcpp::Publisher<PathWithLaneId>::SharedPtr path_publisher_;
-  rclcpp::Publisher<Path>::SharedPtr path_candidate_publisher_;
-  rclcpp::Publisher<PathChangeModuleArray>::SharedPtr force_available_publisher_;
-  rclcpp::Publisher<PathChangeModule>::SharedPtr plan_ready_publisher_;
-  rclcpp::Publisher<PathChangeModuleArray>::SharedPtr plan_running_publisher_;
   rclcpp::Publisher<TurnIndicatorsCommand>::SharedPtr turn_signal_publisher_;
   rclcpp::Publisher<HazardLightsCommand>::SharedPtr hazard_signal_publisher_;
   rclcpp::TimerBase::SharedPtr timer_;
@@ -179,12 +175,6 @@ private:
     const BehaviorModuleOutput & bt_out, const std::shared_ptr<PlannerData> planner_data);
 
   /**
-   * @brief extract path candidate from behavior tree output
-   */
-  PathWithLaneId::SharedPtr getPathCandidate(
-    const BehaviorModuleOutput & bt_out, const std::shared_ptr<PlannerData> planner_data);
-
-  /**
    * @brief skip smooth goal connection
    */
   bool skipSmoothGoalConnection(
@@ -201,10 +191,6 @@ private:
   void publishDebugMarker(const std::vector<MarkerArray> & debug_markers);
   rclcpp::Publisher<LaneChangeDebugMsgArray>::SharedPtr debug_lane_change_msg_array_publisher_;
 
-  /**
-   * @brief check path if it is unsafe or forced
-   */
-  bool isForcedCandidatePath() const;
 };
 }  // namespace behavior_path_planner
 
