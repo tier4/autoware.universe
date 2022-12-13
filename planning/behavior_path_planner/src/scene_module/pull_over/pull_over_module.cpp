@@ -146,7 +146,7 @@ void PullOverModule::onExit()
   RCLCPP_DEBUG(getLogger(), "PULL_OVER onExit");
   clearWaitingApproval();
   removeRTCStatus();
-  publishPathCandidate();
+  resetPathCandidate();
 
   // A child node must never return IDLE
   // https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/include/behaviortree_cpp_v3/basic_types.h#L34
@@ -477,6 +477,8 @@ Pose PullOverModule::getParkingStartPose() const
 
 BehaviorModuleOutput PullOverModule::plan()
 {
+  resetPathCandidate();
+
   status_.current_lanes = util::getExtendedCurrentLanes(planner_data_);
   status_.pull_over_lanes = getPullOverLanes();
   status_.lanes = lanelet::ConstLanelets{};

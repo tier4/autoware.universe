@@ -68,7 +68,7 @@ void PullOutModule::onExit()
 {
   clearWaitingApproval();
   removeRTCStatus();
-  publishPathCandidate();
+  resetPathCandidate();
   current_state_ = BT::NodeStatus::SUCCESS;
   RCLCPP_DEBUG(getLogger(), "PULL_OUT onExit");
 }
