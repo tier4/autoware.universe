@@ -50,9 +50,14 @@ using tier4_planning_msgs::msg::LaneChangeDebugMsgArray;
 class ExternalRequestLaneChangeModule : public SceneModuleInterface
 {
 public:
+  enum class Direction {
+    RIGHT = 0,
+    LEFT,
+  };
+
   ExternalRequestLaneChangeModule(
-    const std::string & name, rclcpp::Node & node,
-    std::shared_ptr<LaneChangeParameters> parameters);
+    const std::string & name, rclcpp::Node & node, std::shared_ptr<LaneChangeParameters> parameters,
+    const Direction & direction);
 
   BehaviorModuleOutput run() override;
 
@@ -73,117 +78,41 @@ public:
     std::cerr << "visited external request lane change module\n";
   }
 
-  void publishRTCStatus() override
-  {
-    rtc_interface_left_.publishCooperateStatus(clock_->now());
-    rtc_interface_right_.publishCooperateStatus(clock_->now());
-  }
-
-  bool isActivated() override
-  {
-    if (rtc_interface_left_.isRegistered(uuid_left_)) {
-      return rtc_interface_left_.isActivated(uuid_left_);
-    }
-    if (rtc_interface_right_.isRegistered(uuid_right_)) {
-      return rtc_interface_right_.isActivated(uuid_right_);
-    }
-    return false;
-  }
-
-  bool isActivatedLeft()
-  {
-    if (rtc_interface_left_.isRegistered(uuid_left_)) {
-      return rtc_interface_left_.isActivated(uuid_left_);
-    }
-    return false;
-  }
-
-  bool isActivatedRight()
-  {
-    if (rtc_interface_right_.isRegistered(uuid_right_)) {
-      return rtc_interface_right_.isActivated(uuid_right_);
-    }
-    return false;
-  }
-
-private:
+protected:
   std::shared_ptr<LaneChangeParameters> parameters_;
-  LaneChangeStatus status_left_;
-  LaneChangeStatus status_right_;
+  LaneChangeStatus status_;
   PathShifter path_shifter_;
   mutable LaneChangeDebugMsgArray lane_change_debug_msg_array_;
+
+  Direction direction_;
 
   double lane_change_lane_length_{200.0};
   double check_distance_{100.0};
 
-  RTCInterface rtc_interface_left_;
-  RTCInterface rtc_interface_right_;
-  UUID uuid_left_;
-  UUID uuid_right_;
-
   bool is_activated_ = false;
-  bool is_proper_ = true;
 
-  void waitApprovalLeft(const double distance)
+  void waitApproval(const double distance)
   {
-    rtc_interface_left_.updateCooperateStatus(
-      uuid_left_, isExecutionReady(), distance, clock_->now());
+    updateRTCStatus(distance);
     is_waiting_approval_ = true;
-  }
-
-  void waitApprovalRight(const double distance)
-  {
-    rtc_interface_right_.updateCooperateStatus(
-      uuid_right_, isExecutionReady(), distance, clock_->now());
-    is_waiting_approval_ = true;
-  }
-
-  void updateRTCStatus(const CandidateOutput & candidate)
-  {
-    if (candidate.lateral_shift > 0.0) {
-      rtc_interface_left_.updateCooperateStatus(
-        uuid_left_, isExecutionReady(), candidate.distance_to_path_change, clock_->now());
-      return;
-    }
-    if (candidate.lateral_shift < 0.0) {
-      rtc_interface_right_.updateCooperateStatus(
-        uuid_right_, isExecutionReady(), candidate.distance_to_path_change, clock_->now());
-      return;
-    }
-
-    RCLCPP_WARN_STREAM(
-      getLogger(),
-      "Direction is UNKNOWN, start_distance = " << candidate.distance_to_path_change);
-  }
-
-  void removeRTCStatus() override
-  {
-    rtc_interface_left_.clearCooperateStatus();
-    rtc_interface_right_.clearCooperateStatus();
   }
 
   PathWithLaneId getReferencePath() const;
-  lanelet::ConstLanelets getLeftLaneChangeLanes(
-    const lanelet::ConstLanelets & current_lanes, const double lane_change_lane_length) const;
-  lanelet::ConstLanelets getRightLaneChangeLanes(
+  lanelet::ConstLanelets getLaneChangeLanes(
     const lanelet::ConstLanelets & current_lanes, const double lane_change_lane_length) const;
   std::pair<bool, bool> getSafePath(
     const lanelet::ConstLanelets & lane_change_lanes, const double check_distance,
     LaneChangePath & safe_path) const;
-  LaneChangePath selectLaneChangePath() const;
-  BT::NodeStatus getState(const LaneChangeStatus & status) const;
-  BehaviorModuleOutput getOutput(const LaneChangeStatus & status);
 
-  void updateLaneChangeStatusLeft();
-  void updateLaneChangeStatusRight();
-  void generateExtendedDrivableArea(PathWithLaneId & path, const LaneChangeStatus & status);
-  void updateOutputTurnSignal(BehaviorModuleOutput & output, const LaneChangeStatus & status);
-
-  bool isProper() const;
-  bool isNearEndOfLane(const LaneChangeStatus & status) const;
+  void updateLaneChangeStatus();
+  void generateExtendedDrivableArea(PathWithLaneId & path);
+  void updateOutputTurnSignal(BehaviorModuleOutput & output);
+  bool isSafe() const;
+  bool isValidPath(const PathWithLaneId & path) const;
+  bool isNearEndOfLane() const;
   bool isCurrentSpeedLow() const;
-  bool isAbortConditionSatisfied(const LaneChangeStatus & status) const;
-  bool hasFinishedLaneChange(const LaneChangeStatus & status) const;
+  bool isAbortConditionSatisfied() const;
+  bool hasFinishedLaneChange() const;
   void resetParameters();
 
   // getter
@@ -197,6 +126,23 @@ private:
 
   void setObjectDebugVisualization() const;
 };
+
+class ExternalRequestLaneChangeRightModule : public ExternalRequestLaneChangeModule
+{
+public:
+  ExternalRequestLaneChangeRightModule(
+    const std::string & name, rclcpp::Node & node,
+    std::shared_ptr<LaneChangeParameters> parameters);
+};
+
+class ExternalRequestLaneChangeLeftModule : public ExternalRequestLaneChangeModule
+{
+public:
+  ExternalRequestLaneChangeLeftModule(
+    const std::string & name, rclcpp::Node & node,
+    std::shared_ptr<LaneChangeParameters> parameters);
+};
+
 }  // namespace behavior_path_planner
 // clang-format off
 #endif  // BEHAVIOR_PATH_PLANNER__SCENE_MODULE__LANE_CHANGE__EXTERNAL_REQUEST_LANE_CHANGE_MODULE_HPP_  // NOLINT
