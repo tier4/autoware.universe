@@ -75,12 +75,6 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
   debug_lane_change_msg_array_publisher_ =
     create_publisher<LaneChangeDebugMsgArray>("~/debug/lane_change_debug_message_array", 1);
 
-  // For remote operation
-  plan_ready_publisher_ = create_publisher<PathChangeModule>("~/output/ready", 1);
-  plan_running_publisher_ = create_publisher<PathChangeModuleArray>("~/output/running", 1);
-  force_available_publisher_ =
-    create_publisher<PathChangeModuleArray>("~/output/force_available", 1);
-
   // Debug
   debug_marker_publisher_ = create_publisher<MarkerArray>("~/debug/markers", 1);
 

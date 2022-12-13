@@ -146,11 +146,7 @@ void PullOverModule::onExit()
   RCLCPP_DEBUG(getLogger(), "PULL_OVER onExit");
   clearWaitingApproval();
   removeRTCStatus();
-<<<<<<< HEAD
-=======
   publishPathCandidate();
-  steering_factor_interface_ptr_->clearSteeringFactors();
->>>>>>> 8c1cbea51 (feat(behavior_path_planner): output multiple candidate paths)
 
   // A child node must never return IDLE
   // https://github.com/BehaviorTree/BehaviorTree.CPP/blob/master/include/behaviortree_cpp_v3/basic_types.h#L34
@@ -610,10 +606,10 @@ BehaviorModuleOutput PullOverModule::planWaitingApproval()
   updateOccupancyGrid();
   BehaviorModuleOutput out;
   const auto path = *(plan().path);
-  out.path_candidate = std::make_shared<PathWithLaneId>(path);
+  path_candidate_ = std::make_shared<PathWithLaneId>(path);
   out.path = std::make_shared<PathWithLaneId>(getReferencePath());
   if (status_.is_safe && isArcPath()) {
-    out.path_candidate = std::make_shared<PathWithLaneId>(parallel_parking_planner_.getFullPath());
+    path_candidate_ = std::make_shared<PathWithLaneId>(parallel_parking_planner_.getFullPath());
   }
 
   const double distance_to_path_change = calcDistanceToPathChange();

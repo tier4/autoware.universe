@@ -242,7 +242,7 @@ BehaviorModuleOutput PullOutModule::planWaitingApproval()
   }
   out.path = std::make_shared<PathWithLaneId>(candidate_path);
 
-  out.path_candidate = std::make_shared<PathWithLaneId>(candidate_path);
+  path_candidate_ = std::make_shared<PathWithLaneId>(candidate_path);
 
   waitApproval();
 

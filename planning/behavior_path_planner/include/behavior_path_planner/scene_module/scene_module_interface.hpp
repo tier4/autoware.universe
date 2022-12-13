@@ -104,16 +104,11 @@ public:
     is_waiting_approval_{false},
     current_state_{BT::NodeStatus::IDLE}
   {
-<<<<<<< HEAD
-=======
     std::string module_ns;
     module_ns.resize(name.size());
     std::transform(name.begin(), name.end(), module_ns.begin(), tolower);
 
-    const auto ns = std::string("~/debug/") + module_ns;
-    pub_debug_marker_ = node.create_publisher<MarkerArray>(ns, 20);
     pub_path_candidate_ = node.create_publisher<Path>("/planning/path_candidate/" + module_ns, 1);
->>>>>>> 8c1cbea51 (feat(behavior_path_planner): output multiple candidate paths)
   }
 
   virtual ~SceneModuleInterface() = default;
@@ -245,12 +240,7 @@ private:
   rclcpp::Logger logger_;
 
 protected:
-<<<<<<< HEAD
-=======
-  rclcpp::Clock::SharedPtr clock_;
-  rclcpp::Publisher<MarkerArray>::SharedPtr pub_debug_marker_;
   rclcpp::Publisher<Path>::SharedPtr pub_path_candidate_;
->>>>>>> 8c1cbea51 (feat(behavior_path_planner): output multiple candidate paths)
   mutable MarkerArray debug_marker_;
   rclcpp::Clock::SharedPtr clock_;
   mutable AvoidanceDebugMsgArray::SharedPtr debug_avoidance_msg_array_ptr_{};
