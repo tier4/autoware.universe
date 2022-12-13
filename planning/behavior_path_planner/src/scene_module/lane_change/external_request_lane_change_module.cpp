@@ -143,7 +143,7 @@ BT::NodeStatus ExternalRequestLaneChangeModule::updateState()
     return current_state_;
   }
 
-  current_state_ = BT::NodeStatus::SUCCESS;
+  current_state_ = BT::NodeStatus::RUNNING;
   return current_state_;
 }
 
@@ -165,6 +165,8 @@ BT::NodeStatus ExternalRequestLaneChangeModule::getState(const LaneChangeStatus 
 
 BehaviorModuleOutput ExternalRequestLaneChangeModule::plan()
 {
+  resetPathCandidate();
+
   if (isActivatedLeft()) {
     is_activated_ = isActivatedLeft();
     return getOutput(status_left_);
@@ -223,7 +225,7 @@ BehaviorModuleOutput ExternalRequestLaneChangeModule::planWaitingApproval()
   BehaviorModuleOutput out;
   out.path = std::make_shared<PathWithLaneId>(getReferencePath());
   const auto candidate = planCandidate();
-  out.path_candidate = std::make_shared<PathWithLaneId>(candidate.path_candidate);
+  path_candidate_ = std::make_shared<PathWithLaneId>(candidate.path_candidate);
   updateRTCStatus(candidate);
   waitApproval();
   return out;
@@ -675,7 +677,7 @@ void ExternalRequestLaneChangeModule::resetParameters()
 {
   clearWaitingApproval();
   removeRTCStatus();
-  //steering_factor_interface_ptr_->clearSteeringFactors();
+  resetPathCandidate();
   object_debug_.clear();
   debug_marker_.markers.clear();
 }
