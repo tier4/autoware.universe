@@ -233,7 +233,7 @@ public:
   bool isWaitingApproval() const { return is_waiting_approval_; }
 
   virtual void accept_visitor(const std::shared_ptr<SceneModuleVisitor> & visitor) const = 0;
-  
+
   PlanResult getPathCandidate() const { return path_candidate_; }
 
   void publishPathCandidate(const Path & path_candidate) const

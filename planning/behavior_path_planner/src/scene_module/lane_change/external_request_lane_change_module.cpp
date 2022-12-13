@@ -65,7 +65,8 @@ BehaviorModuleOutput ExternalRequestLaneChangeModule::run()
 
   const auto current_pose = getEgoPose();
   const double start_distance = motion_utils::calcSignedArcLength(
-    output.path->points, current_pose.position, status_.lane_change_path.shift_point.start.position);
+    output.path->points, current_pose.position,
+    status_.lane_change_path.shift_point.start.position);
   waitApproval(start_distance);
 
   return output;
@@ -440,10 +441,10 @@ bool ExternalRequestLaneChangeModule::isAbortConditionSatisfied() const
 
     std::unordered_map<std::string, CollisionCheckDebug> debug_data;
 
-      return lane_change_utils::isLaneChangePathSafe(
-        path.path, current_lanes, check_lanes, dynamic_objects, current_pose, current_twist, common_parameters, *parameters_,
-        debug_data, false, status_.lane_change_path.acceleration);
-    });
+    return lane_change_utils::isLaneChangePathSafe(
+      path.path, current_lanes, check_lanes, dynamic_objects, current_pose, current_twist,
+      common_parameters, *parameters_, debug_data, false, status_.lane_change_path.acceleration);
+  });
 
   // abort only if velocity is low or vehicle pose is close enough
   if (!is_path_safe) {
@@ -553,8 +554,9 @@ void ExternalRequestLaneChangeModule::generateExtendedDrivableArea(PathWithLaneI
 void ExternalRequestLaneChangeModule::updateOutputTurnSignal(BehaviorModuleOutput & output)
 {
   const auto turn_signal_info = util::getPathTurnSignal(
-    status_.current_lanes, status_.lane_change_path.shifted_path, status_.lane_change_path.shift_point,
-    getEgoPose(), getEgoTwist().linear.x, planner_data_->parameters);
+    status_.current_lanes, status_.lane_change_path.shifted_path,
+    status_.lane_change_path.shift_point, getEgoPose(), getEgoTwist().linear.x,
+    planner_data_->parameters);
   output.turn_signal_info.turn_signal.command = turn_signal_info.first.command;
 
   output.turn_signal_info.turn_signal.command = turn_signal_info.first.command;
