@@ -66,6 +66,7 @@
     # jerk limit
     max_jerk: 2.0
     min_jerk: -5.0
+    emergency_max_jerk: 1.0
 
     # pitch
     use_trajectory_for_pitch_calculation: false
