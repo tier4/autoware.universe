@@ -179,6 +179,8 @@ private:
   // jerk limit
   float64_t m_max_jerk;
   float64_t m_min_jerk;
+  float64_t smooth_stop_acc;
+  float64_t emergency_max_jerk;
 
   // slope compensation
   bool8_t m_use_traj_for_pitch;
