@@ -145,7 +145,6 @@ PidLongitudinalController::PidLongitudinalController(rclcpp::Node & node) : node
     m_smooth_stop.setParams(
       max_strong_acc, min_strong_acc, weak_acc, weak_stop_acc, strong_stop_acc, max_fast_vel,
       min_running_vel, min_running_acc, weak_stop_time, weak_stop_dist, strong_stop_dist);
-    smooth_stop_acc = min_strong_acc;
   }
 
   // parameters for stop state
@@ -171,7 +170,6 @@ PidLongitudinalController::PidLongitudinalController(rclcpp::Node & node) : node
   // parameters for jerk limit
   m_max_jerk = node_->declare_parameter<float64_t>("max_jerk");  // [m/s^3]
   m_min_jerk = node_->declare_parameter<float64_t>("min_jerk");  // [m/s^3]
-  emergency_max_jerk = node_->declare_parameter<float64_t>("emergency_max_jerk");  // [m/s^3]
 
   // parameters for slope compensation
   m_use_traj_for_pitch = node_->declare_parameter<bool8_t>("use_trajectory_for_pitch_calculation");
@@ -344,7 +342,6 @@ rcl_interfaces::msg::SetParametersResult PidLongitudinalController::paramCallbac
   // jerk limit
   update_param("max_jerk", m_max_jerk);
   update_param("min_jerk", m_min_jerk);
-  update_param("emergency_max_jerk", emergency_max_jerk);
 
   // slope compensation
   update_param("max_pitch_rad", m_max_pitch_rad);
@@ -607,7 +604,8 @@ PidLongitudinalController::Motion PidLongitudinalController::calcCtrlCmd(
     // This acceleration is without slope compensation
     const auto & p = m_stopped_state_params;
     raw_ctrl_cmd.vel = p.vel;
-    raw_ctrl_cmd.acc = 0.0;
+    raw_ctrl_cmd.acc = trajectory_follower::longitudinal_utils::applyDiffLimitFilter(
+      p.acc, m_prev_raw_ctrl_cmd.acc, control_data.dt, p.jerk);
 
     RCLCPP_DEBUG(
       node_->get_logger(), "[Stopped]. vel: %3.3f, acc: %3.3f", raw_ctrl_cmd.vel, raw_ctrl_cmd.acc);
@@ -742,14 +740,8 @@ float64_t PidLongitudinalController::calcFilteredAcc(
   m_debug_values.setValues(DebugValues::TYPE::ACC_CMD_SLOPE_APPLIED, acc_slope_filtered);
 
   // This jerk filter must be applied after slope compensation
-  double max_jerk;
-  if (raw_acc > smooth_stop_acc){
-    max_jerk = m_max_jerk;
-  }else{
-    max_jerk = emergency_max_jerk;
-  }
   const float64_t acc_jerk_filtered = trajectory_follower::longitudinal_utils::applyDiffLimitFilter(
-    acc_slope_filtered, m_prev_ctrl_cmd.acc, control_data.dt, max_jerk, m_min_jerk);
+    acc_slope_filtered, m_prev_ctrl_cmd.acc, control_data.dt, m_max_jerk, m_min_jerk);
   m_debug_values.setValues(DebugValues::TYPE::ACC_CMD_JERK_LIMITED, acc_jerk_filtered);
 
   return acc_jerk_filtered;
