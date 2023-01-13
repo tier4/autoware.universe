@@ -381,16 +381,6 @@ void VehicleCmdGate::onTimer()
 
 void VehicleCmdGate::publishControlCommands(const Commands & commands)
 {
-  // Check system emergency
-  if (use_emergency_handling_ && is_emergency_state_heartbeat_timeout_) {
-    return;
-  }
-
-  // Check external emergency stop
-  if (is_external_emergency_stop_) {
-    return;
-  }
-
   // Check initialization is done
   if (!isDataReady()) {
     return;
@@ -428,17 +418,28 @@ void VehicleCmdGate::publishControlCommands(const Commands & commands)
   // Apply limit filtering
   filtered_commands.control = filterControlCommand(filtered_commands.control);
 
+  // Save ControlCmd to steering angle when disengaged
+  prev_control_cmd_ = filtered_commands.control;
+
   // tmp: Publish vehicle emergency status
   VehicleEmergencyStamped vehicle_cmd_emergency;
   vehicle_cmd_emergency.emergency = (use_emergency_handling_ && is_system_emergency_);
   vehicle_cmd_emergency.stamp = filtered_commands.control.stamp;
 
+  // Check system emergency
+  if (use_emergency_handling_ && is_emergency_state_heartbeat_timeout_) {
+    return;
+  }
+
+  // Check external emergency stop
+  if (is_external_emergency_stop_) {
+    return;
+  }
+
   // Publish commands
   vehicle_cmd_emergency_pub_->publish(vehicle_cmd_emergency);
   control_cmd_pub_->publish(filtered_commands.control);
 
-  // Save ControlCmd to steering angle when disengaged
-  prev_control_cmd_ = filtered_commands.control;
 }
 
 void VehicleCmdGate::publishEmergencyStopControlCommands()
