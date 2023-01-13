@@ -306,7 +306,7 @@ void NDTScanMatcher::timerDiagnostic()
     }
     if (
       key_value_stdmap_.count("skipping_publish_num") &&
-      std::stoi(key_value_stdmap_["skipping_publish_num"]) >= 5) {
+      std::stoi(key_value_stdmap_["skipping_publish_num"]) >= 50) {
       diag_status_msg.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
       diag_status_msg.message += "skipping_publish_num exceed limit. ";
     }
