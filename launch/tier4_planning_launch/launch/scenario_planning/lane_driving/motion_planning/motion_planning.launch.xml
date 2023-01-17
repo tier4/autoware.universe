@@ -32,7 +32,7 @@
       <arg name="vehicle_info_param_file" value="$(var vehicle_info_param_file)"/>
       <arg name="adaptive_cruise_control_param_path" value="$(find-pkg-share tier4_planning_launch)/config/obstacle_stop_planner/adaptive_cruise_control.param.yaml"/>
       <arg name="obstacle_stop_planner_param_path" value="$(find-pkg-share tier4_planning_launch)/config/obstacle_stop_planner/obstacle_stop_planner.param.yaml"/>
-      <arg name="enable_slow_down" value="false"/>
+      <arg name="enable_slow_down" value="true"/>
       <!-- remap topic name -->
       <arg name="input_trajectory" value="obstacle_avoidance_planner/trajectory"/>
       <arg name="input_pointcloud" value="/perception/obstacle_segmentation/pointcloud"/>
