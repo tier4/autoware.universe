@@ -145,7 +145,12 @@ public:
     double dec_threshold_reset_velocity_limit_;  // acceleration threshold,
                                                  // check complete deceleration [m/ss]
     double slow_down_search_radius;  // search radius for slow down obstacle point cloud [m]
-    double min_acc_lim;
+    double passing_param;            //for isuzu
+    double curve_min_slow_down_vel; //for isuzu
+    double passing_param_for_curve; //for isuzu
+    double curve_forward_margin;  //for isuzu
+    double curve_backward_margin; //for isuzu
+    bool curvature_stop;
     double curvature_thresh;
     int curvature_smoothing_num;
     double speed_thresh_high;
@@ -311,6 +316,11 @@ private:
     const int idx, const TrajectoryPoints & base_trajectory, const double lateral_deviation,
     const double dist_remain, const double dist_vehicle_to_obstacle,
     const VehicleInfo & vehicle_info, const double current_acc, const double current_vel);
+
+    SlowDownSection createSlowDownSectionforCurve(
+    const int idx, const TrajectoryPoints & base_trajectory,
+    const double dist_remain, const double dist_vehicle_to_obstacle,
+    const double current_acc, const double current_vel);
 
   SlowDownSection createSlowDownSectionFromMargin(
     const int idx, const TrajectoryPoints & base_trajectory, const double forward_margin,

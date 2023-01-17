@@ -213,6 +213,8 @@ void insertVelocity(
   int min_idx = std::max(0, static_cast<int>(insert_index - 1));
   int max_idx =
     std::min(static_cast<int>(insert_index + 1), static_cast<int>(path.points.size() - 1));
+
+
   for (int i = min_idx; i <= max_idx; i++) {
     if (
       tier4_autoware_utils::calcDistance2d(path.points.at(static_cast<size_t>(i)), path_point) <

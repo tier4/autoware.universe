@@ -456,7 +456,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
   // Parameters
   {
     auto & p = node_param_;
-    p.enable_slow_down = declare_parameter("enable_slow_down", false);
+    p.enable_slow_down = declare_parameter("enable_slow_down", true);
     p.max_velocity = declare_parameter("max_velocity", 20.0);
     p.hunting_threshold = declare_parameter("hunting_threshold", 0.5);
     p.lowpass_gain = declare_parameter("lowpass_gain", 0.9);
@@ -470,10 +470,10 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     const std::string ns = "stop_planner.";
     p.stop_margin = declare_parameter(ns + "stop_margin", 5.0);
     p.min_behavior_stop_margin = declare_parameter(ns + "min_behavior_stop_margin", 2.0);
-    p.expand_stop_range = declare_parameter(ns + "expand_stop_range", 2.0);               // default
-    p.expand_stop_range_l = declare_parameter(ns + "expand_stop_range_l", 2.0);           // for isuzu proj
-    p.expand_stop_range_r = declare_parameter(ns + "expand_stop_range_r", 2.0);           // for isuzu proj
-    p.mirror_width = declare_parameter(ns + "mirror_width", 2.0);                         // for isuzu proj
+    p.expand_stop_range = declare_parameter(ns + "expand_stop_range", 0.0);               // default
+    p.expand_stop_range_l = declare_parameter(ns + "expand_stop_range_l", 0.0);           // for isuzu proj
+    p.expand_stop_range_r = declare_parameter(ns + "expand_stop_range_r", 0.0);           // for isuzu proj
+    p.mirror_width = declare_parameter(ns + "mirror_width", 0.0);                         // for isuzu proj
     p.extend_distance = declare_parameter(ns + "extend_distance", 0.0);
     p.step_length = declare_parameter(ns + "step_length", 1.0);
     p.stop_margin += i.max_longitudinal_offset_m;
@@ -498,7 +498,12 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.max_slow_down_vel = declare_parameter(ns + "max_slow_down_vel", 4.0);
     p.min_slow_down_vel = declare_parameter(ns + "min_slow_down_vel", 2.0);
     p.max_deceleration = declare_parameter(ns + "max_deceleration", 2.0); // for obstacle collision checker
-    p.min_acc_lim = declare_parameter(ns + "min_acc", -0.5); // for isuzu proj
+    p.passing_param = declare_parameter(ns + "passing_param", 0.00015); // for isuzu proj
+    p.curve_min_slow_down_vel = declare_parameter(ns + "curve_min_slow_down_vel", 0.5); // for isuzu proj
+    p.passing_param_for_curve = declare_parameter(ns + "passing_param_for_curve", 0.0004); // for isuzu proj
+    p.curve_forward_margin = declare_parameter(ns + "curve_forward_margin", 10.0); // for isuzu proj
+    p.curve_backward_margin = declare_parameter(ns + "curve_backward_margin", 5.0); // for isuzu proj
+
     // consider jerk/dec constraints in slow down
     p.consider_constraints = declare_parameter(ns + "consider_constraints", false);
     p.forward_margin_min = declare_parameter(ns + "forward_margin_min", 1.0);
@@ -513,6 +518,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.forward_margin_min += i.wheel_base_m + i.front_overhang_m;
     p.backward_margin += i.rear_overhang_m;
     p.slow_down_search_radius = stop_param_.step_length + std::hypot(i.vehicle_width_m / 2.0 + p.expand_slow_down_range, i.vehicle_length_m / 2.0);
+    p.curvature_stop = declare_parameter(ns + "curvature_stop", false); // for isuzu proj
     p.curvature_thresh = declare_parameter(ns + "curvature_thresh", 0.01); // for isuzu proj
     p.curvature_smoothing_num = declare_parameter(ns + "curvature_smoothing_num", 15); // for isuzu proj
     p.speed_thresh_high = declare_parameter(ns + "speed_thresh_high", 2.78); // for isuzu proj
@@ -797,7 +803,7 @@ void ObstacleStopPlannerNode::searchObstacle(
         slow_down_pointcloud_ptr);
 
       const auto found_first_slow_down_points =
-        planner_data.found_slow_down_points && !planner_data.slow_down_require;
+        planner_data.found_slow_down_points && !planner_data.slow_down_require;  
 
       if (found_first_slow_down_points) {
         // found nearest slow down obstacle
@@ -936,10 +942,12 @@ void ObstacleStopPlannerNode::insertVelocity(
     // insert slow down point
     const auto traj_end_idx = output.size() - 1;
     const auto idx = planner_data.decimate_trajectory_index_map.at(planner_data.decimate_trajectory_slow_down_index);
+    
     const auto index_with_dist_remain = findNearestFrontIndex(
       std::min(idx, traj_end_idx), 
       output, 
       createPoint(planner_data.nearest_slow_down_point.x, planner_data.nearest_slow_down_point.y, 0));
+  
 
     if (index_with_dist_remain) {
       const auto vehicle_idx = std::min(planner_data.trajectory_trim_index, traj_end_idx);
@@ -958,6 +966,7 @@ void ObstacleStopPlannerNode::insertVelocity(
         vehicle_info, 
         current_acc,
         current_vel);
+   
 
       if (!latest_slow_down_section_ && dist_baselink_to_obstacle + index_with_dist_remain.get().second < vehicle_info.max_longitudinal_offset_m) {
         latest_slow_down_section_ = slow_down_section;
@@ -967,15 +976,31 @@ void ObstacleStopPlannerNode::insertVelocity(
 
       // for isuzu proj
       // in the case that the vehicle is on a road with high curvature
-      if(std::abs(curvature_list[idx]) > slow_down_param_.curvature_thresh){ // Is the i_th foot print of the vehicle on corner?
-        // ROS_WARN("[obstacle_stop_planner] Insert stop line at oncoming object on the corner.");
-        const auto stop_point_on_curv = searchInsertPoint(
-                                          index_with_dist_remain.get().first, 
-                                          output,
-                                          index_with_dist_remain.get().second, 
-                                          stop_param);
-        if (stop_point_on_curv.index <= output.size()) {
-          insertStopPoint(stop_point_on_curv, output, planner_data.stop_reason_diag);
+
+      if(slow_down_param_.curvature_stop){ //if curvature_stop is true, become curvature_stop mode(muramatsu's task4) 
+        if(std::abs(curvature_list[idx]) > slow_down_param_.curvature_thresh){ 
+          RCLCPP_WARN(get_logger(),"[obstacle_stop_planner] Insert stop line at oncoming object on the corner.");
+          const auto stop_point_on_curv = searchInsertPoint(
+                                            index_with_dist_remain.get().first, 
+                                            output,
+                                            index_with_dist_remain.get().second, 
+                                            stop_param);
+          if (stop_point_on_curv.index <= output.size()) {
+          
+            const auto slow_down_section = createSlowDownSectionforCurve(
+              index_with_dist_remain.get().first, 
+              output, 
+              index_with_dist_remain.get().second, 
+              dist_baselink_to_obstacle, 
+              current_acc,
+              current_vel);
+
+            if (!latest_slow_down_section_ && dist_baselink_to_obstacle + index_with_dist_remain.get().second < vehicle_info.max_longitudinal_offset_m) {
+             latest_slow_down_section_ = slow_down_section;
+            }
+
+            insertSlowDownSection(slow_down_section, output);
+          }
         }
       }
     }
@@ -1004,7 +1029,7 @@ void ObstacleStopPlannerNode::insertVelocity(
       slow_down_section.end_point = end_insert_point_with_idx.get().second;
       slow_down_section.velocity =
         set_velocity_limit_ ? std::numeric_limits<double>::max() : slow_down_param_.slow_down_vel;
-
+      
       insertSlowDownSection(slow_down_section, output);
     } else {
       latest_slow_down_section_ = {};
@@ -1183,9 +1208,9 @@ SlowDownSection ObstacleStopPlannerNode::createSlowDownSection(
     const auto update_backward_margin_from_vehicle = slow_down_param_.backward_margin + dist_remain;
 
     // get current velocity and distance to the oncoming car
-    const double current_velocity = current_velocity_ptr_->twist.twist.linear.x;
-    const double distance = std::abs(trajectory_vec_.dot(slow_down_point_vec_));
-    const double acc_constrained_vel = std::max(0.0, current_velocity + (slow_down_param_.min_acc_lim*distance)/current_velocity); // minimum value is 0.0m/s
+    const double current_velocity = current_velocity_ptr_->twist.twist.linear.x; //for isuzu by muramatsu
+    const double acc_constrained_vel = std::max(0.0, current_velocity + (dist_baselink_to_obstacle - slow_down_param_.forward_margin)* slow_down_param_.passing_param *current_velocity); //for isuzu by muramatsu 
+
 
     // for isuzu proj
     // ref : https://tier4.github.io/autoware.iv/tree/main/planning/scenario_planning/lane_driving/motion_planning/obstacle_stop_planner/
@@ -1193,18 +1218,76 @@ SlowDownSection ObstacleStopPlannerNode::createSlowDownSection(
       slow_down_param_.min_slow_down_vel + (slow_down_param_.max_slow_down_vel - slow_down_param_.min_slow_down_vel) *
                             std::max(lateral_deviation - vehicle_info.vehicle_width_m / 2, 0.0) /
                             slow_down_param_.expand_slow_down_range;
+    
+    // use `ros2 run rqt_plot rqt_plot /control/command/control_cmd/longitudinal/acceleration` to check acceleration behavior.
+    // const auto velocity = rule_based_target_velocity; // turn off acc limit
+    const auto velocity =  std::max(rule_based_target_velocity, acc_constrained_vel); // turn on acc limit  //for isuzu by muramatsu
 
-    // use `rqt_plot /control/control_cmd/control/acceleration` to check acceleration behavior.
-    // slow_down_section.velocity = rule_based_target_velocity; // turn off acc limit
-    const auto velocity = std::max(rule_based_target_velocity, acc_constrained_vel); // turn on acc limit
+    // RCLCPP_WARN(get_logger(), "[for isuzu] velocity:%f ",velocity);
 
     return createSlowDownSectionFromMargin(
       idx, base_trajectory, update_forward_margin_from_vehicle, update_backward_margin_from_vehicle,
       velocity);
   }
-
   return SlowDownSection{};
 }
+
+SlowDownSection ObstacleStopPlannerNode::createSlowDownSectionforCurve(  //for isuzu
+  const int idx, const TrajectoryPoints & base_trajectory,
+  const double dist_remain, const double dist_baselink_to_obstacle,
+  const double current_acc, const double current_vel)
+{
+  if (slow_down_param_.consider_constraints) {
+    const auto margin_with_vel = calcFeasibleMarginAndVelocity(
+      slow_down_param_, dist_baselink_to_obstacle + dist_remain, current_vel, current_acc);
+
+    const auto relax_target_vel = margin_with_vel == boost::none;
+    if (relax_target_vel && !set_velocity_limit_) {
+      setExternalVelocityLimit();
+    }
+
+    const auto no_need_velocity_limit =
+      dist_baselink_to_obstacle + dist_remain > slow_down_param_.forward_margin;
+    if (set_velocity_limit_ && no_need_velocity_limit) {
+      resetExternalVelocityLimit(current_acc, current_vel);
+    }
+
+    const auto use_velocity_limit = relax_target_vel || set_velocity_limit_;
+
+    const auto update_forward_margin_from_vehicle =
+      use_velocity_limit ? slow_down_param_.forward_margin_min - dist_remain
+                         : margin_with_vel.get().first - dist_remain;
+    const auto update_backward_margin_from_vehicle = slow_down_param_.backward_margin + dist_remain;
+
+    const auto velocity =
+      use_velocity_limit ? std::numeric_limits<double>::max() : margin_with_vel.get().second;
+
+    return createSlowDownSectionFromMargin(
+      idx, base_trajectory, update_forward_margin_from_vehicle, update_backward_margin_from_vehicle,
+      velocity);
+  } else {
+    const auto update_forward_margin_from_vehicle = slow_down_param_.curve_forward_margin - dist_remain;
+    const auto update_backward_margin_from_vehicle = slow_down_param_.curve_backward_margin + dist_remain;
+
+    // get current velocity and distance to the oncoming car
+    const double current_velocity = current_velocity_ptr_->twist.twist.linear.x; //for isuzu by muramatsu
+    const double acc_constrained_vel = std::max(0.0, current_velocity + (dist_baselink_to_obstacle - slow_down_param_.forward_margin)* slow_down_param_.passing_param_for_curve *current_velocity); //for isuzu by muramatsu 
+
+
+    // for isuzu proj
+    const double rule_based_target_velocity = slow_down_param_.curve_min_slow_down_vel;
+    
+    const auto velocity = std::max(rule_based_target_velocity, acc_constrained_vel); // turn on acc limit  //for isuzu by muramatsu
+    
+    // RCLCPP_WARN(get_logger(), "[for isuzu] velocity:%f ",velocity);
+
+    return createSlowDownSectionFromMargin(
+      idx, base_trajectory, update_forward_margin_from_vehicle, update_backward_margin_from_vehicle,
+      velocity);
+  }
+  return SlowDownSection{};
+}
+
 
 SlowDownSection ObstacleStopPlannerNode::createSlowDownSectionFromMargin(
   const int idx, const TrajectoryPoints & base_trajectory, const double forward_margin,
@@ -1228,6 +1311,7 @@ SlowDownSection ObstacleStopPlannerNode::createSlowDownSectionFromMargin(
   slow_down_section.slow_down_end_idx = end_insert_point_with_idx.get().first;
   slow_down_section.end_point = end_insert_point_with_idx.get().second;
   slow_down_section.velocity = velocity;
+
 
   return slow_down_section;
 }
@@ -1287,12 +1371,14 @@ void ObstacleStopPlannerNode::insertSlowDownSection(
   } else if (is_end_p_next_and_p_insert_overlap) {
     // not insert: p_insert is merged into p_next
     update_end_idx = std::min(update_end_idx + 1, traj_end_idx);
-  }
+  }  
+
 
   for (size_t i = update_start_idx; i <= update_end_idx; ++i) {
     output.at(i).longitudinal_velocity_mps = std::min(
       slow_down_section.velocity, static_cast<double>(output.at(i).longitudinal_velocity_mps));
   }
+
 
   debug_ptr_->pushPose(p_base_start.pose, PoseType::SlowDownStart);
   debug_ptr_->pushPose(p_base_end.pose, PoseType::SlowDownEnd);
