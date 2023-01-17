@@ -279,7 +279,7 @@ bool DetectionAreaModule::modifyPathVelocity(
 
   // Ignore objects if braking distance is not enough
   if (planner_param_.use_pass_judge_line) {
-    if (state_ != State::STOP && !hasEnoughBrakingDistance(self_pose, stop_pose)) {
+    if (state_ != State::STOP && hasEnoughBrakingDistance(self_pose, stop_pose)) { //"'!'hasEno~" deleted for isuzu by muramatsu
       RCLCPP_WARN_THROTTLE(
         logger_, *clock_, std::chrono::milliseconds(1000).count(),
         "[detection_area] vehicle is over stop border");
@@ -371,12 +371,13 @@ bool DetectionAreaModule::hasEnoughBrakingDistance(
 {
   // get vehicle info and compute pass_judge_line_distance
   const auto current_velocity = planner_data_->current_velocity->twist.linear.x;
-  const double max_acc = planner_data_->max_stop_acceleration_threshold;
+  const double max_acc = planner_param_.min_acc; // default : -0.5[m/s^2] // for isuzu proj
   const double delay_response_time = planner_data_->delay_response_time;
+
   const double pass_judge_line_distance =
     planning_utils::calcJudgeLineDistWithAccLimit(current_velocity, max_acc, delay_response_time);
 
-  return calcSignedDistance(self_pose, line_pose.position) > pass_judge_line_distance;
+  return calcSignedDistance(self_pose, line_pose.position) < pass_judge_line_distance; // return true if there is "not" enough braking distance
 }
 
 autoware_auto_planning_msgs::msg::PathWithLaneId DetectionAreaModule::insertStopPoint(
@@ -396,6 +397,7 @@ autoware_auto_planning_msgs::msg::PathWithLaneId DetectionAreaModule::insertStop
 
   // Insert stop point or replace with zero velocity
   planning_utils::insertVelocity(output_path, stop_point_with_lane_id, 0.0, insert_idx);
+  
   return output_path;
 }
 
