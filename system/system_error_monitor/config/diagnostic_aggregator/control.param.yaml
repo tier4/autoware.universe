@@ -40,7 +40,7 @@
                   type: diagnostic_aggregator/GenericAnalyzer
                   path: lane_departure
                   contains: [": lane_departure"]
-                  timeout: 1.0
+                  timeout: 3.0
 
                 trajectory_deviation:
                   type: diagnostic_aggregator/GenericAnalyzer
