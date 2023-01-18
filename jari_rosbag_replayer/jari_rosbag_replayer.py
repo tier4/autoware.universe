@@ -66,6 +66,7 @@ class JariRosbagReplayer(Node):
         self.rosbag_ego_data = []
         self.load_rosbag("/mnt/data/rosbags/230118_jari_planning_sim/16_1")
 
+        self.publish_empty_object()
         self.publish_line_marker()
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
@@ -191,6 +192,10 @@ class JariRosbagReplayer(Node):
         # self.get_logger().info(result)
         return bool(outer > 0)
 
+    def publish_empty_object(self):
+        msg = PredictedObjects()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.pub_perception.publish(msg)
 
 
 def main(args=None):
