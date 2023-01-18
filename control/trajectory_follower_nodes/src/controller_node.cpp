@@ -60,7 +60,7 @@ Controller::Controller(const rclcpp::NodeOptions & node_options) : Node("control
   }
 
   const auto longitudinal_controller_mode =
-    getLongitudinalControllerMode(declare_parameter("longitudinal_controller_mode", "constant"));
+    getLongitudinalControllerMode(declare_parameter("longitudinal_controller_mode", "pid"));
   switch (longitudinal_controller_mode) {
     case LongitudinalControllerMode::PID: {
       longitudinal_controller_ =
