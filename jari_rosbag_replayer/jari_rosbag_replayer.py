@@ -105,8 +105,6 @@ class JariRosbagReplayer(Node):
             self.pub_perception.publish(msg)
             return
 
-        self.publish_line_marker()
-
         (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
         t_now = int(sec * 1e9) + nanosec
         t_spent_real = t_now - self.triggered_time
