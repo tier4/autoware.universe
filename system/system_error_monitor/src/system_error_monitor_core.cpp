@@ -196,6 +196,7 @@ autoware_auto_system_msgs::msg::HazardStatus createTimeoutHazardStatus()
   return hazard_status;
 }
 
+/*
 int isInNoFaultCondition(
   const autoware_auto_system_msgs::msg::AutowareState & autoware_state,
   const tier4_control_msgs::msg::GateMode & current_gate_mode)
@@ -222,6 +223,7 @@ int isInNoFaultCondition(
 
   return false;
 }
+*/
 }  // namespace
 
 AutowareErrorMonitor::AutowareErrorMonitor()
@@ -525,11 +527,12 @@ autoware_auto_system_msgs::msg::HazardStatus AutowareErrorMonitor::judgeHazardSt
     }
   }
 
+/*
   // Ignore error when vehicle is not ready to start
   if (isInNoFaultCondition(*autoware_state_, *current_gate_mode_)) {
     hazard_status.level = autoware_auto_system_msgs::msg::HazardStatus::NO_FAULT;
   }
-
+*/
   return hazard_status;
 }
 

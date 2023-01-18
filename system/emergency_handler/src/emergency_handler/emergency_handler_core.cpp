@@ -235,9 +235,23 @@ void EmergencyHandler::updateEmergencyState()
   const bool is_emergency = isEmergency(hazard_status_stamped_->status);
 
   // Get mode
-  const bool is_auto_mode = control_mode_->mode == ControlModeReport::AUTONOMOUS;
-  const bool is_takeover_done = control_mode_->mode == ControlModeReport::MANUAL;
+  //const bool is_auto_mode = control_mode_->mode == ControlModeReport::AUTONOMOUS;
+  //const bool is_takeover_done = control_mode_->mode == ControlModeReport::MANUAL;
 
+  // State Machine
+  if (emergency_state_ == EmergencyState::NORMAL) {
+    if (is_emergency) {
+      transitionTo(EmergencyState::MRM_SUCCEEDED);
+      return;
+    }
+  } else {
+    if (!is_emergency) {
+      transitionTo(EmergencyState::NORMAL);
+      return;
+    }
+  }
+
+/*
   // State Machine
   if (emergency_state_ == EmergencyState::NORMAL) {
     // NORMAL
@@ -285,6 +299,7 @@ void EmergencyHandler::updateEmergencyState()
       throw std::runtime_error(msg);
     }
   }
+*/
 }
 
 bool EmergencyHandler::isEmergency(
