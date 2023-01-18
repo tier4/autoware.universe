@@ -24,7 +24,8 @@ POS_Y_R = 93171.4
 # start rosbag time: start time of the replayed rosbag
 # Note: this time is available by checking the time when the ego in rosbag exceeds the line above.
 # T0 = 1668048507772541470 # 1668048507, 772541470
-T0 = 1664876748366648640
+# T0 = 1664876748366648640
+T0 = 1664876748166648640
 
 def get_rosbag_options(path, serialization_format="cdr"):
     storage_options = rosbag2_py.StorageOptions(uri=path, storage_id="sqlite3")
