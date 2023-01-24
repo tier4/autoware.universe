@@ -17,6 +17,7 @@
       expand_slow_down_range: 1.9 #1.0 # offset from vehicle side edge for expanding the search area of the surrounding point cloud [m]
       expand_slow_down_range_l: 0.4 # offset from vehicle left edge for expanding the search area of the surrounding point cloud [m]
       expand_slow_down_range_r: 1.9 # offset from vehicle right edge for expanding the search area of the surrounding point cloud [m]
+      time_margin: 10  # if detect obstacle for more than time_margin, slow down start (integer)
       max_slow_down_vel: 4.16 #5.55 #4.16 #15km/h # max slow down velocity [m/s]
       min_slow_down_vel: 4.16 #5.55 #2.77 #10km/h # min slow down velocity [m/s]
       max_deceleration: 2.0 # for obstacle collision checker

@@ -130,6 +130,7 @@ public:
     double expand_slow_down_range;    // lateral range of detection area [m]
     double expand_slow_down_range_r;  // for isuzu proj
     double expand_slow_down_range_l;  // for isuzu proj
+    int time_margin;                  // for isuzu proj
     double max_slow_down_vel;         // maximum speed in slow down section [m/s]
     double min_slow_down_vel;         // minimum velocity in slow down section [m/s]
     double max_deceleration;
@@ -156,6 +157,8 @@ public:
     double speed_thresh_high;
     double speed_thresh_low;
     double yaw_rate_thresh;
+
+    int slow_down_cnt; //muramatsu0119
   };
 
   struct PlannerData
@@ -181,6 +184,8 @@ public:
     bool stop_require{false};
     bool slow_down_require{false};
     bool enable_adaptive_cruise{false};
+    // int  slow_down_cnt{0};
+    bool IsFound{false};
   };
 
 private:
@@ -231,6 +236,7 @@ private:
    * Callback
    */
   void obstaclePointcloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr input_msg);
+  // void pathCallback(const Trajectory::ConstSharedPtr input_msg, const int& slow_down_cnt);
   void pathCallback(const Trajectory::ConstSharedPtr input_msg);
   void dynamicObjectCallback(const PredictedObjects::ConstSharedPtr input_msg);
   void currentVelocityCallback(const nav_msgs::msg::Odometry::ConstSharedPtr input_msg);
@@ -253,7 +259,14 @@ private:
   bool convexHull(
     const std::vector<cv::Point2d> & pointcloud, std::vector<cv::Point2d> & polygon_points);
 
-  void searchObstacle(
+  // void searchObstacle(
+  //   const TrajectoryPoints & decimate_trajectory, TrajectoryPoints & output,
+  //   PlannerData & planner_data, const std_msgs::msg::Header & trajectory_header,
+  //   const VehicleInfo & vehicle_info, const StopParam & stop_param,
+  //   const sensor_msgs::msg::PointCloud2::SharedPtr obstacle_ros_pointcloud_ptr,
+  //   int & slow_down_cnt);
+
+    void searchObstacle(
     const TrajectoryPoints & decimate_trajectory, TrajectoryPoints & output,
     PlannerData & planner_data, const std_msgs::msg::Header & trajectory_header,
     const VehicleInfo & vehicle_info, const StopParam & stop_param,

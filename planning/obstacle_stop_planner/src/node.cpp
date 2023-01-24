@@ -495,6 +495,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.expand_slow_down_range = declare_parameter(ns + "expand_slow_down_range", 1.0);     // default
     p.expand_slow_down_range_l = declare_parameter(ns + "expand_slow_down_range_l", 1.0); // for isuzu proj
     p.expand_slow_down_range_r = declare_parameter(ns + "expand_slow_down_range_r", 1.0); // for isuzu proj
+    p.time_margin = declare_parameter(ns + "time_margin", 10); // for isuzu proj
     p.max_slow_down_vel = declare_parameter(ns + "max_slow_down_vel", 4.0);
     p.min_slow_down_vel = declare_parameter(ns + "min_slow_down_vel", 2.0);
     p.max_deceleration = declare_parameter(ns + "max_deceleration", 2.0); // for obstacle collision checker
@@ -524,6 +525,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.speed_thresh_high = declare_parameter(ns + "speed_thresh_high", 2.78); // for isuzu proj
     p.speed_thresh_low = declare_parameter(ns + "speed_thresh_low", 1.39); // for isuzu proj
     p.yaw_rate_thresh = declare_parameter(ns + "yaw_rate_thresh", 0.1); // for isuzu proj
+    p.slow_down_cnt = 0; //for isuzu proj
   }
 
   // Initializer
@@ -548,7 +550,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     createSubscriptionOptions(this));
   path_sub_ = this->create_subscription<Trajectory>(
     "~/input/trajectory", 1,
-    std::bind(&ObstacleStopPlannerNode::pathCallback, this, std::placeholders::_1),
+    std::bind(&ObstacleStopPlannerNode::pathCallback, this, std::placeholders::_1), 
     createSubscriptionOptions(this));
   current_velocity_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "~/input/odometry", 1,
@@ -628,7 +630,7 @@ std::vector<double> ObstacleStopPlannerNode::calcTrajectoryCurvature(
   return curvature_vec;
 }
 
-void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr input_msg)
+void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr input_msg) 
 {
   mutex_.lock();
   // NOTE: these variables must not be referenced for multithreading
@@ -695,7 +697,7 @@ void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr inpu
     extend_trajectory, stop_param.step_length, planner_data.decimate_trajectory_index_map);
 
   // search obstacles within slow-down/collision area
-  searchObstacle(
+    searchObstacle(
     decimate_trajectory, output_trajectory_points, planner_data, input_msg->header, vehicle_info,
     stop_param, obstacle_ros_pointcloud_ptr);
   // insert slow-down-section/stop-point
@@ -742,6 +744,8 @@ void ObstacleStopPlannerNode::searchObstacle(
         trajectory_header, vehicle_info, stop_param)) {
     return;
   }
+
+  planner_data.IsFound = false; 
 
   for (size_t i = 0; i < decimate_trajectory.size() - 1; ++i) {
     // create one step circle center for vehicle
@@ -802,13 +806,21 @@ void ObstacleStopPlannerNode::searchObstacle(
         prev_center_point, next_center_point, obstacle_candidate_pointcloud_ptr,
         slow_down_pointcloud_ptr);
 
+      if(planner_data.found_slow_down_points){
+          planner_data.IsFound = true;
+        }
+
       const auto found_first_slow_down_points =
         planner_data.found_slow_down_points && !planner_data.slow_down_require;  
 
       if (found_first_slow_down_points) {
         // found nearest slow down obstacle
         planner_data.decimate_trajectory_slow_down_index = i;
+
+        if(slow_down_param_.slow_down_cnt > slow_down_param_.time_margin){
         planner_data.slow_down_require = true;
+        } 
+
         getNearestPoint(
           *slow_down_pointcloud_ptr, p_front, &planner_data.nearest_slow_down_point,
           &planner_data.nearest_collision_point_time);
@@ -905,6 +917,13 @@ void ObstacleStopPlannerNode::searchObstacle(
       }
     }
   }
+
+  if(planner_data.IsFound == true){
+    slow_down_param_.slow_down_cnt += 1;
+  }else{
+    slow_down_param_.slow_down_cnt = 0;
+  }
+
 }
 
 void ObstacleStopPlannerNode::insertVelocity(
