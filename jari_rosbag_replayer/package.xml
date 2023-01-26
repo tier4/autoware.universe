@@ -11,6 +11,8 @@
   <depend>nav_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>autoware_auto_perception_msgs</depend>
+  <depend>tier4_debug_msgs</depend>
+  <depend>tf_transformations</depend>
 
   <export>
     <build_type>ament_python</build_type>
