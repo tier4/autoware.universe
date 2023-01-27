@@ -12,16 +12,16 @@
 
     slow_down_planner:
       # slow down planner parameters
-      forward_margin: 250.0  #150.0 # margin distance from slow down point to vehicle front [m]
+      forward_margin: 250.0   # margin distance from slow down point to vehicle front [m]
       backward_margin: 5.0 # margin distance from slow down point to vehicle rear [m]
-      expand_slow_down_range: 1.9 #1.0 # offset from vehicle side edge for expanding the search area of the surrounding point cloud [m]
+      expand_slow_down_range: 1.9  # offset from vehicle side edge for expanding the search area of the surrounding point cloud [m]
       expand_slow_down_range_l: 0.4 # offset from vehicle left edge for expanding the search area of the surrounding point cloud [m]
       expand_slow_down_range_r: 1.9 # offset from vehicle right edge for expanding the search area of the surrounding point cloud [m]
       time_margin: 10  # if detect obstacle for more than time_margin, slow down start (integer)
-      max_slow_down_vel: 4.16 #5.55 #4.16 #15km/h # max slow down velocity [m/s]
-      min_slow_down_vel: 4.16 #5.55 #2.77 #10km/h # min slow down velocity [m/s]
+      max_slow_down_vel: 4.16  #15km/h # max slow down velocity [m/s]
+      min_slow_down_vel: 4.16  #15km/h # min slow down velocity [m/s]
       max_deceleration: 2.0 # for obstacle collision checker
-      passing_param: 0.00010  #0.00015 #[-] set bigger, deceleration become bigger. for isuzu tyokusen suretigai.
+      passing_param: 0.000023   #[-] set bigger, deceleration become bigger. for isuzu tyokusen suretigai.
       speed_thresh_high: 1.38 # [m/s]
       speed_thresh_low : 0.0 # [m/s]
       yaw_rate_thresh: 100.0 # [rad/s] <= need tuning parameter 100=disable
@@ -30,8 +30,7 @@
       curvature_smoothing_num: 50 # [-]
       curve_forward_margin: 120.0  #150.0 # margin distance from slow down point to vehicle front in high curvature[m]
       curve_backward_margin: 5.0 # margin distance from slow down point to vehicle rear in high curvature[m]
-      curve_min_slow_down_vel: 0.5  # min slow down velocity in high curvature[m/s] x > 0
-      passing_param_for_curve: 0.0003   #[-] set bigger, deceleration become bigger. for isuzu tyokusen suretigai in high curvature.
+      passing_param_for_curve: 0.00020   #[-] set bigger, deceleration become bigger. for isuzu tyokusen suretigai in high curvature.
 
 
       # slow down constraint parameters

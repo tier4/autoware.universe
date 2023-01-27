@@ -147,7 +147,6 @@ public:
                                                  // check complete deceleration [m/ss]
     double slow_down_search_radius;  // search radius for slow down obstacle point cloud [m]
     double passing_param;            //for isuzu
-    double curve_min_slow_down_vel; //for isuzu
     double passing_param_for_curve; //for isuzu
     double curve_forward_margin;  //for isuzu
     double curve_backward_margin; //for isuzu
