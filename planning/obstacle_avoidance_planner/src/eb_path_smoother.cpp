@@ -282,7 +282,7 @@ std::tuple<std::vector<TrajectoryPoint>, size_t> EBPathSmoother::getPaddedTrajec
 
 void EBPathSmoother::updateConstraint(
   const std::vector<TrajectoryPoint> & traj_points, const bool is_goal_contained,
-  const int pad_start_idx) const
+  const int pad_start_idx)
 {
   time_keeper_ptr_->tic(__func__);
 
@@ -293,8 +293,9 @@ void EBPathSmoother::updateConstraint(
   std::vector<double> lower_bound(p.num_points * 2, 0.0);
   for (size_t i = 0; i < static_cast<size_t>(p.num_points); ++i) {
     const double constraint_segment_length = [&]() {
-      // NOTE: fix first and second pose to keep start orientation
-      if (i < 2) {
+      // NOTE: Index 0 is previous optimized point but 1 is the input path.
+      //       Therefore, there is a lateral deviation between the two points.
+      if (i == 0) {
         return p.clearance_for_fix;
       }
       if (is_goal_contained) {
@@ -326,11 +327,22 @@ void EBPathSmoother::updateConstraint(
     lower_bound.at(i + p.num_points) = constraint.lat.lower_bound;
   }
 
-  osqp_solver_ptr_->updateA(A);
-  osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
-  osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
-  osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
-  osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+  const bool enable_warm_start = true;
+  if (enable_warm_start) {
+    osqp_solver_ptr_->updateA(A);
+    osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
+    osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
+    osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
+    osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+  } else {
+    const Eigen::MatrixXd P = makePMatrix(p.num_points);
+    const std::vector<double> q(p.num_points * 2, 0.0);
+    osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
+                                                                               P, A, q, lower_bound, upper_bound, p.qp_param.eps_abs);
+    osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
+    osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
+    osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+  }
 
   time_keeper_ptr_->toc(__func__, "        ");
 }
