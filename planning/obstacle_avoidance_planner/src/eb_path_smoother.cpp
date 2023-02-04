@@ -329,8 +329,10 @@ void EBPathSmoother::updateConstraint(
 
   const bool enable_warm_start = true;
   if (enable_warm_start) {
-    osqp_solver_ptr_->updateA(A);
-    osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
+    const auto A_csc = autoware::common::osqp::calCSCMatrix(A);
+    osqp_solver_ptr_->updateCscA(A_csc);
+    osqp_solver_ptr_->updateL(lower_bound);
+    osqp_solver_ptr_->updateU(upper_bound);
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
     osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
     osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
