@@ -606,7 +606,8 @@ void MPTOptimizer::updateFixedPoint(std::vector<ReferencePoint> & ref_points) co
     ref_points, prev_ref_front_point.pose, mpt_param_.delta_arc_length);
   ref_points.front().curvature = prev_ref_front_point.curvature;
 
-  // add previous front pose and curvature
+  // add previous front pose and curvature if it exists
+  // NOTE: In order to fix the front orientation defined by two front points
   if (prev_ref_front_point_idx != 0) {
     ref_points.insert(ref_points.begin(), prev_ref_points_ptr_->at(prev_ref_front_point_idx - 1));
   }
@@ -615,15 +616,20 @@ void MPTOptimizer::updateFixedPoint(std::vector<ReferencePoint> & ref_points) co
   // NOTE: Only pose, velocity and curvature will be interpolated.
   ref_points = trajectory_utils::resampleReferencePoints(ref_points, mpt_param_.delta_arc_length);
 
-  // update pose
+  // update pose which is previous one, and fixed kinematic state
+  // NOTE: There may be a lateral error between the previous and input points.
+  //       Therefore, the pose for fix should not be resampled.
   if (prev_ref_front_point_idx != 0) {
-    ref_points.front().pose = prev_ref_points_ptr_->at(prev_ref_front_point_idx - 1).pose;
+    const auto & prev_ref_prev_front_point = prev_ref_points_ptr_->at(prev_ref_front_point_idx - 1);
+    ref_points.front().pose = prev_ref_prev_front_point.pose;
     ref_points.at(1).pose = prev_ref_front_point.pose;
+
+    ref_points.front().fixed_kinematic_state = prev_ref_prev_front_point.optimized_kinematic_state;
+    ref_points.at(1).fixed_kinematic_state = prev_ref_front_point.optimized_kinematic_state;
   } else {
     ref_points.front().pose = prev_ref_front_point.pose;
+    ref_points.front().fixed_kinematic_state = prev_ref_front_point.optimized_kinematic_state;
   }
-
-  ref_points.front().fixed_kinematic_state = prev_ref_front_point.optimized_kinematic_state;
 
   time_keeper_ptr_->toc(__func__, "          ");
 }
