@@ -335,15 +335,9 @@ void EBPathSmoother::updateConstraint(
   }
 
   if (p.enable_warm_start) {
-    const auto A_csc = autoware::common::osqp::calCSCMatrix(A);
-    osqp_solver_ptr_->updateCscA(A_csc);
-    osqp_solver_ptr_->updateL(lower_bound);
-    osqp_solver_ptr_->updateU(upper_bound);
-    // osqp_solver_ptr_->updateA(A);
-    // osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
-    // osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
-    // osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
-    // osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+    osqp_solver_ptr_->updateA(A);
+    osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
+    osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
   } else {
     const Eigen::MatrixXd P = makePMatrix(p.num_points);
     const std::vector<double> q(p.num_points * 2, 0.0);

@@ -1146,14 +1146,10 @@ std::optional<Eigen::VectorXd> MPTOptimizer::calcOptimizedSteerAngles(
     osqp_solver_ptr_->updateCscA(A_csc);
     osqp_solver_ptr_->updateL(lower_bound);
     osqp_solver_ptr_->updateU(upper_bound);
-    // osqp_solver_ptr_->updateEpsRel(1e-5);
-    // osqp_solver_ptr_->updateEpsAbs(1e-7);
   } else {
     RCLCPP_INFO_EXPRESSION(logger_, enable_debug_info_, "no warm start");
     osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
       P_csc, A_csc, f, lower_bound, upper_bound, osqp_epsilon_);
-    // osqp_solver_ptr_->updateEpsRel(1e-5);
-    // osqp_solver_ptr_->updateEpsAbs(1e-5);
   }
   prev_mat_n_ = H.rows();
   prev_mat_m_ = A.rows();
