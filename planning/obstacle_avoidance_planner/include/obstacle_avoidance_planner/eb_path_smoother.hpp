@@ -71,6 +71,10 @@ private:
     double clearance_for_joint;
     double clearance_for_smooth;
 
+    // weight
+    double smooth_weight;
+    double lat_error_weight;
+
     // qp
     QPParam qp_param;
 
@@ -101,6 +105,7 @@ private:
 
   // publisher
   rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_traj_pub_;
+  rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_fixed_traj_pub_;
 
   std::unique_ptr<autoware::common::osqp::OSQPInterface> osqp_solver_ptr_;
   std::shared_ptr<std::vector<TrajectoryPoint>> prev_eb_traj_points_ptr_{nullptr};
@@ -112,8 +117,8 @@ private:
     const std::vector<TrajectoryPoint> & traj_points) const;
 
   void updateConstraint(
-  const std::vector<TrajectoryPoint> & traj_points, const bool is_goal_contained,
-  const int pad_start_idx);
+    const std_msgs::msg::Header & header, const std::vector<TrajectoryPoint> & traj_points,
+    const bool is_goal_contained, const int pad_start_idx);
 
   Constraint2d getConstraint2dFromConstraintSegment(
     const geometry_msgs::msg::Pose & pose, const double constraint_segment_length) const;

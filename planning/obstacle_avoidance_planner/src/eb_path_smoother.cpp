@@ -67,7 +67,7 @@ Eigen::MatrixXd makePMatrix(const int num_points)
 // NOTE: The value (1.0) is not valid. Where non-zero values exist is valid.
 Eigen::MatrixXd makeDefaultAMatrix(const size_t num_points)
 {
-  const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points , num_points);
+  const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points, num_points);
   return A;
 }
 
@@ -82,8 +82,7 @@ namespace obstacle_avoidance_planner
 EBPathSmoother::EBParam::EBParam(rclcpp::Node * node)
 {
   {  // option
-    enable_warm_start =
-      node->declare_parameter<bool>("eb.option.enable_warm_start");
+    enable_warm_start = node->declare_parameter<bool>("eb.option.enable_warm_start");
     enable_optimization_validation =
       node->declare_parameter<bool>("eb.option.enable_optimization_validation");
   }
@@ -98,6 +97,11 @@ EBPathSmoother::EBParam::EBParam(rclcpp::Node * node)
     clearance_for_fix = node->declare_parameter<double>("eb.clearance.clearance_for_fix");
     clearance_for_joint = node->declare_parameter<double>("eb.clearance.clearance_for_joint");
     clearance_for_smooth = node->declare_parameter<double>("eb.clearance.clearance_for_smooth");
+  }
+
+  {  // weight
+    smooth_weight = node->declare_parameter<double>("eb.weight.smooth_weight");
+    lat_error_weight = node->declare_parameter<double>("eb.weight.lat_error_weight");
   }
 
   {  // qp
@@ -116,7 +120,8 @@ void EBPathSmoother::EBParam::onParam(const std::vector<rclcpp::Parameter> & par
 
   {  // option
     updateParam<bool>(parameters, "eb.option.enable_warm_start", enable_warm_start);
-    updateParam<bool>(parameters, "eb.option.enable_optimization_validation", enable_optimization_validation);
+    updateParam<bool>(
+      parameters, "eb.option.enable_optimization_validation", enable_optimization_validation);
   }
 
   {  // common
@@ -129,6 +134,11 @@ void EBPathSmoother::EBParam::onParam(const std::vector<rclcpp::Parameter> & par
     updateParam<double>(parameters, "eb.clearance.clearance_for_fix", clearance_for_fix);
     updateParam<double>(parameters, "eb.clearance.clearance_for_joint", clearance_for_joint);
     updateParam<double>(parameters, "eb.clearance.clearance_for_smooth", clearance_for_smooth);
+  }
+
+  {  // weight
+    updateParam<double>(parameters, "eb.weight.smooth_weight", smooth_weight);
+    updateParam<double>(parameters, "eb.weight.lat_error_weight", lat_error_weight);
   }
 
   {  // qp
@@ -170,11 +180,14 @@ EBPathSmoother::EBPathSmoother(
 
   osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
     modified_P, A, modified_q, lower_bound, upper_bound, qp_param.eps_abs);
+
+  // osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(qp_param.eps_abs);
   osqp_solver_ptr_->updateEpsRel(qp_param.eps_rel);
   osqp_solver_ptr_->updateMaxIter(qp_param.max_iteration);
 
   // publisher
-  debug_eb_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_trajectory", 1);
+  debug_eb_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_traj", 1);
+  debug_eb_fixed_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_fixed_traj", 1);
 }
 
 void EBPathSmoother::onParam(const std::vector<rclcpp::Parameter> & parameters)
@@ -215,14 +228,24 @@ EBPathSmoother::getEBTrajectory(const PlannerData & planner_data)
   const auto traj_points_with_fixed_point = insertFixedPoint(cropped_traj_points);
 
   // 3. resample trajectory with delta_arc_length
-  const auto resampled_traj_points = trajectory_utils::resampleTrajectoryPoints(
-    traj_points_with_fixed_point, eb_param_.delta_arc_length);
+  const auto resampled_traj_points = [&]() {
+    // NOTE: If the interval of points is not constant, the optimization is sometimes unstable.
+    //       Therefore, we do not resample a stop point here.
+    auto tmp_traj_points = trajectory_utils::resampleTrajectoryPointsWithoutStopPoint(
+      traj_points_with_fixed_point, eb_param_.delta_arc_length);
+
+    // NOTE: The front point is previous optimized one, and the others are the input ones.
+    //       There may be a certain lateral error, which makes orientation large.
+    //       Therefore, the front pose is updated after resample.
+    tmp_traj_points.front().pose = traj_points_with_fixed_point.front().pose;
+    return tmp_traj_points;
+  }();
 
   // 4. pad trajectory points
   const auto [padded_traj_points, pad_start_idx] = getPaddedTrajectoryPoints(resampled_traj_points);
 
   // 5. update constraint for elastic band's QP
-  updateConstraint(padded_traj_points, is_goal_contained, pad_start_idx);
+  updateConstraint(p.header, padded_traj_points, is_goal_contained, pad_start_idx);
 
   // 6. get optimization result
   const auto optimized_points = optimizeTrajectory();
@@ -293,21 +316,24 @@ std::tuple<std::vector<TrajectoryPoint>, size_t> EBPathSmoother::getPaddedTrajec
 }
 
 void EBPathSmoother::updateConstraint(
-  const std::vector<TrajectoryPoint> & traj_points, const bool is_goal_contained,
-  const int pad_start_idx)
+  const std_msgs::msg::Header & header, const std::vector<TrajectoryPoint> & traj_points,
+  const bool is_goal_contained, const int pad_start_idx)
 {
   time_keeper_ptr_->tic(__func__);
 
   const auto & p = eb_param_;
+
+  std::vector<TrajectoryPoint> debug_fixed_traj_points;  // for debug
 
   const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(p.num_points, p.num_points);
   std::vector<double> upper_bound(p.num_points, 0.0);
   std::vector<double> lower_bound(p.num_points, 0.0);
   for (size_t i = 0; i < static_cast<size_t>(p.num_points); ++i) {
     const double constraint_segment_length = [&]() {
-      // NOTE: Index 0 is previous optimized point but 1 is the input path.
-      //       Therefore, there is a lateral deviation between the two points.
       if (i == 0) {
+        // NOTE: Only first point can be fixed since there is a lateral deviation
+        //       between the two points.
+        //       The front point is previous optimized one, and the others are the input ones.
         return p.clearance_for_fix;
       }
       if (is_goal_contained) {
@@ -322,8 +348,13 @@ void EBPathSmoother::updateConstraint(
       }
       return p.clearance_for_smooth;
     }();
+
     upper_bound.at(i) = constraint_segment_length;
     lower_bound.at(i) = -constraint_segment_length;
+
+    if (constraint_segment_length == 0.0) {
+      debug_fixed_traj_points.push_back(traj_points.at(i));
+    }
   }
 
   Eigen::VectorXd x_mat(2 * p.num_points);
@@ -337,25 +368,33 @@ void EBPathSmoother::updateConstraint(
     theta_mat(i, i + p.num_points) = std::cos(yaw);
   }
 
-  const Eigen::MatrixXd P = makePMatrix(p.num_points);
-  const Eigen::MatrixXd modified_P = theta_mat * P * theta_mat.transpose();
+  const Eigen::MatrixXd raw_P_for_smooth = p.smooth_weight * makePMatrix(p.num_points);
+  const Eigen::MatrixXd P_for_smooth = theta_mat * raw_P_for_smooth * theta_mat.transpose();
+  const Eigen::MatrixXd P_for_lat_error =
+    p.lat_error_weight * Eigen::MatrixXd::Identity(p.num_points, p.num_points);
 
-  const Eigen::VectorXd q = theta_mat * P * x_mat;
-  const auto modified_q = toStdVector(q);
+  const Eigen::MatrixXd P = P_for_smooth + P_for_lat_error;
+
+  const Eigen::VectorXd raw_q_for_smooth = theta_mat * raw_P_for_smooth * x_mat;
+  const auto q = toStdVector(raw_q_for_smooth);
 
   if (p.enable_warm_start) {
-    osqp_solver_ptr_->updateP(modified_P);
-    osqp_solver_ptr_->updateQ(modified_q);
+    osqp_solver_ptr_->updateP(P);
+    osqp_solver_ptr_->updateQ(q);
     osqp_solver_ptr_->updateA(A);
     osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
   } else {
     osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
-                                                                               modified_P, A, modified_q, lower_bound, upper_bound, p.qp_param.eps_abs);
+      P, A, q, lower_bound, upper_bound, p.qp_param.eps_abs);
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
     osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
     osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
   }
+
+  // publish fixed trajectory
+  const auto eb_fixed_traj = trajectory_utils::createTrajectory(header, debug_fixed_traj_points);
+  debug_eb_fixed_traj_pub_->publish(eb_fixed_traj);
 
   time_keeper_ptr_->toc(__func__, "        ");
 }
@@ -429,7 +468,8 @@ std::optional<std::vector<TrajectoryPoint>> EBPathSmoother::convertOptimizedPoin
     }
 
     auto eb_traj_point = traj_points.at(i);
-    eb_traj_point.pose = tier4_autoware_utils::calcOffsetPose(eb_traj_point.pose, 0.0, lat_offset, 0.0);
+    eb_traj_point.pose =
+      tier4_autoware_utils::calcOffsetPose(eb_traj_point.pose, 0.0, lat_offset, 0.0);
     eb_traj_points.push_back(eb_traj_point);
   }
 

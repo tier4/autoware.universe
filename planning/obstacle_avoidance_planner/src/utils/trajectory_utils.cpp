@@ -127,8 +127,23 @@ Trajectory createTrajectory(
 std::vector<TrajectoryPoint> resampleTrajectoryPoints(
   const std::vector<TrajectoryPoint> traj_points, const double interval)
 {
+  constexpr bool enable_resampling_stop_point = true;
+
   const auto traj = motion_utils::convertToTrajectory(traj_points);
-  const auto resampled_traj = motion_utils::resampleTrajectory(traj, interval);
+  const auto resampled_traj = motion_utils::resampleTrajectory(
+    traj, interval, false, true, true, enable_resampling_stop_point);
+  return motion_utils::convertToTrajectoryPointArray(resampled_traj);
+}
+
+// NOTE: stop point will not be resampled
+std::vector<TrajectoryPoint> resampleTrajectoryPointsWithoutStopPoint(
+  const std::vector<TrajectoryPoint> traj_points, const double interval)
+{
+  constexpr bool enable_resampling_stop_point = false;
+
+  const auto traj = motion_utils::convertToTrajectory(traj_points);
+  const auto resampled_traj = motion_utils::resampleTrajectory(
+    traj, interval, false, true, true, enable_resampling_stop_point);
   return motion_utils::convertToTrajectoryPointArray(resampled_traj);
 }
 

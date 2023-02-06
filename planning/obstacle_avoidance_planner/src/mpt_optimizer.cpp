@@ -498,7 +498,8 @@ std::vector<ReferencePoint> MPTOptimizer::calcReferencePoints(
   time_keeper_ptr_->tic("resampleReferencePoints");
   auto ref_points = [&]() {
     const auto resampled_smoothed_points =
-      trajectory_utils::resampleTrajectoryPoints(smoothed_points, mpt_param_.delta_arc_length);
+      trajectory_utils::resampleTrajectoryPointsWithoutStopPoint(
+        smoothed_points, mpt_param_.delta_arc_length);
     return trajectory_utils::convertToReferencePoints(resampled_smoothed_points);
   }();
   time_keeper_ptr_->toc("resampleReferencePoints", "          ");
