@@ -20,14 +20,14 @@ Note that the velocity is just taken over from the input path.
 
 | Name                                 | Type                             | Description                                        |
 | ------------------------------------ | -------------------------------- | -------------------------------------------------- |
-| `~/input/path`                       | autoware_auto_planning_msgs/Path | Reference path and the corresponding drivable area |
-| `/localization/kinematic_kinematics` | nav_msgs/Odometry                | Current Velocity of ego vehicle                    |
+| `~/input/path`                       | autoware_auto_planning_msgs/msg/Path | Reference path and the corresponding drivable area |
+| `~/input/odometry` | nav_msgs/msg/Odometry                | Current Velocity of ego vehicle                    |
 
 ### output
 
 | Name                  | Type                                   | Description                                                       |
 | --------------------- | -------------------------------------- | ----------------------------------------------------------------- |
-| `~/output/trajectory` | autoware_auto_planning_msgs/Trajectory | Optimized trajectory that is feasible to drive and collision-free |
+| `~/output/trajectory` | autoware_auto_planning_msgs/msg/Trajectory | Optimized trajectory that is feasible to drive and collision-free |
 
 ## Flowchart
 
@@ -88,7 +88,7 @@ struct PlannerData
 
   // ego
   geometry_msgs::msg::Pose ego_pose;
-  double ego_vel{};
+  double ego_vel;
 };
 ```
 

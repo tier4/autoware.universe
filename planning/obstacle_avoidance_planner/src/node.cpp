@@ -83,7 +83,7 @@ ObstacleAvoidancePlanner::ObstacleAvoidancePlanner(const rclcpp::NodeOptions & n
   path_sub_ = create_subscription<Path>(
     "~/input/path", 1, std::bind(&ObstacleAvoidancePlanner::onPath, this, std::placeholders::_1));
   odom_sub_ = create_subscription<Odometry>(
-    "/localization/kinematic_state", 1,
+    "~/input/odometry", 1,
     [this](const Odometry::SharedPtr msg) { ego_state_ptr_ = msg; });
 
   // debug publisher
@@ -224,17 +224,9 @@ void ObstacleAvoidancePlanner::onPath(const Path::SharedPtr path_ptr)
 
   // 2. generate optimized trajectory
   const auto optimized_traj_points = generateOptimizedTrajectory(planner_data);
-  // TODO(murooka) remove this
-  if (!resample_utils::validate_points_duplication(optimized_traj_points)) {
-    std::cerr << "mpt: duplicated points" << std::endl;
-  }
 
   // 3. extend trajectory to connect the optimized trajectory and the following path smoothly
   auto full_traj_points = extendTrajectory(planner_data.traj_points, optimized_traj_points);
-  // TODO(murooka) remove this
-  if (!resample_utils::validate_points_duplication(optimized_traj_points)) {
-    std::cerr << "extend trajectory: duplicated points" << std::endl;
-  }
 
   // 4. set zero velocity after stop point
   setZeroVelocityAfterStopPoint(full_traj_points);

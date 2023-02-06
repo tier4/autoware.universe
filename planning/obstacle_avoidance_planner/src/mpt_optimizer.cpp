@@ -21,8 +21,6 @@
 #include "tf2/utils.h"
 #include "tier4_autoware_utils/tier4_autoware_utils.hpp"
 
-#include "boost/assign/list_of.hpp"
-
 #include <algorithm>
 #include <chrono>
 #include <limits>
@@ -709,8 +707,8 @@ void MPTOptimizer::updateVehicleBounds(
 
   for (size_t p_idx = 0; p_idx < ref_points.size(); ++p_idx) {
     const auto & ref_point = ref_points.at(p_idx);
-    // TODO(murooka) this is required.
-    // somtimes vehile_bounds has already value with previous value?
+    // NOTE: This clear is required.
+    // It seems they sometimes already have previous values.
     ref_points.at(p_idx).bounds_on_constraints.clear();
     ref_points.at(p_idx).beta.clear();
 
@@ -750,7 +748,6 @@ void MPTOptimizer::updateVehicleBounds(
         const double prev_s = ref_points_spline.getAccumulatedLength(prev_idx);
         const double next_s = ref_points_spline.getAccumulatedLength(next_idx);
 
-        // TODO(murooka) is this required?
         const double ratio = std::clamp((collision_check_s - prev_s) / (next_s - prev_s), 0.0, 1.0);
 
         auto bounds = Bounds::lerp(prev_bounds, next_bounds, ratio);
