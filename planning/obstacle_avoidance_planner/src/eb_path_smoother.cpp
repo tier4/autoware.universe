@@ -67,15 +67,13 @@ Eigen::MatrixXd makePMatrix(const int num_points)
 // NOTE: The value (1.0) is not valid. Where non-zero values exist is valid.
 Eigen::MatrixXd makeDefaultAMatrix(const size_t num_points)
 {
-  Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points * 2, num_points * 2);
-  for (size_t i = 0; i < num_points * 2; ++i) {
-    if (i < num_points) {
-      A(i, i + num_points) = 1.0;
-    } else {
-      A(i, i - num_points) = 1.0;
-    }
-  }
+  const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points , num_points);
   return A;
+}
+
+std::vector<double> toStdVector(const Eigen::VectorXd & eigen_vec)
+{
+  return {eigen_vec.data(), eigen_vec.data() + eigen_vec.rows()};
 }
 }  // namespace
 
@@ -156,15 +154,22 @@ EBPathSmoother::EBPathSmoother(
   const auto & qp_param = eb_param_.qp_param;
   const int num_points = eb_param_.num_points;
 
+  Eigen::MatrixXd theta_mat = Eigen::MatrixXd::Zero(num_points, 2 * num_points);
+  for (size_t i = 0; i < static_cast<size_t>(num_points); ++i) {
+    theta_mat(i, i) = 1.0;
+    theta_mat(i, i + num_points) = 1.0;
+  }
   const Eigen::MatrixXd P = makePMatrix(num_points);
-  const std::vector<double> q(num_points * 2, 0.0);
+  const Eigen::MatrixXd modified_P = theta_mat * P * theta_mat.transpose();
+
+  const std::vector<double> modified_q(num_points, 1.0);
 
   const Eigen::MatrixXd A = makeDefaultAMatrix(num_points);
-  const std::vector<double> lower_bound(num_points * 2, 0.0);
-  const std::vector<double> upper_bound(num_points * 2, 0.0);
+  const std::vector<double> lower_bound(num_points, 1.0);
+  const std::vector<double> upper_bound(num_points, 1.0);
 
   osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
-    P, A, q, lower_bound, upper_bound, qp_param.eps_abs);
+    modified_P, A, modified_q, lower_bound, upper_bound, qp_param.eps_abs);
   osqp_solver_ptr_->updateEpsRel(qp_param.eps_rel);
   osqp_solver_ptr_->updateMaxIter(qp_param.max_iteration);
 
@@ -295,9 +300,9 @@ void EBPathSmoother::updateConstraint(
 
   const auto & p = eb_param_;
 
-  Eigen::MatrixXd A = Eigen::MatrixXd::Zero(p.num_points * 2, p.num_points * 2);
-  std::vector<double> upper_bound(p.num_points * 2, 0.0);
-  std::vector<double> lower_bound(p.num_points * 2, 0.0);
+  const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(p.num_points, p.num_points);
+  std::vector<double> upper_bound(p.num_points, 0.0);
+  std::vector<double> lower_bound(p.num_points, 0.0);
   for (size_t i = 0; i < static_cast<size_t>(p.num_points); ++i) {
     const double constraint_segment_length = [&]() {
       // NOTE: Index 0 is previous optimized point but 1 is the input path.
@@ -317,32 +322,36 @@ void EBPathSmoother::updateConstraint(
       }
       return p.clearance_for_smooth;
     }();
-
-    const auto constraint =
-      getConstraint2dFromConstraintSegment(traj_points.at(i).pose, constraint_segment_length);
-
-    // longitudinal constraint
-    A(i, i) = constraint.lon.coef(0);
-    A(i, i + p.num_points) = constraint.lon.coef(1);
-    upper_bound.at(i) = constraint.lon.upper_bound;
-    lower_bound.at(i) = constraint.lon.lower_bound;
-
-    // lateral constraint
-    A(i + p.num_points, i) = constraint.lat.coef(0);
-    A(i + p.num_points, i + p.num_points) = constraint.lat.coef(1);
-    upper_bound.at(i + p.num_points) = constraint.lat.upper_bound;
-    lower_bound.at(i + p.num_points) = constraint.lat.lower_bound;
+    upper_bound.at(i) = constraint_segment_length;
+    lower_bound.at(i) = -constraint_segment_length;
   }
 
+  Eigen::VectorXd x_mat(2 * p.num_points);
+  Eigen::MatrixXd theta_mat = Eigen::MatrixXd::Zero(p.num_points, 2 * p.num_points);
+  for (size_t i = 0; i < static_cast<size_t>(p.num_points); ++i) {
+    x_mat(i) = traj_points.at(i).pose.position.x;
+    x_mat(i + p.num_points) = traj_points.at(i).pose.position.y;
+
+    const double yaw = tf2::getYaw(traj_points.at(i).pose.orientation);
+    theta_mat(i, i) = -std::sin(yaw);
+    theta_mat(i, i + p.num_points) = std::cos(yaw);
+  }
+
+  const Eigen::MatrixXd P = makePMatrix(p.num_points);
+  const Eigen::MatrixXd modified_P = theta_mat * P * theta_mat.transpose();
+
+  const Eigen::VectorXd q = theta_mat * P * x_mat;
+  const auto modified_q = toStdVector(q);
+
   if (p.enable_warm_start) {
+    osqp_solver_ptr_->updateP(modified_P);
+    osqp_solver_ptr_->updateQ(modified_q);
     osqp_solver_ptr_->updateA(A);
     osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
   } else {
-    const Eigen::MatrixXd P = makePMatrix(p.num_points);
-    const std::vector<double> q(p.num_points * 2, 0.0);
     osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
-                                                                               P, A, q, lower_bound, upper_bound, p.qp_param.eps_abs);
+                                                                               modified_P, A, modified_q, lower_bound, upper_bound, p.qp_param.eps_abs);
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
     osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
     osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
@@ -410,22 +419,17 @@ std::optional<std::vector<TrajectoryPoint>> EBPathSmoother::convertOptimizedPoin
 
   // update only x and y
   for (size_t i = 0; i < static_cast<size_t>(pad_start_idx); ++i) {
+    const double lat_offset = optimized_points.at(i);
+
     // validate optimization result
     if (eb_param_.enable_optimization_validation) {
-      const double diff_x = optimized_points.at(i) - eb_traj_points.at(i).pose.position.x;
-      const double diff_y =
-        optimized_points.at(i + eb_param_.num_points) - eb_traj_points.at(i).pose.position.y;
-      if (
-        eb_param_.max_validation_error < std::abs(diff_x) ||
-        eb_param_.max_validation_error < std::abs(diff_y)) {
+      if (eb_param_.max_validation_error < std::abs(lat_offset)) {
         return std::nullopt;
       }
     }
 
     auto eb_traj_point = traj_points.at(i);
-    eb_traj_point.pose.position.x = optimized_points.at(i);
-    eb_traj_point.pose.position.y = optimized_points.at(i + eb_param_.num_points);
-
+    eb_traj_point.pose = tier4_autoware_utils::calcOffsetPose(eb_traj_point.pose, 0.0, lat_offset, 0.0);
     eb_traj_points.push_back(eb_traj_point);
   }
 
