@@ -861,8 +861,6 @@ MPTOptimizer::ObjectiveMatrix MPTOptimizer::calcObjectiveMatrix(
   const size_t D_u = state_equation_generator_.getDimU();
   const size_t D_xn = D_x * N_ref;
   const size_t D_v = D_x + (N_ref - 1) * D_u;
-
-  const size_t N_collision_check = vehicle_circle_longitudinal_offsets_.size();
   const size_t N_slack = getNumberOfSlackVariables();
 
   // generate T matrix and vector to shift optimization center
@@ -1364,7 +1362,8 @@ double MPTOptimizer::getTrajectoryLength() const
   return forward_traj_length + backward_traj_length;
 }
 
-size_t MPTOptimizer::getNumberOfSlackVariables() const {
+size_t MPTOptimizer::getNumberOfSlackVariables() const
+{
   if (mpt_param_.soft_constraint) {
     if (mpt_param_.l_inf_norm) {
       return 1;
