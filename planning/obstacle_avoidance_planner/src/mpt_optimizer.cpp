@@ -453,10 +453,10 @@ std::optional<std::vector<TrajectoryPoint>> MPTOptimizer::getModelPredictiveTraj
   const auto val_mat = calcValueMatrix(ref_points, traj_points);
 
   // 4. get objective matrix
-  const auto obj_mat = getObjectiveMatrix(mpt_mat, val_mat, ref_points);
+  const auto obj_mat = calcObjectiveMatrix(mpt_mat, val_mat, ref_points);
 
   // 5. get constraints matrix
-  const auto const_mat = getConstraintMatrix(mpt_mat, ref_points);
+  const auto const_mat = calcConstraintMatrix(mpt_mat, ref_points);
 
   // 6. optimize steer angles
   const auto optimized_steer_angles = calcOptimizedSteerAngles(ref_points, obj_mat, const_mat);
@@ -850,7 +850,7 @@ MPTOptimizer::ValueMatrix MPTOptimizer::calcValueMatrix(
   return m;
 }
 
-MPTOptimizer::ObjectiveMatrix MPTOptimizer::getObjectiveMatrix(
+MPTOptimizer::ObjectiveMatrix MPTOptimizer::calcObjectiveMatrix(
   const StateEquationGenerator::Matrix & mpt_mat, const ValueMatrix & val_mat,
   const std::vector<ReferencePoint> & ref_points) const
 {
@@ -863,15 +863,7 @@ MPTOptimizer::ObjectiveMatrix MPTOptimizer::getObjectiveMatrix(
   const size_t D_v = D_x + (N_ref - 1) * D_u;
 
   const size_t N_collision_check = vehicle_circle_longitudinal_offsets_.size();
-  const size_t N_slack = [&]() -> size_t {
-    if (mpt_param_.soft_constraint) {
-      if (mpt_param_.l_inf_norm) {
-        return 1;
-      }
-      return N_collision_check;
-    }
-    return 0;
-  }();
+  const size_t N_slack = getNumberOfSlackVariables();
 
   // generate T matrix and vector to shift optimization center
   // NOTE: Z is defined as time-series vector of shifted deviation
@@ -930,7 +922,7 @@ MPTOptimizer::ObjectiveMatrix MPTOptimizer::getObjectiveMatrix(
 // Constraint: lb <= A u <= ub
 // decision variable
 // u := [initial state, steer angles, soft variables]
-MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
+MPTOptimizer::ConstraintMatrix MPTOptimizer::calcConstraintMatrix(
   const StateEquationGenerator::Matrix & mpt_mat,
   const std::vector<ReferencePoint> & ref_points) const
 {
@@ -940,20 +932,12 @@ MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
   const size_t D_u = state_equation_generator_.getDimU();
   const size_t N_ref = ref_points.size();
   const size_t N_u = (N_ref - 1) * D_u;
-  const size_t N_v = D_x + N_u;
+  const size_t D_v = D_x + N_u;
   const size_t N_collision_check = vehicle_circle_longitudinal_offsets_.size();
 
   // NOTE: The number of one-step slack variables.
   //       The number of all slack variables will be N_ref * N_slack.
-  const size_t N_slack = [&]() -> size_t {
-    if (mpt_param_.soft_constraint) {
-      if (mpt_param_.l_inf_norm) {
-        return 1;
-      }
-      return N_collision_check;
-    }
-    return 0;
-  }();
+  const size_t N_slack = getNumberOfSlackVariables();
 
   // calculate indices of fixed points
   std::vector<size_t> fixed_points_indices;
@@ -980,9 +964,9 @@ MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
 
   const size_t A_cols = [&] {
     if (mpt_param_.soft_constraint) {
-      return N_v + N_ref * N_slack;  // initial state + steer angles + soft variables
+      return D_v + N_ref * N_slack;  // initial state + steer angles + soft variables
     }
-    return N_v;  // initial state + steer angles
+    return D_v;  // initial state + steer angles
   }();
 
   Eigen::MatrixXd A = Eigen::MatrixXd::Zero(A_rows, A_cols);
@@ -1019,15 +1003,15 @@ MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
 
     // soft constraints
     if (mpt_param_.soft_constraint) {
-      size_t A_offset_cols = N_v;
+      size_t A_offset_cols = D_v;
       const size_t A_blk_rows = 3 * N_ref;
 
       // A := [C * B | O | ... | O | I | O | ...
       //      -C * B | O | ... | O | I | O | ...
       //          O    | O | ... | O | I | O | ... ]
       Eigen::MatrixXd A_blk = Eigen::MatrixXd::Zero(A_blk_rows, A_cols);
-      A_blk.block(0, 0, N_ref, N_v) = CB;
-      A_blk.block(N_ref, 0, N_ref, N_v) = -CB;
+      A_blk.block(0, 0, N_ref, D_v) = CB;
+      A_blk.block(N_ref, 0, N_ref, D_v) = -CB;
 
       size_t local_A_offset_cols = A_offset_cols;
       if (!mpt_param_.l_inf_norm) {
@@ -1072,7 +1056,7 @@ MPTOptimizer::ConstraintMatrix MPTOptimizer::getConstraintMatrix(
   // fixed points constraint
   // X = B v + w where point is fixed
   for (const size_t i : fixed_points_indices) {
-    A.block(A_rows_end, 0, D_x, N_v) = mpt_mat.B.block(i * D_x, 0, D_x, N_v);
+    A.block(A_rows_end, 0, D_x, D_v) = mpt_mat.B.block(i * D_x, 0, D_x, D_v);
 
     lb.segment(A_rows_end, D_x) =
       ref_points[i].fixed_kinematic_state->toEigenVector() - mpt_mat.W.segment(i * D_x, D_x);
@@ -1127,7 +1111,9 @@ std::optional<Eigen::VectorXd> MPTOptimizer::calcOptimizedSteerAngles(
   const size_t D_x = state_equation_generator_.getDimX();
   const size_t D_u = state_equation_generator_.getDimU();
   const size_t N_ref = ref_points.size();
-  const size_t N_v = D_x + (N_ref - 1) * D_u;
+  const size_t D_v = D_x + (N_ref - 1) * D_u;
+  const size_t N_slack = getNumberOfSlackVariables();
+  const size_t D_un = D_v + N_ref * N_slack;
 
   // for manual warm start, calculate initial solution
   const auto u0 = [&]() -> std::optional<Eigen::VectorXd> {
@@ -1193,12 +1179,12 @@ std::optional<Eigen::VectorXd> MPTOptimizer::calcOptimizedSteerAngles(
   auto optimization_result =
     std::get<0>(result);  // NOTE: const cannot be added due to the next operation.
   const Eigen::VectorXd optimized_steer_angles =
-    Eigen::Map<Eigen::VectorXd>(&optimization_result[0], N_v);
+    Eigen::Map<Eigen::VectorXd>(&optimization_result[0], D_un);
 
   time_keeper_ptr_->toc(__func__, "        ");
 
   if (u0) {  // manual warm start
-    return static_cast<Eigen::VectorXd>(optimized_steer_angles + u0->segment(0, N_v));
+    return static_cast<Eigen::VectorXd>(optimized_steer_angles + *u0);
   }
   return optimized_steer_angles;
 }
@@ -1211,22 +1197,34 @@ Eigen::VectorXd MPTOptimizer::calcInitialSolutionForManualWarmStart(
   const size_t D_u = state_equation_generator_.getDimU();
   const size_t N_ref = ref_points.size();
   const size_t N_u = (N_ref - 1) * D_u;
-  const size_t N_v = D_x + N_u;
+  const size_t D_v = D_x + N_u;
+  const size_t N_slack = getNumberOfSlackVariables();
+  const size_t D_un = D_v + N_ref * N_slack;
 
-  Eigen::VectorXd u0 = Eigen::VectorXd::Zero(N_v);
+  Eigen::VectorXd u0 = Eigen::VectorXd::Zero(D_un);
 
-  const size_t seg_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
+  const size_t nearest_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
     prev_ref_points, ref_points.front().pose, ego_nearest_param_.dist_threshold,
     ego_nearest_param_.yaw_threshold);
 
   // set previous lateral and yaw deviaton
-  u0(0) = prev_ref_points.at(seg_idx).optimized_kinematic_state.lat;
-  u0(1) = prev_ref_points.at(seg_idx).optimized_kinematic_state.yaw;
+  u0(0) = prev_ref_points.at(nearest_idx).optimized_kinematic_state.lat;
+  u0(1) = prev_ref_points.at(nearest_idx).optimized_kinematic_state.yaw;
 
   // set previous steer angles
   for (size_t i = 0; i < N_u; ++i) {
-    const size_t prev_target_idx = std::min(seg_idx + i, prev_ref_points.size() - 1);
+    const size_t prev_target_idx = std::min(nearest_idx + i, prev_ref_points.size() - 1);
     u0(D_x + i) = prev_ref_points.at(prev_target_idx).optimized_input;
+  }
+
+  // set previous slack variables
+  for (size_t i = 0; i < N_ref; ++i) {
+    const auto & slack_variables = ref_points.at(i).slack_variables;
+    if (slack_variables) {
+      for (size_t j = 0; j < slack_variables->size(); ++j) {
+        u0(D_v + i * N_slack + j) = slack_variables->at(j);
+      }
+    }
   }
 
   return u0;
@@ -1272,9 +1270,14 @@ std::optional<std::vector<TrajectoryPoint>> MPTOptimizer::calcMPTPoints(
   const size_t D_x = state_equation_generator_.getDimX();
   const size_t D_u = state_equation_generator_.getDimU();
   const size_t N_ref = ref_points.size();
+  const size_t D_v = D_x + (N_ref - 1) * D_u;
+  const size_t N_slack = getNumberOfSlackVariables();
+
+  const Eigen::VectorXd steer_angles = U.segment(0, D_v);
+  const Eigen::VectorXd slack_variables = U.segment(D_v, N_ref * N_slack);
 
   // predict time-series states from optimized control inputs
-  const Eigen::VectorXd X = state_equation_generator_.predict(mpt_mat, U);
+  const Eigen::VectorXd X = state_equation_generator_.predict(mpt_mat, steer_angles);
 
   // calculate trajectory points from optimization result
   std::vector<TrajectoryPoint> traj_points;
@@ -1298,8 +1301,14 @@ std::optional<std::vector<TrajectoryPoint>> MPTOptimizer::calcMPTPoints(
     if (i == N_ref - 1) {
       ref_point.optimized_input = 0.0;
     } else {
-      ref_point.optimized_input = U(D_x + i * D_u);
+      ref_point.optimized_input = steer_angles(D_x + i * D_u);
     }
+
+    std::vector<double> tmp_slack_variables;
+    for (size_t j = 0; j < N_slack; ++j) {
+      tmp_slack_variables.push_back(slack_variables(i * N_slack + j));
+    }
+    ref_point.slack_variables = tmp_slack_variables;
 
     // update pose and velocity
     TrajectoryPoint traj_point;
@@ -1353,5 +1362,15 @@ double MPTOptimizer::getTrajectoryLength() const
   const double forward_traj_length = mpt_param_.num_points * mpt_param_.delta_arc_length;
   const double backward_traj_length = traj_param_.output_backward_traj_length;
   return forward_traj_length + backward_traj_length;
+}
+
+size_t MPTOptimizer::getNumberOfSlackVariables() const {
+  if (mpt_param_.soft_constraint) {
+    if (mpt_param_.l_inf_norm) {
+      return 1;
+    }
+    return vehicle_circle_longitudinal_offsets_.size();
+  }
+  return 0;
 }
 }  // namespace obstacle_avoidance_planner

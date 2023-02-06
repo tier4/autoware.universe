@@ -85,6 +85,7 @@ struct ReferencePoint
   std::optional<KinematicState> fixed_kinematic_state{std::nullopt};
   KinematicState optimized_kinematic_state{};
   double optimized_input{};
+  std::optional<std::vector<double>> slack_variables{std::nullopt};
 
   double getYaw() const { return tf2::getYaw(pose.orientation); }
 
@@ -255,11 +256,11 @@ private:
     const std::vector<ReferencePoint> & reference_points,
     const std::vector<TrajectoryPoint> & traj_points) const;
 
-  ObjectiveMatrix getObjectiveMatrix(
+  ObjectiveMatrix calcObjectiveMatrix(
     const StateEquationGenerator::Matrix & mpt_mat, const ValueMatrix & obj_mat,
     const std::vector<ReferencePoint> & ref_points) const;
 
-  ConstraintMatrix getConstraintMatrix(
+  ConstraintMatrix calcConstraintMatrix(
     const StateEquationGenerator::Matrix & mpt_mat,
     const std::vector<ReferencePoint> & ref_points) const;
 
@@ -286,6 +287,8 @@ private:
     const std::vector<TrajectoryPoint> & mpt_traj_points) const;
   std::vector<TrajectoryPoint> extractFixedPoints(
     const std::vector<ReferencePoint> & ref_points) const;
+
+  size_t getNumberOfSlackVariables() const;
 };
 }  // namespace obstacle_avoidance_planner
 #endif  // OBSTACLE_AVOIDANCE_PLANNER__MPT_OPTIMIZER_HPP_
