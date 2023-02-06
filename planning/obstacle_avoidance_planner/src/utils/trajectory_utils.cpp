@@ -152,7 +152,7 @@ std::vector<ReferencePoint> resampleReferencePoints(
 {
   // resample pose and velocity
   const auto traj_points = convertToTrajectoryPoints(ref_points);
-  const auto resampled_traj_points = resampleTrajectoryPoints(traj_points, interval);
+  const auto resampled_traj_points = resampleTrajectoryPointsWithoutStopPoint(traj_points, interval);
   const auto resampled_ref_points = convertToReferencePoints(resampled_traj_points);
 
   // resample curvature

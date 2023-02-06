@@ -238,7 +238,8 @@ void updateFrontPointForFix(
   const double dist = tier4_autoware_utils::calcDistance2d(points.front(), target_pose);
 
   // check if deviation is too large
-  if (3.0 < dist) {
+  constexpr double max_lat_error = 3.0;
+  if (max_lat_error < dist) {
     RCLCPP_WARN(
       rclcpp::get_logger("obstacle_avoidance_planner.trajectory_utils"),
       "New Fixed point is too far from points %f [m]", dist);
