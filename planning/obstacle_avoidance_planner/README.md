@@ -191,13 +191,6 @@ Although it has a cons to converge to the local minima, it can get a good soluti
 
 ## How to Tune Parameters
 
-### Assumptions
-
-- EB optimized trajectory length should be longer than MPT optimized trajectory length
-  - since MPT result may be jerky because of non-fixed reference path (= EB optimized trajectory)
-  - At least, EB fixed optimized trajectory length must be longer than MPT fixed optimization trajectory length
-    - This causes the case that there is a large difference between MPT fixed optimized point and MPT optimized point just after the point.
-
 ### Drivability in narrow roads
 
 - set `option.drivability_check.use_vehicle_circles` true
