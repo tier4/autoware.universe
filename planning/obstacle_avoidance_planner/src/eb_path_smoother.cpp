@@ -152,12 +152,6 @@ EBPathSmoother::EBPathSmoother(
   // eb param
   eb_param_ = EBParam(node);
 
-  const auto & p = eb_param_;
-  const auto & qp_param = p.qp_param;
-
-  // initialize osqp solver
-  osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>();
-
   // publisher
   debug_eb_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_traj", 1);
   debug_eb_fixed_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_fixed_traj", 1);
@@ -176,7 +170,6 @@ void EBPathSmoother::initialize(const bool enable_debug_info, const TrajectoryPa
 
 void EBPathSmoother::resetPreviousData() {
  prev_eb_traj_points_ptr_ = nullptr;
-  is_osqp_initialized_ = false;
 }
 
 std::optional<std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint>>
@@ -200,7 +193,7 @@ EBPathSmoother::getEBTrajectory(const PlannerData & planner_data)
     geometry_utils::isSamePoint(cropped_traj_points.back(), planner_data.traj_points.back());
 
   // 2. insert fixed point
-  // NOTE: Should be after crop trajectory so that fixed point will not be cropped.
+  // NOTE: This should be after cropping trajectory so that fixed point will not be cropped.
   const auto traj_points_with_fixed_point = insertFixedPoint(cropped_traj_points);
 
   // 3. resample trajectory with delta_arc_length
@@ -211,7 +204,7 @@ EBPathSmoother::getEBTrajectory(const PlannerData & planner_data)
       traj_points_with_fixed_point, eb_param_.delta_arc_length);
 
     // NOTE: The front point is previous optimized one, and the others are the input ones.
-    //       There may be a certain lateral error, which makes orientation large.
+    //       There may be a lateral error between the points, which makes orientation unexpected.
     //       Therefore, the front pose is updated after resample.
     tmp_traj_points.front().pose = traj_points_with_fixed_point.front().pose;
     return tmp_traj_points;
@@ -344,17 +337,18 @@ void EBPathSmoother::updateConstraint(
     theta_mat(i, i + p.num_points) = std::cos(yaw);
   }
 
+  // calculate P
   const Eigen::MatrixXd raw_P_for_smooth = p.smooth_weight * makePMatrix(p.num_points);
   const Eigen::MatrixXd P_for_smooth = theta_mat * raw_P_for_smooth * theta_mat.transpose();
   const Eigen::MatrixXd P_for_lat_error =
     p.lat_error_weight * Eigen::MatrixXd::Identity(p.num_points, p.num_points);
-
   const Eigen::MatrixXd P = P_for_smooth + P_for_lat_error;
 
+  // calculate q
   const Eigen::VectorXd raw_q_for_smooth = theta_mat * raw_P_for_smooth * x_mat;
   const auto q = toStdVector(raw_q_for_smooth);
 
-  if (p.enable_warm_start && is_osqp_initialized_) {
+  if (p.enable_warm_start && osqp_solver_ptr_) {
     osqp_solver_ptr_->updateP(P);
     osqp_solver_ptr_->updateQ(q);
     osqp_solver_ptr_->updateA(A);
@@ -366,8 +360,6 @@ void EBPathSmoother::updateConstraint(
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
     osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
     osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
-
-    is_osqp_initialized_ = true;
   }
 
   // publish fixed trajectory
@@ -375,35 +367,6 @@ void EBPathSmoother::updateConstraint(
   debug_eb_fixed_traj_pub_->publish(eb_fixed_traj);
 
   time_keeper_ptr_->toc(__func__, "        ");
-}
-
-EBPathSmoother::Constraint2d EBPathSmoother::getConstraint2dFromConstraintSegment(
-  const geometry_msgs::msg::Pose & pose, const double constraint_segment_length) const
-{
-  Constraint2d constraint;
-  const double theta = tf2::getYaw(pose.orientation);
-
-  // longitudinal constraint
-  constraint.lon.coef = Eigen::Vector2d(std::cos(theta), std::sin(theta));
-  const double lon_bound =
-    constraint.lon.coef.transpose() * Eigen::Vector2d(pose.position.x, pose.position.y);
-  constraint.lon.upper_bound = lon_bound;
-  constraint.lon.lower_bound = lon_bound;
-
-  // lateral constraint
-  constraint.lat.coef = Eigen::Vector2d(std::sin(theta), -std::cos(theta));
-  const auto lat_bound_pos1 =
-    tier4_autoware_utils::calcOffsetPose(pose, 0.0, -constraint_segment_length / 2.0, 0.0).position;
-  const auto lat_bound_pos2 =
-    tier4_autoware_utils::calcOffsetPose(pose, 0.0, constraint_segment_length / 2.0, 0.0).position;
-  const double lat_bound1 =
-    constraint.lat.coef.transpose() * Eigen::Vector2d(lat_bound_pos1.x, lat_bound_pos1.y);
-  const double lat_bound2 =
-    constraint.lat.coef.transpose() * Eigen::Vector2d(lat_bound_pos2.x, lat_bound_pos2.y);
-  constraint.lat.upper_bound = std::max(lat_bound1, lat_bound2);
-  constraint.lat.lower_bound = std::min(lat_bound1, lat_bound2);
-
-  return constraint;
 }
 
 std::optional<std::vector<double>> EBPathSmoother::optimizeTrajectory()

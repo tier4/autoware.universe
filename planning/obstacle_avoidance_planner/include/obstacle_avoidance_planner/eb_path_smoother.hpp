@@ -103,8 +103,6 @@ private:
   mutable std::shared_ptr<TimeKeeper> time_keeper_ptr_;
   rclcpp::Logger logger_;
 
-  bool is_osqp_initialized_{false};
-
   // publisher
   rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_traj_pub_;
   rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_fixed_traj_pub_;
@@ -121,9 +119,6 @@ private:
   void updateConstraint(
     const std_msgs::msg::Header & header, const std::vector<TrajectoryPoint> & traj_points,
     const bool is_goal_contained, const int pad_start_idx);
-
-  Constraint2d getConstraint2dFromConstraintSegment(
-    const geometry_msgs::msg::Pose & pose, const double constraint_segment_length) const;
 
   std::optional<std::vector<double>> optimizeTrajectory();
 

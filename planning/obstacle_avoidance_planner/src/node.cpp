@@ -292,6 +292,7 @@ std::vector<TrajectoryPoint> ObstacleAvoidancePlanner::generateOptimizedTrajecto
 
   // 1. calculate trajectory with EB and MPT
   //    NOTE: This function may return previously optimized trajectory points.
+  //          Also, velocity on some points will not be updated for a logic purpose.
   auto optimized_traj_points = optimizeTrajectory(planner_data);
 
   // 2. update velocity
