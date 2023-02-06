@@ -14,7 +14,7 @@ from geometry_msgs.msg import Point
 from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry
 from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
-from tier4_debug_msgs.msg import Float32Stamped
+from tier4_debug_msgs.msg import Float32Stamped, Float32MultiArrayStamped
 from visualization_msgs.msg import Marker
 import tf_transformations
 
@@ -63,6 +63,27 @@ class JariCutinAnalyzer(Node):
             Float32Stamped, "/jari/time_to_collision/sim", 1)
         self.pub_ttc_real = self.create_publisher(
             Float32Stamped, "/jari/time_to_collision/real", 1)
+        self.pub_debug_sim = self.create_publisher(
+            Float32MultiArrayStamped, "/jari/debug/sim", 1)
+        self.pub_debug_real = self.create_publisher(
+            Float32MultiArrayStamped, "/jari/debug/real", 1)
+
+        self.msg_debug_sim = Float32MultiArrayStamped()
+        self.msg_debug_real = Float32MultiArrayStamped()
+        # data[0]: yaw ego [rad]
+        # data[1]: yaw forward vehicle [rad]
+        # data[2]: yaw diff [rad]
+        # data[3]: euclidean distance [m]
+        # data[4]: euclidean distance * cos(yaw_diff) [m]
+        # data[5]: length / 2 of the forward vehicle [m]
+        # data[6]: width / 2 of the forward vehicle [m]
+        # data[7]: length / 2 * cos(yaw_diff) [m]
+        # data[8]: width / 2 * sin(yaw_diff) [m]
+        # data[9]: baselink to front [m]
+        # data[10]: sum of length deduction [m]
+        # data[11]: distance between the vehicles [m]
+        # data[12]: pose.position.x [m]
+        # data[13]: pose.position.y [m]
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
 
@@ -72,7 +93,8 @@ class JariCutinAnalyzer(Node):
 
         dist_between_vehicles = self.calc_dist_between_vehicles(
             msg.pose.pose,
-            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose)
+            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose,
+            True)
 
         velocity_ego_vehicle = msg.twist.twist.linear.x
         time_to_collision = dist_between_vehicles / velocity_ego_vehicle
@@ -88,13 +110,17 @@ class JariCutinAnalyzer(Node):
         msg_ttc.data = time_to_collision
         self.pub_ttc_sim.publish(msg_ttc)
 
+        self.msg_debug_sim.stamp = self.get_clock().now().to_msg()
+        self.pub_debug_sim.publish(self.msg_debug_sim)
+
     def onOdomReal(self, msg):
         if self.forward_vehicle_object == None:
             return
 
         dist_between_vehicles = self.calc_dist_between_vehicles(
             msg.pose.pose,
-            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose)
+            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose,
+            False)
 
         velocity_ego_vehicle = msg.twist.twist.linear.x
         time_to_collision = dist_between_vehicles / velocity_ego_vehicle
@@ -110,7 +136,10 @@ class JariCutinAnalyzer(Node):
         msg_ttc.data = time_to_collision
         self.pub_ttc_real.publish(msg_ttc)
 
-    def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose):
+        self.msg_debug_real.stamp = self.get_clock().now().to_msg()
+        self.pub_debug_real.publish(self.msg_debug_real)
+
+    def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose, is_sim):
         yaw_ego_vehicle = quaternion_to_yaw(ego_vehicle_pose.orientation)
         yaw_forward_vehicle = quaternion_to_yaw(forward_vehicle_pose.orientation)
         yaw_diff = math.fabs(yaw_ego_vehicle - yaw_forward_vehicle)
@@ -130,6 +159,27 @@ class JariCutinAnalyzer(Node):
         # print(f"euclidean_dist * cos: {euclidean_dist * math.cos(yaw_diff)}")
         # print(f"length/2 * cos: {length_forward_vehicle / 2.0 * math.cos(yaw_diff)}")
         # print(f"width/2 * sin: {width_forward_vehicle / 2.0 * math.sin(yaw_diff)}")
+
+        debug_array = []
+        debug_array.append(yaw_ego_vehicle)
+        debug_array.append(yaw_forward_vehicle)
+        debug_array.append(yaw_diff)
+        debug_array.append(euclidean_dist)
+        debug_array.append(euclidean_dist * math.cos(yaw_diff))
+        debug_array.append(length_forward_vehicle / 2.0)
+        debug_array.append(width_forward_vehicle / 2.0)
+        debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
+        debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
+        debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE)
+        debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE + length_forward_vehicle / 2.0 * math.cos(yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+        debug_array.append(debug_array[4] - debug_array[10])
+        debug_array.append(ego_vehicle_pose.position.x)
+        debug_array.append(ego_vehicle_pose.position.y)
+
+        if is_sim:
+            self.msg_debug_sim.data = debug_array
+        else:
+            self.msg_debug_real.data = debug_array
 
         return dist_between_vehicles
 
