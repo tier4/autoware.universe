@@ -553,12 +553,12 @@ std::vector<ReferencePoint> MPTOptimizer::calcReferencePoints(
     ref_points.resize(mpt_param_.num_points);
   }
 
-  // // TODO(murooka) remove this by stabling optimization
-  // // Currently, without this, the optimization result is weird
-  // // with sample_map.
-  // for (size_t i = 0; i < ref_points.size(); ++i) {
-  //   ref_points.at(i).curvature = 0.0;
-  // }
+  // TODO(murooka) remove this by stabling optimization
+  // Currently, without this, the optimization result is weird
+  // with sample_map.
+  for (size_t i = 0; i < ref_points.size(); ++i) {
+    ref_points.at(i).curvature = 0.0;
+  }
 
   time_keeper_ptr_->toc(__func__, "        ");
 
@@ -606,11 +606,22 @@ void MPTOptimizer::updateFixedPoint(std::vector<ReferencePoint> & ref_points) co
     ref_points, prev_ref_front_point.pose, mpt_param_.delta_arc_length);
   ref_points.front().curvature = prev_ref_front_point.curvature;
 
+  // add previous front pose and curvature
+  if (prev_ref_front_point_idx != 0) {
+    ref_points.insert(ref_points.begin(), prev_ref_points_ptr_->at(prev_ref_front_point_idx - 1));
+  }
+
   // resample to make ref_points' interval constant.
   // NOTE: Only pose, velocity and curvature will be interpolated.
   ref_points = trajectory_utils::resampleReferencePoints(ref_points, mpt_param_.delta_arc_length);
-  // TODO(murooka) deal with it
-  // ref_points.front().pose = prev_ref_front_point.pose;
+
+  // update pose
+  if (prev_ref_front_point_idx != 0) {
+    ref_points.front().pose = prev_ref_points_ptr_->at(prev_ref_front_point_idx - 1).pose;
+    ref_points.at(1).pose = prev_ref_front_point.pose;
+  } else {
+    ref_points.front().pose = prev_ref_front_point.pose;
+  }
 
   ref_points.front().fixed_kinematic_state = prev_ref_front_point.optimized_kinematic_state;
 
