@@ -63,14 +63,6 @@ Eigen::MatrixXd makePMatrix(const int num_points)
   return P;
 }
 
-// make default linear constraint matrix
-// NOTE: The value (1.0) is not valid. Where non-zero values exist is valid.
-Eigen::MatrixXd makeDefaultAMatrix(const size_t num_points)
-{
-  const Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points, num_points);
-  return A;
-}
-
 std::vector<double> toStdVector(const Eigen::VectorXd & eigen_vec)
 {
   return {eigen_vec.data(), eigen_vec.data() + eigen_vec.rows()};
@@ -160,30 +152,11 @@ EBPathSmoother::EBPathSmoother(
   // eb param
   eb_param_ = EBParam(node);
 
+  const auto & p = eb_param_;
+  const auto & qp_param = p.qp_param;
+
   // initialize osqp solver
-  const auto & qp_param = eb_param_.qp_param;
-  const int num_points = eb_param_.num_points;
-
-  Eigen::MatrixXd theta_mat = Eigen::MatrixXd::Zero(num_points, 2 * num_points);
-  for (size_t i = 0; i < static_cast<size_t>(num_points); ++i) {
-    theta_mat(i, i) = 1.0;
-    theta_mat(i, i + num_points) = 1.0;
-  }
-  const Eigen::MatrixXd P = makePMatrix(num_points);
-  const Eigen::MatrixXd modified_P = theta_mat * P * theta_mat.transpose();
-
-  const std::vector<double> modified_q(num_points, 1.0);
-
-  const Eigen::MatrixXd A = makeDefaultAMatrix(num_points);
-  const std::vector<double> lower_bound(num_points, 1.0);
-  const std::vector<double> upper_bound(num_points, 1.0);
-
-  osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(
-    modified_P, A, modified_q, lower_bound, upper_bound, qp_param.eps_abs);
-
-  // osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>(qp_param.eps_abs);
-  osqp_solver_ptr_->updateEpsRel(qp_param.eps_rel);
-  osqp_solver_ptr_->updateMaxIter(qp_param.max_iteration);
+  osqp_solver_ptr_ = std::make_unique<autoware::common::osqp::OSQPInterface>();
 
   // publisher
   debug_eb_traj_pub_ = node->create_publisher<Trajectory>("~/debug/eb_traj", 1);
@@ -201,7 +174,10 @@ void EBPathSmoother::initialize(const bool enable_debug_info, const TrajectoryPa
   traj_param_ = traj_param;
 }
 
-void EBPathSmoother::resetPreviousData() { prev_eb_traj_points_ptr_ = nullptr; }
+void EBPathSmoother::resetPreviousData() {
+ prev_eb_traj_points_ptr_ = nullptr;
+  is_osqp_initialized_ = false;
+}
 
 std::optional<std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint>>
 EBPathSmoother::getEBTrajectory(const PlannerData & planner_data)
@@ -378,7 +354,7 @@ void EBPathSmoother::updateConstraint(
   const Eigen::VectorXd raw_q_for_smooth = theta_mat * raw_P_for_smooth * x_mat;
   const auto q = toStdVector(raw_q_for_smooth);
 
-  if (p.enable_warm_start) {
+  if (p.enable_warm_start && is_osqp_initialized_) {
     osqp_solver_ptr_->updateP(P);
     osqp_solver_ptr_->updateQ(q);
     osqp_solver_ptr_->updateA(A);
@@ -390,6 +366,8 @@ void EBPathSmoother::updateConstraint(
     osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
     osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
     osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+
+    is_osqp_initialized_ = true;
   }
 
   // publish fixed trajectory

@@ -103,6 +103,8 @@ private:
   mutable std::shared_ptr<TimeKeeper> time_keeper_ptr_;
   rclcpp::Logger logger_;
 
+  bool is_osqp_initialized_{false};
+
   // publisher
   rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_traj_pub_;
   rclcpp::Publisher<Trajectory>::SharedPtr debug_eb_fixed_traj_pub_;
