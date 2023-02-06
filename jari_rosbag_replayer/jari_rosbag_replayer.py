@@ -13,6 +13,8 @@ from geometry_msgs.msg import Pose, Point
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
+from autoware_auto_control_msgs.msg import AckermannControlCommand
+from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
 from visualization_msgs.msg import Marker
 
 # set line: when the ego is over the line, the rosbag start is triggered
@@ -50,12 +52,20 @@ class JariRosbagReplayer(Node):
         self.triggered_time = None
         self.next_pub_index_ego_odom = 0
         self.next_pub_index_perception = 0
+        self.next_pub_index_ego_control_cmd = 0
+        self.next_pub_index_ego_control_debug = 0
 
         self.sub_odom = self.create_subscription(
             Odometry, "/localization/kinematic_state", self.onOdom, 1
         )
         self.pub_ego_odom = self.create_publisher(
             Odometry, "/localization/kinematic_state_rosbag", 1
+        )
+        self.pub_ego_control_cmd = self.create_publisher(
+            AckermannControlCommand, "/control/command/control_cmd_rosbag", 1
+        )
+        self.pub_ego_control_debug = self.create_publisher(
+            Float32MultiArrayDiagnostic, "/control/trajectory_follower/longitudinal/diagnostic_rosbag", 1
         )
         self.pub_perception = self.create_publisher(
             PredictedObjects, "/perception/object_recognition/objects", 1
@@ -65,6 +75,8 @@ class JariRosbagReplayer(Node):
         )
         self.rosbag_objects_data = []
         self.rosbag_ego_data = []
+        self.rosbag_ego_control_cmd = []
+        self.rosbag_ego_control_debug = []
         self.load_rosbag("/mnt/data/rosbags/230118_jari_planning_sim/16_1")
 
         self.publish_empty_object()
@@ -143,6 +155,40 @@ class JariRosbagReplayer(Node):
             else:
                 break
 
+        # publish_until_spent_time (todo: make function)
+        while rclpy.ok() and self.next_pub_index_ego_control_cmd < len(self.rosbag_ego_control_cmd):
+            object = self.rosbag_ego_control_cmd[self.next_pub_index_ego_control_cmd]
+            t_spent_rosbag = object[0] - T0
+            if t_spent_rosbag < 0: # do not use data before T0
+                self.next_pub_index_ego_control_cmd += + 1
+                continue
+            if t_spent_rosbag < t_spent_real:
+                msg = object[1]
+                msg.stamp = self.get_clock().now().to_msg()
+                self.pub_ego_control_cmd.publish(msg)
+                self.next_pub_index_ego_control_cmd += + 1
+                # print("odom published: ", self.next_pub_index_ego_control_cmd, "t_spent_rosbag: ", t_spent_rosbag)
+            else:
+                break
+
+        # publish_until_spent_time (todo: make function)
+        while rclpy.ok() and self.next_pub_index_ego_control_debug < len(self.rosbag_ego_control_debug):
+            object = self.rosbag_ego_control_debug[self.next_pub_index_ego_control_debug]
+            t_spent_rosbag = object[0] - T0
+            if t_spent_rosbag < 0: # do not use data before T0
+                self.next_pub_index_ego_control_debug += + 1
+                continue
+            if t_spent_rosbag < t_spent_real:
+                msg = object[1]
+                msg.diag_header.data_stamp = self.get_clock().now().to_msg()
+                msg.diag_header.computation_start = self.get_clock().now().to_msg()
+                self.pub_ego_control_debug.publish(msg)
+                self.next_pub_index_ego_control_debug += + 1
+                # print("odom published: ", self.next_pub_index_ego_control_debug, "t_spent_rosbag: ", t_spent_rosbag)
+            else:
+                break
+
+
 
     def onOdom(self, odom):
         pos = odom.pose.pose.position
@@ -161,7 +207,10 @@ class JariRosbagReplayer(Node):
 
         perception_topic = '/perception/object_recognition/objects'
         ego_odom_topic = '/localization/kinematic_state'
-        topic_filter = StorageFilter(topics=[perception_topic, ego_odom_topic])
+        ego_control_cmd_topic = '/control/command/control_cmd'
+        ego_control_debug_topic = '/control/trajectory_follower/longitudinal/diagnostic'
+        topic_filter = StorageFilter(
+            topics=[perception_topic, ego_odom_topic, ego_control_cmd_topic, ego_control_debug_topic])
         reader.set_filter(topic_filter)
 
         while reader.has_next():
@@ -172,6 +221,10 @@ class JariRosbagReplayer(Node):
                 self.rosbag_objects_data.append((stamp, msg))
             if (topic == ego_odom_topic):
                 self.rosbag_ego_data.append((stamp, msg))
+            if (topic == ego_control_cmd_topic):
+                self.rosbag_ego_control_cmd.append((stamp, msg))
+            if (topic == ego_control_debug_topic):
+                self.rosbag_ego_control_debug.append((stamp, msg))
 
         # print(self.rosbag_objects_data[0])
         # print(self.rosbag_ego_data[0])
