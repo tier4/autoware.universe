@@ -64,7 +64,7 @@ Eigen::MatrixXd makePMatrix(const int num_points)
 }
 
 // make default linear constraint matrix
-// NOTE: value (1.0) is not valid. Where non-zero values exis is valid.
+// NOTE: The value (1.0) is not valid. Where non-zero values exist is valid.
 Eigen::MatrixXd makeDefaultAMatrix(const size_t num_points)
 {
   Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_points * 2, num_points * 2);
@@ -84,6 +84,8 @@ namespace obstacle_avoidance_planner
 EBPathSmoother::EBParam::EBParam(rclcpp::Node * node)
 {
   {  // option
+    enable_warm_start =
+      node->declare_parameter<bool>("eb.option.enable_warm_start");
     enable_optimization_validation =
       node->declare_parameter<bool>("eb.option.enable_optimization_validation");
   }
@@ -113,6 +115,11 @@ EBPathSmoother::EBParam::EBParam(rclcpp::Node * node)
 void EBPathSmoother::EBParam::onParam(const std::vector<rclcpp::Parameter> & parameters)
 {
   using tier4_autoware_utils::updateParam;
+
+  {  // option
+    updateParam<bool>(parameters, "eb.option.enable_warm_start", enable_warm_start);
+    updateParam<bool>(parameters, "eb.option.enable_optimization_validation", enable_optimization_validation);
+  }
 
   {  // common
     updateParam<double>(parameters, "eb.common.delta_arc_length", delta_arc_length);
@@ -327,15 +334,16 @@ void EBPathSmoother::updateConstraint(
     lower_bound.at(i + p.num_points) = constraint.lat.lower_bound;
   }
 
-  const bool enable_warm_start = true;
-  if (enable_warm_start) {
+  if (p.enable_warm_start) {
     const auto A_csc = autoware::common::osqp::calCSCMatrix(A);
     osqp_solver_ptr_->updateCscA(A_csc);
     osqp_solver_ptr_->updateL(lower_bound);
     osqp_solver_ptr_->updateU(upper_bound);
-    osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
-    osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
-    osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
+    // osqp_solver_ptr_->updateA(A);
+    // osqp_solver_ptr_->updateBounds(lower_bound, upper_bound);
+    // osqp_solver_ptr_->updateEpsRel(p.qp_param.eps_rel);
+    // osqp_solver_ptr_->updateEpsAbs(p.qp_param.eps_abs);
+    // osqp_solver_ptr_->updateMaxIter(p.qp_param.max_iteration);
   } else {
     const Eigen::MatrixXd P = makePMatrix(p.num_points);
     const std::vector<double> q(p.num_points * 2, 0.0);
