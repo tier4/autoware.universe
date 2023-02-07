@@ -20,6 +20,11 @@ rosbagに入っている認識情報に対して、simの車両が動く
   - テストデータで定常状態（車速一定、加速度0になった場所）の左右の点をセット。（goal poseとかを置いてtopic echoでpos.x,yを確認するのが楽）
 - rosbagの再生開始時刻
   - 再生トリガーラインをセットした後にrosbagを流すと、rosbag内部の自己位置がラインを超えたタイミングでターミナルに「ライン超えたよ！」と印字される。そのときに同時に表示されているros timeをrosbagの再生開始時刻にセットする
+  - rosbagの再生開始時刻はrosbag保存時のros timeを入力する必要があるため、再生開始時刻を決めるときのみ以下のコマンドで実行する
+
+```sh
+python3 jari_rosbag_replayer.py --ros-args -p use_sim_time:=true
+```
 
 
 ## TODO
