@@ -203,20 +203,30 @@ MPTOptimizer::MPTParam::MPTParam(
     steer_input_weight = node->declare_parameter<double>("mpt.weight.steer_input_weight");
     steer_rate_weight = node->declare_parameter<double>("mpt.weight.steer_rate_weight");
 
-    obstacle_avoid_lat_error_weight =
-      node->declare_parameter<double>("mpt.weight.obstacle_avoid_lat_error_weight");
-    obstacle_avoid_yaw_error_weight =
-      node->declare_parameter<double>("mpt.weight.obstacle_avoid_yaw_error_weight");
-    obstacle_avoid_steer_input_weight =
-      node->declare_parameter<double>("mpt.weight.obstacle_avoid_steer_input_weight");
-    near_objects_length = node->declare_parameter<double>("mpt.weight.near_objects_length");
-
     terminal_lat_error_weight =
       node->declare_parameter<double>("mpt.weight.terminal_lat_error_weight");
     terminal_yaw_error_weight =
       node->declare_parameter<double>("mpt.weight.terminal_yaw_error_weight");
     goal_lat_error_weight = node->declare_parameter<double>("mpt.weight.goal_lat_error_weight");
     goal_yaw_error_weight = node->declare_parameter<double>("mpt.weight.goal_yaw_error_weight");
+  }
+
+  { // avoidance
+    max_avoidance_cost =
+      node->declare_parameter<double>("mpt.avoidance.max_avoidance_cost");
+    avoidance_cost_margin =
+      node->declare_parameter<double>("mpt.avoidance.avoidance_cost_margin");
+    avoidance_cost_band_length =
+      node->declare_parameter<double>("mpt.avoidance.avoidance_cost_band_length");
+    avoidance_cost_decrease_rate =
+      node->declare_parameter<double>("mpt.avoidance.avoidance_cost_decrease_rate");
+
+    avoidance_lat_error_weight =
+      node->declare_parameter<double>("mpt.avoidance.weight.lat_error_weight");
+    avoidance_yaw_error_weight =
+      node->declare_parameter<double>("mpt.avoidance.weight.yaw_error_weight");
+    avoidance_steer_input_weight =
+      node->declare_parameter<double>("mpt.avoidance.weight.steer_input_weight");
   }
 
   {  // collision free constraints
@@ -335,20 +345,29 @@ void MPTOptimizer::MPTParam::onParam(const std::vector<rclcpp::Parameter> & para
     updateParam<double>(parameters, "mpt.weight.steer_rate_weight", steer_rate_weight);
 
     updateParam<double>(
-      parameters, "mpt.weight.obstacle_avoid_lat_error_weight", obstacle_avoid_lat_error_weight);
-    updateParam<double>(
-      parameters, "mpt.weight.obstacle_avoid_yaw_error_weight", obstacle_avoid_yaw_error_weight);
-    updateParam<double>(
-      parameters, "mpt.weight.obstacle_avoid_steer_input_weight",
-      obstacle_avoid_steer_input_weight);
-    updateParam<double>(parameters, "mpt.weight.near_objects_length", near_objects_length);
-
-    updateParam<double>(
       parameters, "mpt.weight.terminal_lat_error_weight", terminal_lat_error_weight);
     updateParam<double>(
       parameters, "mpt.weight.terminal_yaw_error_weight", terminal_yaw_error_weight);
     updateParam<double>(parameters, "mpt.weight.goal_lat_error_weight", goal_lat_error_weight);
     updateParam<double>(parameters, "mpt.weight.goal_yaw_error_weight", goal_yaw_error_weight);
+  }
+
+  { // avoidance
+    updateParam<double>(
+      parameters, "mpt.avoidance.max_avoidance_cost", max_avoidance_cost);
+    updateParam<double>(
+      parameters, "mpt.avoidance.avoidance_cost_margin", avoidance_cost_margin);
+    updateParam<double>(
+      parameters, "mpt.avoidance.avoidance_cost_band_length", avoidance_cost_band_length);
+    updateParam<double>(
+      parameters, "mpt.avoidance.avoidance_cost_decrease_rate", avoidance_cost_decrease_rate);
+
+    updateParam<double>(
+      parameters, "mpt.avoidance.weight.lat_error_weight", avoidance_lat_error_weight);
+    updateParam<double>(
+      parameters, "mpt.avoidance.weight.yaw_error_weight", avoidance_yaw_error_weight);
+    updateParam<double>(
+      parameters, "mpt.avoidance.weight.steer_input_weight", avoidance_steer_input_weight);
   }
 
   {  // validation
@@ -646,8 +665,8 @@ void MPTOptimizer::updateDeltaArcLength(std::vector<ReferencePoint> & ref_points
 
 void MPTOptimizer::updateExtraPoints(std::vector<ReferencePoint> & ref_points) const
 {
+  // alpha
   for (size_t i = 0; i < ref_points.size(); ++i) {
-    // alpha
     const auto front_wheel_pos =
       trajectory_utils::getNearestPosition(ref_points, i, vehicle_info_.wheel_base_m);
 
@@ -655,42 +674,51 @@ void MPTOptimizer::updateExtraPoints(std::vector<ReferencePoint> & ref_points) c
       tier4_autoware_utils::calcDistance2d(front_wheel_pos, ref_points.at(i).pose.position) < 1e-03;
     const auto front_wheel_yaw =
       are_too_close_points
-        ? ref_points.at(i).getYaw()
-        : tier4_autoware_utils::calcAzimuthAngle(ref_points.at(i).pose.position, front_wheel_pos);
+      ? ref_points.at(i).getYaw()
+      : tier4_autoware_utils::calcAzimuthAngle(ref_points.at(i).pose.position, front_wheel_pos);
     ref_points.at(i).alpha =
       tier4_autoware_utils::normalizeRadian(front_wheel_yaw - ref_points.at(i).getYaw());
+  }
 
-    /*
-    // near objects
-    ref_points.at(i).near_objects = [&]() {
-      const int avoidance_check_steps =
-        mpt_param_.near_objects_length / mpt_param_.delta_arc_length;
+  { // avoidance
+    // calculate one-step avoidance const
+    for (size_t i = 0; i < ref_points.size(); ++i) {
+      const double negative_avoidance_cost = std::min(-ref_points.at(i).bounds.lower_bound - mpt_param_.avoidance_cost_margin,
+                                                      ref_points.at(i).bounds.upper_bound - mpt_param_.avoidance_cost_margin);
+      if (negative_avoidance_cost < 0) {
+        const double normalized_avoidance_cost = std::clamp(-negative_avoidance_cost / mpt_param_.max_avoidance_cost, 0.0, 1.0);
 
-      const int avoidance_check_begin_idx =
-        std::max(0, static_cast<int>(i) - avoidance_check_steps);
-      const int avoidance_check_end_idx =
-        std::min(static_cast<int>(ref_points.size()), static_cast<int>(i) + avoidance_check_steps);
-
-      for (int a_idx = avoidance_check_begin_idx; a_idx < avoidance_check_end_idx; ++a_idx) {
-        if (ref_points.at(a_idx).vehicle_bounds.at(0).hasCollisionWithObject()) {
-          return true;
+        const int max_length_idx = std::floor(mpt_param_.avoidance_cost_band_length / mpt_param_.delta_arc_length);
+        for (int j = -max_length_idx; j <= max_length_idx; ++j) {
+          const int k = i + j;
+          if (0 <= k && k < static_cast<int>(ref_points.size())) {
+            ref_points.at(k).normalized_avoidance_cost = normalized_avoidance_cost;
+          }
         }
       }
-      return false;
-    }();
-    */
+    }
 
-    // The point are considered to be near the object if nearest previous ref point is near the
-    // object.
-    if (prev_ref_points_ptr_ && prev_ref_points_ptr_->empty()) {
-      const size_t prev_idx = motion_utils::findFirstNearestIndexWithSoftConstraints(
-        *prev_ref_points_ptr_, tier4_autoware_utils::getPose(ref_points.at(i)),
-        traj_param_.delta_dist_threshold_for_closest_point,
-        traj_param_.delta_yaw_threshold_for_closest_point);
-      const double dist_to_nearest_prev_ref =
-        tier4_autoware_utils::calcDistance2d(prev_ref_points_ptr_->at(prev_idx), ref_points.at(i));
-      if (dist_to_nearest_prev_ref < 1.0 && prev_ref_points_ptr_->at(prev_idx).near_objects) {
-        ref_points.at(i).near_objects = true;
+    // calculate spread avoidance cost
+    for (int i = 0; i < static_cast<int>(ref_points.size()); ++i) {
+      const double base_normalized_avoidance_cost = ref_points.at(i).normalized_avoidance_cost;
+      if (0 < base_normalized_avoidance_cost) {
+        const int max_decrease_idx = std::floor(ref_points.at(i).normalized_avoidance_cost / mpt_param_.avoidance_cost_decrease_rate);
+        for (int j = -max_decrease_idx; j <= max_decrease_idx; ++j) {
+          const int k = i + j;
+          if (0 <= k && k < static_cast<int>(ref_points.size())) {
+            const double normalized_avoidance_cost = std::max(base_normalized_avoidance_cost - std::abs(j) * mpt_param_.avoidance_cost_decrease_rate, ref_points.at(k).normalized_avoidance_cost);
+            ref_points.at(k).normalized_avoidance_cost = std::clamp(normalized_avoidance_cost, 0.0, 1.0);
+          }
+        }
+      }
+    }
+
+    // take over previous avoidance cost
+    if (prev_ref_points_ptr_ && !prev_ref_points_ptr_->empty()) {
+      for (int i = 0; i < static_cast<int>(ref_points.size()); ++i) {
+        const size_t prev_idx = trajectory_utils::findEgoIndex(
+          *prev_ref_points_ptr_, tier4_autoware_utils::getPose(ref_points.at(i)), ego_nearest_param_);
+        ref_points.at(i).normalized_avoidance_cost = std::max(prev_ref_points_ptr_->at(prev_idx).normalized_avoidance_cost, ref_points.at(i).normalized_avoidance_cost);
       }
     }
   }
@@ -802,20 +830,20 @@ MPTOptimizer::ValueMatrix MPTOptimizer::calcValueMatrix(
   std::vector<Eigen::Triplet<double>> Q_triplet_vec;
   for (size_t i = 0; i < N_ref; ++i) {
     const auto adaptive_error_weight = [&]() -> std::array<double, 2> {
-      if (ref_points.at(i).near_objects) {
-        return {
-          mpt_param_.obstacle_avoid_lat_error_weight, mpt_param_.obstacle_avoid_yaw_error_weight};
-      } else if (i == N_ref - 1) {
+      // for terminal point
+      if (i == N_ref - 1) {
         if (is_goal_contained) {
           return {mpt_param_.goal_lat_error_weight, mpt_param_.goal_yaw_error_weight};
         }
         return {mpt_param_.terminal_lat_error_weight, mpt_param_.terminal_yaw_error_weight};
       }
-      // NOTE: may be better to add decreasing weights in a narrow and sharp curve
-      // else if (std::abs(ref_points[i].k) > 0.3) {
-      //   return {0.0, 0.0};
-      // }
-
+      // for avoidance
+      if (0 < ref_points.at(i).normalized_avoidance_cost) {
+        const double lat_error_weight = interpolation::lerp(mpt_param_.lat_error_weight, mpt_param_.avoidance_lat_error_weight, ref_points.at(i).normalized_avoidance_cost);
+        const double yaw_error_weight = interpolation::lerp(mpt_param_.yaw_error_weight, mpt_param_.avoidance_yaw_error_weight, ref_points.at(i).normalized_avoidance_cost);
+        return {lat_error_weight, yaw_error_weight};
+      }
+      // normal case
       return {mpt_param_.lat_error_weight, mpt_param_.yaw_error_weight};
     }();
 
@@ -832,9 +860,7 @@ MPTOptimizer::ValueMatrix MPTOptimizer::calcValueMatrix(
   Eigen::SparseMatrix<double> R_sparse_mat(D_v, D_v);
   std::vector<Eigen::Triplet<double>> R_triplet_vec;
   for (size_t i = 0; i < N_ref - 1; ++i) {
-    const double adaptive_steer_weight = ref_points.at(i).near_objects
-                                           ? mpt_param_.obstacle_avoid_steer_input_weight
-                                           : mpt_param_.steer_input_weight;
+    const double adaptive_steer_weight = interpolation::lerp(mpt_param_.steer_input_weight, mpt_param_.avoidance_steer_input_weight, ref_points.at(i).normalized_avoidance_cost);
     R_triplet_vec.push_back(
       Eigen::Triplet<double>(D_x + D_u * i, D_x + D_u * i, adaptive_steer_weight));
   }

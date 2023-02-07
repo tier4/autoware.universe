@@ -75,13 +75,14 @@ struct ReferencePoint
   double delta_arc_length{0.0};
   double alpha{0.0};
   Bounds bounds{};  // bounds on `pose`
-  bool near_objects{false};
   std::vector<std::optional<double>> beta{};
+  double normalized_avoidance_cost{0.0};
 
   // bounds and its local pose on each collision-free constraint
   std::vector<Bounds> bounds_on_constraints{};
   std::vector<geometry_msgs::msg::Pose> pose_on_constraints{};
 
+  // optimization result
   std::optional<KinematicState> fixed_kinematic_state{std::nullopt};
   KinematicState optimized_kinematic_state{};
   double optimized_input{};
@@ -169,8 +170,6 @@ private:
     double yaw_error_weight;
     double yaw_error_rate_weight;
 
-    double near_objects_length;
-
     double terminal_lat_error_weight;
     double terminal_yaw_error_weight;
     double goal_lat_error_weight;
@@ -179,9 +178,14 @@ private:
     double steer_input_weight;
     double steer_rate_weight;
 
-    double obstacle_avoid_lat_error_weight;
-    double obstacle_avoid_yaw_error_weight;
-    double obstacle_avoid_steer_input_weight;
+    // avoidance
+    double max_avoidance_cost;
+    double avoidance_cost_margin;
+    double avoidance_cost_band_length;
+    double avoidance_cost_decrease_rate;
+    double avoidance_lat_error_weight;
+    double avoidance_yaw_error_weight;
+    double avoidance_steer_input_weight;
 
     // constraint type
     bool soft_constraint;
