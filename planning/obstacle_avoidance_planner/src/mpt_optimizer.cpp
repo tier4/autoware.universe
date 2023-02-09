@@ -134,29 +134,46 @@ std::optional<geometry_msgs::msg::Point> intersect(
   return intersect_point;
 }
 
+bool isLeft(const geometry_msgs::msg::Pose & pose, const geometry_msgs::msg::Point & target_pos)
+{
+  const double base_theta = tf2::getYaw(pose.orientation);
+  const double target_theta = tier4_autoware_utils::calcAzimuthAngle(pose.position, target_pos);
+  const double diff_theta = tier4_autoware_utils::normalizeRadian(target_theta - base_theta);
+  return diff_theta > 0;
+}
+
 // NOTE: Regarding boundary's sign, left is positive, and right is negative
 double calcLateralDistToBounds(
   const geometry_msgs::msg::Pose & pose, const std::vector<geometry_msgs::msg::Point> & bound,
   const double additional_offset, const bool is_left_bound = true)
 {
-  constexpr double max_lat_offset = 5.0;
+  constexpr double max_lat_offset_for_left = 5.0;
+  constexpr double min_lat_offset_for_left = -5.0;
 
-  const double lat_offset = is_left_bound ? max_lat_offset : -max_lat_offset;
-  const auto lat_offset_point =
-    tier4_autoware_utils::calcOffsetPose(pose, 0.0, lat_offset, 0.0).position;
+  const double max_lat_offset = is_left_bound ? max_lat_offset_for_left : -max_lat_offset_for_left;
+  const double min_lat_offset = is_left_bound ? min_lat_offset_for_left : -min_lat_offset_for_left;
+  const auto max_lat_offset_point =
+    tier4_autoware_utils::calcOffsetPose(pose, 0.0, max_lat_offset, 0.0).position;
+  const auto min_lat_offset_point =
+    tier4_autoware_utils::calcOffsetPose(pose, 0.0, min_lat_offset, 0.0).position;
 
-  double dist_to_bound = max_lat_offset;
+  double closest_dist_to_bound = max_lat_offset;
   for (size_t i = 0; i < bound.size() - 1; ++i) {
     const auto intersect_point =
-      intersect(pose.position, lat_offset_point, bound.at(i), bound.at(i + 1));
+      intersect(min_lat_offset_point, max_lat_offset_point, bound.at(i), bound.at(i + 1));
     if (intersect_point) {
-      const double tmp_dist =
-        tier4_autoware_utils::calcDistance2d(pose.position, *intersect_point) - additional_offset;
-      dist_to_bound = std::min(tmp_dist, dist_to_bound);
+      const bool is_point_left = isLeft(pose, *intersect_point);
+      const double dist_to_bound =
+        tier4_autoware_utils::calcDistance2d(pose.position, *intersect_point) *
+        (is_point_left ? 1.0 : -1.0);
+
+      closest_dist_to_bound =
+        is_left_bound ? std::min(dist_to_bound - additional_offset, closest_dist_to_bound)
+                      : std::max(dist_to_bound + additional_offset, closest_dist_to_bound);
     }
   }
 
-  return is_left_bound ? dist_to_bound : -dist_to_bound;
+  return closest_dist_to_bound;
 }
 }  // namespace
 
