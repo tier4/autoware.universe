@@ -196,7 +196,6 @@ autoware_auto_system_msgs::msg::HazardStatus createTimeoutHazardStatus()
   return hazard_status;
 }
 
-/*
 int isInNoFaultCondition(
   const autoware_auto_system_msgs::msg::AutowareState & autoware_state,
   const tier4_control_msgs::msg::GateMode & current_gate_mode)
@@ -223,7 +222,6 @@ int isInNoFaultCondition(
 
   return false;
 }
-*/
 }  // namespace
 
 AutowareErrorMonitor::AutowareErrorMonitor()
@@ -236,6 +234,7 @@ AutowareErrorMonitor::AutowareErrorMonitor()
   get_parameter_or<bool>("ignore_missing_diagnostics", params_.ignore_missing_diagnostics, false);
   get_parameter_or<bool>("add_leaf_diagnostics", params_.add_leaf_diagnostics, true);
   get_parameter_or<double>("data_ready_timeout", params_.data_ready_timeout, 30.0);
+  get_parameter_or<double>("data_heartbeat_timeout", params_.data_heartbeat_timeout, 1.0);
   get_parameter_or<double>("diag_timeout_sec", params_.diag_timeout_sec, 1.0);
   get_parameter_or<double>("hazard_recovery_timeout", params_.hazard_recovery_timeout, 5.0);
   get_parameter_or<int>(
@@ -365,24 +364,36 @@ void AutowareErrorMonitor::onDiagArray(
       diag_buffer.pop_front();
     }
   }
+
+  // for Heartbeat
+  diag_array_stamp_ = this->now();
 }
 
 void AutowareErrorMonitor::onCurrentGateMode(
   const tier4_control_msgs::msg::GateMode::ConstSharedPtr msg)
 {
   current_gate_mode_ = msg;
+
+  // for Heartbeat
+  current_gate_mode_stamp_ = this->now();
 }
 
 void AutowareErrorMonitor::onAutowareState(
   const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg)
 {
   autoware_state_ = msg;
+
+  // for Heartbeat
+  autoware_state_stamp_ = this->now();
 }
 
 void AutowareErrorMonitor::onControlMode(
   const autoware_auto_vehicle_msgs::msg::ControlModeReport::ConstSharedPtr msg)
 {
   control_mode_ = msg;
+
+  // for Heartbeat
+  control_mode_stamp_ = this->now();
 }
 
 bool AutowareErrorMonitor::isDataReady()
@@ -410,6 +421,37 @@ bool AutowareErrorMonitor::isDataReady()
   return true;
 }
 
+bool AutowareErrorMonitor::isDataHeartbeatTimeout()
+{
+  auto isTimeout = [this](const rclcpp::Time & last_stamp, const double threshold) {
+    const auto time_diff = this->now() - last_stamp;
+    return time_diff.seconds() > threshold;
+  };
+
+  if (isTimeout(diag_array_stamp_, params_.data_heartbeat_timeout)) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "diag_array msg is timeout...");
+    return true;
+  }
+
+  if (isTimeout(current_gate_mode_stamp_, params_.data_heartbeat_timeout)) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "current_gate_mode msg is timeout...");
+    return true;
+  }
+
+  if (isTimeout(autoware_state_stamp_, params_.data_heartbeat_timeout)) {
+    RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "autoware_state msg is timeout...");
+    return true;
+  }
+
+  if (isTimeout(control_mode_stamp_, params_.data_heartbeat_timeout)) {
+    RCLCPP_ERROR_THROTTLE(
+      get_logger(), *get_clock(), 5000, "vehicle_state_report msg is timeout...");
+    return true;
+  }
+
+  return false;
+}
+
 void AutowareErrorMonitor::onTimer()
 {
   if (!isDataReady()) {
@@ -419,6 +461,11 @@ void AutowareErrorMonitor::onTimer()
         "input data is timeout");
       publishHazardStatus(createTimeoutHazardStatus());
     }
+    return;
+  }
+
+  if (isDataHeartbeatTimeout()) {
+    publishHazardStatus(createTimeoutHazardStatus());
     return;
   }
 
@@ -527,12 +574,11 @@ autoware_auto_system_msgs::msg::HazardStatus AutowareErrorMonitor::judgeHazardSt
     }
   }
 
-/*
   // Ignore error when vehicle is not ready to start
   if (isInNoFaultCondition(*autoware_state_, *current_gate_mode_)) {
     hazard_status.level = autoware_auto_system_msgs::msg::HazardStatus::NO_FAULT;
   }
-*/
+
   return hazard_status;
 }
 

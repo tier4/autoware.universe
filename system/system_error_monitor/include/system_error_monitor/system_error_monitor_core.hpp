@@ -17,12 +17,12 @@
 
 #include <rclcpp/create_timer.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <std_srvs/srv/trigger.hpp>
 
 #include <autoware_auto_system_msgs/msg/autoware_state.hpp>
 #include <autoware_auto_system_msgs/msg/hazard_status_stamped.hpp>
 #include <autoware_auto_vehicle_msgs/msg/control_mode_report.hpp>
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <tier4_control_msgs/msg/gate_mode.hpp>
 
 #include <boost/optional.hpp>
@@ -71,6 +71,7 @@ private:
     bool ignore_missing_diagnostics;
     bool add_leaf_diagnostics;
     double data_ready_timeout;
+    double data_heartbeat_timeout;
     double diag_timeout_sec;
     double hazard_recovery_timeout;
     int emergency_hazard_level;
@@ -92,6 +93,7 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 
   bool isDataReady();
+  bool isDataHeartbeatTimeout();
   void onTimer();
 
   // Subscriber
@@ -124,6 +126,12 @@ private:
   bool onClearEmergencyService(
     [[maybe_unused]] std_srvs::srv::Trigger::Request::SharedPtr request,
     std_srvs::srv::Trigger::Response::SharedPtr response);
+
+  // for Heartbeat
+  rclcpp::Time diag_array_stamp_;
+  rclcpp::Time autoware_state_stamp_;
+  rclcpp::Time current_gate_mode_stamp_;
+  rclcpp::Time control_mode_stamp_;
 
   // Algorithm
   boost::optional<DiagStamped> getLatestDiag(const std::string & diag_name) const;
