@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 
+import argparse
+import copy
+import math
+import os
+import subprocess
 import time
+
+from autoware_auto_perception_msgs.msg import DetectedObjects
+from autoware_auto_perception_msgs.msg import PredictedObjects
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
 import rclpy
-import rosbag2_py
-from rosbag2_py import StorageFilter
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.serialization import deserialize_message
+import rosbag2_py
+from rosbag2_py import StorageFilter
 from rosidl_runtime_py.utilities import get_message
-from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import PointField
-from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
-import os
-import argparse
-import math
-import subprocess
-from tf2_ros.buffer import Buffer
-from tf2_ros import LookupException
-from tf2_ros.transform_listener import TransformListener
 import tf2_geometry_msgs
-from geometry_msgs.msg import PoseStamped
-from tf_transformations import euler_from_quaternion, quaternion_from_euler
-import copy
+from tf2_ros import LookupException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from tf_transformations import euler_from_quaternion
+from tf_transformations import quaternion_from_euler
+
 
 def get_rosbag_options(path, serialization_format="cdr"):
     storage_options = rosbag2_py.StorageOptions(uri=path, storage_id="sqlite3")
@@ -34,32 +38,36 @@ def get_rosbag_options(path, serialization_format="cdr"):
 
     return storage_options, converter_options
 
+
 def open_reader(path: str):
     storage_options, converter_options = get_rosbag_options(path)
     reader = rosbag2_py.SequentialReader()
     reader.open(storage_options, converter_options)
     return reader
 
+
 def calc_squared_distance(p1, p2):
-    return math.sqrt((p1.x - p2.x)**2 +  (p1.y - p2.y)**2)
+    return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
+
 
 def create_empty_pointcloud(timestamp):
     pointcloud_msg = PointCloud2()
     pointcloud_msg.header.stamp = timestamp
-    pointcloud_msg.header.frame_id= 'map'
-    pointcloud_msg.height=1
+    pointcloud_msg.header.frame_id = "map"
+    pointcloud_msg.height = 1
     pointcloud_msg.is_dense = True
-    pointcloud_msg.point_step=16
-    field_name_vec = ['x', 'y', 'z']
+    pointcloud_msg.point_step = 16
+    field_name_vec = ["x", "y", "z"]
     offset_vec = [0, 4, 8]
     for field_name, offset in zip(field_name_vec, offset_vec):
         field = PointField()
         field.name = field_name
         field.offset = offset
-        field.datatype= 7
-        field.count=1
+        field.datatype = 7
+        field.count = 1
         pointcloud_msg.fields.append(field)
     return pointcloud_msg
+
 
 class PerceptionReproducer(Node):
     def __init__(self, args):
@@ -68,10 +76,10 @@ class PerceptionReproducer(Node):
 
         # kill empty_objects_publisher
         if self.args.predicted_object:
-            cmd="ps aux | grep empty_objects_publisher | awk '{ print \"kill \", $2 }' | sh"
+            cmd = "ps aux | grep empty_objects_publisher | awk '{ print \"kill \", $2 }' | sh"
         else:
-            cmd="ps aux | grep dummy_perception_publisher | awk '{ print \"kill \", $2 }' | sh"
-        ps = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+            cmd = "ps aux | grep dummy_perception_publisher | awk '{ print \"kill \", $2 }' | sh"
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         ps.communicate()[0]
 
         # subscriber
@@ -82,12 +90,15 @@ class PerceptionReproducer(Node):
         # publisher
         if self.args.predicted_object:
             self.objects_pub = self.create_publisher(
-                PredictedObjects, "/perception/object_recognition/objects", 1)
+                PredictedObjects, "/perception/object_recognition/objects", 1
+            )
         else:
             self.objects_pub = self.create_publisher(
-                DetectedObjects, "/perception/object_recognition/detection/objects", 1)
+                DetectedObjects, "/perception/object_recognition/detection/objects", 1
+            )
         self.pointcloud_pub = self.create_publisher(
-            PointCloud2, "/perception/obstacle_segmentation/pointcloud", 1)
+            PointCloud2, "/perception/obstacle_segmentation/pointcloud", 1
+        )
 
         # tf
         if not self.args.predicted_object:
@@ -106,7 +117,7 @@ class PerceptionReproducer(Node):
             self.load_rosbag(args.bag)
         elif args.directory:
             for bag_file in sorted(os.listdir(args.directory)):
-                self.load_rosbag(args.directory + '/' + bag_file)
+                self.load_rosbag(args.directory + "/" + bag_file)
         print("Ended loading rosbag")
 
         # wait for ready to publish/subscribe
@@ -131,19 +142,33 @@ class PerceptionReproducer(Node):
             if objects_msg:
                 objects_msg.header.stamp = timestamp
                 if not self.args.predicted_object:
-                    objects_msg.header.frame_id = 'map'
+                    objects_msg.header.frame_id = "map"
                     for o in objects_msg.objects:
                         object_pose = o.kinematics.pose_with_covariance.pose
-                        ego_orientation_list = [self.ego_pose.orientation.x, self.ego_pose.orientation.y, self.ego_pose.orientation.z, self.ego_pose.orientation.w]
+                        ego_orientation_list = [
+                            self.ego_pose.orientation.x,
+                            self.ego_pose.orientation.y,
+                            self.ego_pose.orientation.z,
+                            self.ego_pose.orientation.w,
+                        ]
                         ego_yaw = euler_from_quaternion(ego_orientation_list)[2]
                         print(ego_yaw)
                         theta = math.atan2(object_pose.position.x, object_pose.position.y)
                         length = math.hypot(object_pose.position.x, object_pose.position.y)
 
-                        object_pose.position.x = self.ego_pose.position.x + length * math.cos(ego_yaw + theta)
-                        object_pose.position.y = self.ego_pose.position.y + length * math.sin(ego_yaw + theta)
+                        object_pose.position.x = self.ego_pose.position.x + length * math.cos(
+                            ego_yaw + theta
+                        )
+                        object_pose.position.y = self.ego_pose.position.y + length * math.sin(
+                            ego_yaw + theta
+                        )
 
-                        obj_orientation_list = [object_pose.orientation.x, object_pose.orientation.y, object_pose.orientation.z, object_pose.orientation.w]
+                        obj_orientation_list = [
+                            object_pose.orientation.x,
+                            object_pose.orientation.y,
+                            object_pose.orientation.z,
+                            object_pose.orientation.w,
+                        ]
                         obj_yaw = euler_from_quaternion(obj_orientation_list)[2]
                         obj_q = quaternion_from_euler(0, 0, ego_yaw + obj_yaw)
                         object_pose.orientation.x = obj_q[0]
@@ -164,7 +189,7 @@ class PerceptionReproducer(Node):
             end_idx = len(self.rosbag_ego_odom_data) - 1
 
         nearest_idx = 0
-        nearest_dist = float('inf')
+        nearest_dist = float("inf")
         for idx in range(start_idx, end_idx + 1):
             data = self.rosbag_ego_odom_data[idx]
             dist = calc_squared_distance(data[1].pose.pose.position, ego_pose.position)
@@ -187,8 +212,12 @@ class PerceptionReproducer(Node):
         # Create a map for quicker lookup
         type_map = {topic_types[i].name: topic_types[i].type for i in range(len(topic_types))}
 
-        objects_topic = '/perception/object_recognition/objects' if self.args.predicted_object else '/perception/object_recognition/detection/objects'
-        ego_odom_topic = '/localization/kinematic_state'
+        objects_topic = (
+            "/perception/object_recognition/objects"
+            if self.args.predicted_object
+            else "/perception/object_recognition/detection/objects"
+        )
+        ego_odom_topic = "/localization/kinematic_state"
         topic_filter = StorageFilter(topics=[objects_topic, ego_odom_topic])
         reader.set_filter(topic_filter)
 
@@ -202,11 +231,14 @@ class PerceptionReproducer(Node):
             if topic == ego_odom_topic:
                 self.rosbag_ego_odom_data.append((stamp, msg))
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--bag', help='rosbag', default=None)
-    parser.add_argument('-d', '--directory', help='directory of rosbags', default=None)
-    parser.add_argument('-p', '--predicted-object', help='publish predicted object', action='store_true')
+    parser.add_argument("-b", "--bag", help="rosbag", default=None)
+    parser.add_argument("-d", "--directory", help="directory of rosbags", default=None)
+    parser.add_argument(
+        "-p", "--predicted-object", help="publish predicted object", action="store_true"
+    )
     args = parser.parse_args()
 
     rclpy.init()

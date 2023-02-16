@@ -696,31 +696,42 @@ void MPTOptimizer::updateExtraPoints(std::vector<ReferencePoint> & ref_points) c
   {  // avoidance
     // calculate one-step avoidance const
     for (size_t i = 0; i < ref_points.size(); ++i) {
-      const double negative_avoidance_cost = std::min(
-        -ref_points.at(i).bounds.lower_bound - mpt_param_.avoidance_cost_margin,
-        ref_points.at(i).bounds.upper_bound - mpt_param_.avoidance_cost_margin);
-      if (negative_avoidance_cost < 0) {
-        const double normalized_avoidance_cost =
-          std::clamp(-negative_avoidance_cost / mpt_param_.max_avoidance_cost, 0.0, 1.0);
-
+      const auto normalized_avoidance_cost = calcNormalizedAvoidanceCost(ref_points.at(i));
+      if (normalized_avoidance_cost) {
         const int max_length_idx =
           std::floor(mpt_param_.avoidance_cost_band_length / mpt_param_.delta_arc_length);
         for (int j = -max_length_idx; j <= max_length_idx; ++j) {
           const int k = i + j;
           if (0 <= k && k < static_cast<int>(ref_points.size())) {
-            ref_points.at(k).normalized_avoidance_cost = normalized_avoidance_cost;
+            ref_points.at(k).normalized_avoidance_cost = *normalized_avoidance_cost;
           }
         }
       }
     }
 
-    // calculate spread avoidance cost
+    /*
+    // update avoidance cost between longitudinally close obstacles
+    constexpr double max_longitudinal_length_to_fill_drivable_area = 50;
+    const int edge_fill_index = std::ceil(max_longitudinal_length_to_fill_drivable_area /
+    mpt_param_.delta_arc_length / 2); const auto copied_ref_points = ref_points; for (size_t i = 0;
+    i < ref_points.size(); ++i) { const double base_normalized_avoidance_cost =
+    ref_points.at(i).normalized_avoidance_cost; for (int j = -edge_fill_index; j <= edge_fill_index;
+    ++j) { const int k = i + j; if (k < 0 || ref_points.size() - 1 <= k) { continue;
+        }
+        ref_points.at(i).normalized_avoidance_cost =
+    std::max(ref_points.at(i).normalized_avoidance_cost,
+    copied_ref_points.at(k).normalized_avoidance_cost);
+      }
+    }
+    */
+
+    // update spread avoidance cost
     for (int i = 0; i < static_cast<int>(ref_points.size()); ++i) {
       const double base_normalized_avoidance_cost = ref_points.at(i).normalized_avoidance_cost;
       if (0 < base_normalized_avoidance_cost) {
-        const int max_decrease_idx = std::floor(
+        const int edge_decrease_idx = std::floor(
           ref_points.at(i).normalized_avoidance_cost / mpt_param_.avoidance_cost_decrease_rate);
-        for (int j = -max_decrease_idx; j <= max_decrease_idx; ++j) {
+        for (int j = -edge_decrease_idx; j <= edge_decrease_idx; ++j) {
           const int k = i + j;
           if (0 <= k && k < static_cast<int>(ref_points.size())) {
             const double normalized_avoidance_cost = std::max(
@@ -735,11 +746,19 @@ void MPTOptimizer::updateExtraPoints(std::vector<ReferencePoint> & ref_points) c
     }
 
     // take over previous avoidance cost
+    const double max_dist_threshold = mpt_param_.delta_arc_length / 2.0;
     if (prev_ref_points_ptr_ && !prev_ref_points_ptr_->empty()) {
       for (int i = 0; i < static_cast<int>(ref_points.size()); ++i) {
         const size_t prev_idx = trajectory_utils::findEgoIndex(
           *prev_ref_points_ptr_, tier4_autoware_utils::getPose(ref_points.at(i)),
           ego_nearest_param_);
+
+        const double dist_to_prev = tier4_autoware_utils::calcDistance2d(
+          ref_points.at(i), prev_ref_points_ptr_->at(prev_idx));
+        if (max_dist_threshold < dist_to_prev) {
+          continue;
+        }
+
         ref_points.at(i).normalized_avoidance_cost = std::max(
           prev_ref_points_ptr_->at(prev_idx).normalized_avoidance_cost,
           ref_points.at(i).normalized_avoidance_cost);
@@ -766,6 +785,23 @@ void MPTOptimizer::updateBounds(
       calcLateralDistToBounds(ref_point.pose, right_bound, soft_road_clearance, false);
     ref_point.bounds = Bounds{dist_to_right_bound, dist_to_left_bound};
   }
+
+  /*
+  // TODO(murooka)
+  // fill between obstacles
+  constexpr double max_longitudinal_length_to_fill_drivable_area = 20;
+  const int edge_fill_index = std::ceil(max_longitudinal_length_to_fill_drivable_area /
+  mpt_param_.delta_arc_length / 2); for (int i = 0; i < ref_points.size(); ++i) { for (int j =
+  -edge_fill_index; j <= edge_fill_index; ++j) { const int k = i + j; if (k < 0 || ref_points.size()
+  - 1 <= k) { continue;
+      }
+
+      const auto normalized_avoidance_cost = calcNormalizedAvoidanceCost(ref_points.at(k));
+      if (normalized_avoidance_cost) {
+      }
+    }
+  }
+  */
 
   time_keeper_ptr_->toc(__func__, "          ");
   return;
@@ -1427,5 +1463,17 @@ size_t MPTOptimizer::getNumberOfSlackVariables() const
     return vehicle_circle_longitudinal_offsets_.size();
   }
   return 0;
+}
+
+std::optional<double> MPTOptimizer::calcNormalizedAvoidanceCost(
+  const ReferencePoint & ref_point) const
+{
+  const double negative_avoidance_cost = std::min(
+    -ref_point.bounds.lower_bound - mpt_param_.avoidance_cost_margin,
+    ref_point.bounds.upper_bound - mpt_param_.avoidance_cost_margin);
+  if (0 <= negative_avoidance_cost) {
+    return {};
+  }
+  return std::clamp(-negative_avoidance_cost / mpt_param_.max_avoidance_cost, 0.0, 1.0);
 }
 }  // namespace obstacle_avoidance_planner

@@ -293,6 +293,7 @@ private:
     const std::vector<ReferencePoint> & ref_points) const;
 
   size_t getNumberOfSlackVariables() const;
+  std::optional<double> calcNormalizedAvoidanceCost(const ReferencePoint & ref_point) const;
 };
 }  // namespace obstacle_avoidance_planner
 #endif  // OBSTACLE_AVOIDANCE_PLANNER__MPT_OPTIMIZER_HPP_
