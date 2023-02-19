@@ -86,6 +86,16 @@ def launch_setup(context, *args, **kwargs):
             process_monitor_config,
         ],
     )
+    with open(LaunchConfiguration("voltage_monitor_config_file").perform(context), "r") as f:
+        voltage_monitor_config = yaml.safe_load(f)["/**"]["ros__parameters"]
+    voltage_monitor = ComposableNode(
+        package="system_monitor",
+        plugin="VoltageMonitor",
+        name="sub_voltage_monitor",
+        parameters=[
+            voltage_monitor_config,
+        ],
+    )
 
     # set container to run all required components in the same process
     container = ComposableNodeContainer(
@@ -100,6 +110,7 @@ def launch_setup(context, *args, **kwargs):
             net_monitor,
             ntp_monitor,
             process_monitor,
+            voltage_monitor,
         ],
         output="screen",
     )
@@ -139,6 +150,10 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "gpu_monitor_config_file",
                 default_value=os.path.join(system_monitor_path, "gpu_monitor.param.yaml"),
+            ),
+            DeclareLaunchArgument(
+                "voltage_monitor_config_file",
+                default_value=os.path.join(system_monitor_path, "voltage_monitor.param.yaml"),
             ),
             OpaqueFunction(function=launch_setup),
         ]
