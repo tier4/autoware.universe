@@ -268,10 +268,14 @@ std::pair<lanelet::BasicPoint2d, double> calcSmallestEnclosingCircle(
 
 std::vector<geometry_msgs::msg::Point> DetectionAreaModule::getObstaclePoints() const
 {
+  if (!planner_data_->compare_map_pointcloud) {
+    return std::vector<geometry_msgs::msg::Point>();
+  }
+
   std::vector<geometry_msgs::msg::Point> obstacle_points;
 
   const auto detection_areas = detection_area_reg_elem_.detectionAreas();
-  const auto & points = *(planner_data_->no_ground_pointcloud);
+  const auto & points = *(planner_data_->compare_map_pointcloud);
 
   for (const auto & detection_area : detection_areas) {
     const auto poly = lanelet::utils::to2D(detection_area);

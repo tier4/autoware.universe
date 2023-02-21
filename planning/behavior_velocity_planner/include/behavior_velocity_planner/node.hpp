@@ -72,6 +72,8 @@ private:
     sub_virtual_traffic_light_states_;
   rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr sub_occupancy_grid_;
   rclcpp::Subscription<VelocityLimit>::SharedPtr sub_external_velocity_limit_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
+    sub_compare_map_filtered_pointcloud_;
 
   void onTrigger(
     const autoware_auto_planning_msgs::msg::PathWithLaneId::ConstSharedPtr input_path_msg);
@@ -93,6 +95,7 @@ private:
   void onOccupancyGrid(const nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg);
   void onExternalVelocityLimit(const VelocityLimit::ConstSharedPtr msg);
   void onParam();
+  void onCompareMapFilteredPointCloud(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
 
   // publisher
   rclcpp::Publisher<autoware_auto_planning_msgs::msg::Path>::SharedPtr path_pub_;
