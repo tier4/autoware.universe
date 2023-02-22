@@ -201,6 +201,7 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
       RCLCPP_WARN_STREAM(this->get_logger(), "Invalid point in CSV:" << row.to_json());
     }
   }
+
   csv_loaded_ = true;
   create_area_marker_msg();
 
@@ -228,13 +229,15 @@ bool MapAreaFilterComponent::transform_pointcloud(
 }
 
 void MapAreaFilterComponent::filter_points_by_area(
-  const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input, pcl::PointCloud<pcl::PointXYZ>::Ptr output)
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & input, pcl::PointCloud<pcl::PointXYZ>::Ptr output,
+  const std::size_t border)
 {
-  int area_i = 0;
+  t_local_2_.lap();
 
-  std::vector<bool> area_check(area_polygons_.size(), false);
+  const auto polygon_size = area_polygons_.size();
 
-  for ([[maybe_unused]] const auto & area : area_polygons_) {
+  std::vector<bool> area_check(polygon_size, false);
+  for (std::size_t area_i = 0; area_i < polygon_size; area_i++) {
     const auto & centroid = centroid_polygons_[area_i];
     double distance = sqrt(
       (centroid.x() - current_pose_.pose.position.x) *
@@ -245,28 +248,67 @@ void MapAreaFilterComponent::filter_points_by_area(
     area_check[area_i++] = (distance <= area_distance_check_);
   }  // for polygons
 
-  for (const auto & point : input->points) {
-    bool within = false;
-    area_i = 0;
-    for (const auto & check : area_check) {
-      if (check) {
-        if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
-          if (area_types_[area_i] == AreaType::DELETE_ALL) {
-            within = true;
-            break;
-          } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
-            if (!point.r && !point.g && !point.b) {
-              within = true;
-            }
-          }
+  std::cout << ">>> >>> 各area_polygonsの重心を求める操作 [us]:                             "
+            << t_local_2_.lap() << std::endl;
+
+  const auto point_size = input->points.size();
+  std::vector<bool> within(point_size, true);
+#pragma omp parallel for
+  for (std::size_t point_i = 0; point_i < point_size; ++point_i) {
+    const auto point = input->points[point_i];
+    bool _within = false;
+    for (std::size_t area_i = 0; area_i < polygon_size; area_i++) {
+      if (!area_check[area_i]) continue;
+
+      if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
+        if (area_types_[area_i] == AreaType::DELETE_ALL) {
+          _within = true;
+        } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
+          if (point_i >= border) _within = true;
         }
       }
-      area_i++;
-    }  // for areas
-    if (!within) {
+    }
+
+    if (!_within) within[point_i] = false;
+  }
+
+  for (std::size_t point_i = 0; point_i < point_size; ++point_i) {
+    if (!within[point_i]) {
+      const auto point = input->points[point_i];
       output->points.emplace_back(pcl::PointXYZ(point.x, point.y, point.z));
     }
-  }  // for points in cloud
+  }
+
+  /* ========================== */
+
+  // int area_i = 0;
+  // std::size_t  point_i = 0;
+  // for (const auto & point : input->points) {
+  //   bool within = false;
+  //   area_i = 0;
+  //   for (const auto & check : area_check) {
+  //     if (check) {
+  //       if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
+  //         if (area_types_[area_i] == AreaType::DELETE_ALL) {
+  //           within = true;
+  //           break;
+  //         } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
+  //           if (point_i >= border) {
+  //             within = true;
+  //           }
+  //         }
+  //       }
+  //     }
+  //     area_i++;
+  //   }  // for areas
+  //   if (!within) {
+  //     output->points.emplace_back(pcl::PointXYZ(point.x, point.y, point.z));
+  //   }
+  //   point_i++;
+  }
+
+  std::cout << ">>> >>> 各点群がarea_polygonsの範囲内に存在するかを求める操作 [us]:         "
+            << t_local_2_.lap() << std::endl;
 }
 
 bool MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
@@ -308,6 +350,11 @@ void MapAreaFilterComponent::filter(
   const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices,
   PointCloud2 & output)
 {
+  t_local_.lap();
+  t_global_.lap();
+  std::cout << "======================================================================="
+            << std::endl;
+
   std::scoped_lock lock(mutex_);
 
   if (!csv_loaded_) {
@@ -330,8 +377,10 @@ void MapAreaFilterComponent::filter(
     output = *input;
     return;
   }
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr map_frame_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr map_frame_cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(map_frame_cloud, *map_frame_cloud_pcl);
+  std::cout << ">>> フィルタリングする点群をbase_link座標系からmap座標系へ座標変換 [us]:    "
+            << t_local_.lap() << std::endl;
 
   // transform known object cloud to map frame
   sensor_msgs::msg::PointCloud2 objects_frame_cloud;
@@ -343,23 +392,46 @@ void MapAreaFilterComponent::filter(
                                              << " not filtering. Not including object cloud");
     }
   }
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl_temp(
-    new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl_temp);
+  std::cout << ">>> 物体検出で抽出した点群をbase_link座標系からmap座標系へ座標変換 [us]:    "
+            << t_local_.lap() << std::endl;
+
+  /* ========================== */
+
+  // pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl_temp(
+  //   new pcl::PointCloud<pcl::PointXYZRGB>);
+  // pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl_temp);
+
+  // // if known object cloud contains points add to the filtered cloud
+  // if (!objects_cloud_pcl_temp->points.empty()) {
+  //   pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl(new
+  //   pcl::PointCloud<pcl::PointXYZRGB>); for (const auto & point : objects_cloud_pcl_temp->points)
+  //   {
+  //     objects_cloud_pcl->emplace_back(pcl::PointXYZRGB(point.x, point.y, point.z, 255, 255,
+  //     255));
+  //   }
+  //   *map_frame_cloud_pcl += *objects_cloud_pcl;
+  // }
+
+  /* ========================== */
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl);
 
   // if known object cloud contains points add to the filtered cloud
-  if (!objects_cloud_pcl_temp->points.empty()) {
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
-    for (const auto & point : objects_cloud_pcl_temp->points) {
-      objects_cloud_pcl->emplace_back(pcl::PointXYZRGB(point.x, point.y, point.z, 255, 255, 255));
-    }
-    *map_frame_cloud_pcl += *objects_cloud_pcl;
-  }
+  const std::size_t border = map_frame_cloud_pcl->size();
+  if (!objects_cloud_pcl->points.empty()) *map_frame_cloud_pcl += *objects_cloud_pcl;
+
+  /* ========================== */
+
+  std::cout << ">>> 物体検出で抽出した点群をpcl::PointCloud<pcl::PointXYZRGB>型へ変換 [us]: "
+            << t_local_.lap() << std::endl;
 
   // create filtered cloud container
   pcl::PointCloud<pcl::PointXYZ>::Ptr map_frame_cloud_pcl_filtered(
     new pcl::PointCloud<pcl::PointXYZ>);
-  filter_points_by_area(map_frame_cloud_pcl, map_frame_cloud_pcl_filtered);
+  filter_points_by_area(map_frame_cloud_pcl, map_frame_cloud_pcl_filtered, border);
+  std::cout << ">>> CSVで指定したエリアの点群をフィルタリングする処理 [us]:                 "
+            << t_local_.lap() << std::endl;
 
   pcl::toROSMsg(*map_frame_cloud_pcl_filtered, output);
   output.header = input->header;
@@ -373,9 +445,19 @@ void MapAreaFilterComponent::filter(
     return;
   }
   output.header = input->header;
+  std::cout << ">>> フィルタリングした点群をmap座標系からbase_link座標系へ座標変換 [us]:    "
+            << t_local_.lap() << std::endl;
 
   PredictedObjects out_objects;
   if (filter_objects_by_area(out_objects)) filtered_objects_pub_->publish(out_objects);
+  std::cout << ">>> CSVで指定したエリアの物体検出結果をフィルタリングする処理 [us]:         "
+            << t_local_.lap() << std::endl;
+  std::cout << "-----------------------------------------------------------------------"
+            << std::endl;
+  std::cout << ">>> 全体の処理にかかった時間 [us]:                                          "
+            << t_global_.lap() << std::endl;
+  std::cout << ">>> これまでの処理時間の平均 (iteration: " << t_global_.iteration()
+            << ") [ms]: " << t_global_.average() << std::endl;
 }
 
 rcl_interfaces::msg::SetParametersResult MapAreaFilterComponent::paramCallback(

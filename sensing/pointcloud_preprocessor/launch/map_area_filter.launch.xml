@@ -1,0 +1,23 @@
+<launch>
+  <arg name="input_topic_name" default="/perception/obstacle_segmentation/voxel_grid_outlier_filtered/pointcloud"/>
+  <arg name="output_topic_name" default="/pointcloud_filtered"/>
+  <arg name="pose_topic_name" default="/localization/pose_estimator/pose"/>
+  <arg name="objects_cloud_topic_name" default="/perception/object_recognition/detection/apollo/debug/instance_pointcloud"/>
+  <arg name="objects_topic_name" default="/perception/object_recognition/prediction/map_based_prediction/objects"/>
+
+  <arg name="input_frame" default="base_link"/>
+  <arg name="output_frame" default="base_link"/>
+  <arg name="map_area_csv" default="/home/map4/data/map_area_filter/normal.csv"/>
+
+  <node pkg="pointcloud_preprocessor" exec="map_area_filter_node" name="map_area_filter" output="screen">
+    <remap from="input" to="$(var input_topic_name)"/>
+    <remap from="output" to="$(var output_topic_name)"/>
+    <remap from="input/pose_topic" to="$(var pose_topic_name)"/>
+    <remap from="input/objects_cloud" to="$(var objects_cloud_topic_name)"/>
+    <remap from="input/objects" to="$(var objects_topic_name)"/>
+
+    <param name="input_frame" value="$(var input_frame)"/>
+    <param name="output_frame" value="$(var output_frame)"/>
+    <param name="map_area_csv" value="$(var map_area_csv)"/>
+  </node>
+</launch>
