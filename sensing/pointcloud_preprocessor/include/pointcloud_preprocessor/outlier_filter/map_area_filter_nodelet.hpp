@@ -39,45 +39,8 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-//! For debug. Remove them later
-#include <chrono>
-
 namespace pointcloud_preprocessor
 {
-
-namespace debug
-{
-class Timer
-{
-public:
-  Timer() : iteration_(0), sum_(0.0), past_(std::chrono::high_resolution_clock::now()) {}
-
-  int lap()
-  {
-    const auto now = std::chrono::high_resolution_clock::now();
-    const auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(now - past_).count();
-    past_ = now;
-
-    iteration_++;
-    sum_ += microseconds * 1e-3;
-
-    return microseconds;
-  }
-
-  double average() {
-    return sum_ / iteration_;
-  }
-
-  std::size_t iteration() {
-    return iteration_;
-  }
-
-private:
-  std::size_t iteration_;
-  double sum_;
-  std::chrono::_V2::system_clock::time_point past_;
-};
-}  // namespace debug
 
 enum class AreaType {
   DELETE_STATIC,  // Delete only static cloud
@@ -113,10 +76,6 @@ protected:
 private:
   std::shared_ptr<tf2_ros::Buffer> tf2_;
   std::shared_ptr<tf2_ros::TransformListener> tf2_listener_;
-
-  debug::Timer t_local_;
-  debug::Timer t_local_2_;
-  debug::Timer t_global_;
 
   std::string map_frame_;
   std::string base_link_frame_;
