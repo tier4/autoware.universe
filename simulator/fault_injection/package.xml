@@ -16,6 +16,7 @@
   <depend>diagnostic_updater</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
+  <depend>pluginlib</depend>
   <depend>tier4_autoware_utils</depend>
   <depend>tier4_simulation_msgs</depend>
 
