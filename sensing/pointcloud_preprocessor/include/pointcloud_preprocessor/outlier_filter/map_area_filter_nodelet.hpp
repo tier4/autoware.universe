@@ -104,8 +104,8 @@ private:
   bool load_areas_from_csv(const std::string & file_name);
 
   void filter_points_by_area(
-    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr output);
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr & input,
+    pcl::PointCloud<pcl::PointXYZ>::Ptr output, const std::size_t border);
 
   bool filter_objects_by_area(PredictedObjects & out_objects);
 

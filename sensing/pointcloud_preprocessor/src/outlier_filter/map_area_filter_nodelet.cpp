@@ -201,6 +201,7 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
       RCLCPP_WARN_STREAM(this->get_logger(), "Invalid point in CSV:" << row.to_json());
     }
   }
+
   csv_loaded_ = true;
   create_area_marker_msg();
 
@@ -228,13 +229,13 @@ bool MapAreaFilterComponent::transform_pointcloud(
 }
 
 void MapAreaFilterComponent::filter_points_by_area(
-  const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & input, pcl::PointCloud<pcl::PointXYZ>::Ptr output)
+  const pcl::PointCloud<pcl::PointXYZ>::Ptr & input, pcl::PointCloud<pcl::PointXYZ>::Ptr output,
+  const std::size_t border)
 {
-  int area_i = 0;
+  const auto polygon_size = area_polygons_.size();
 
-  std::vector<bool> area_check(area_polygons_.size(), false);
-
-  for ([[maybe_unused]] const auto & area : area_polygons_) {
+  std::vector<bool> area_check(polygon_size, false);
+  for (std::size_t area_i = 0; area_i < polygon_size; area_i++) {
     const auto & centroid = centroid_polygons_[area_i];
     double distance = sqrt(
       (centroid.x() - current_pose_.pose.position.x) *
@@ -245,28 +246,33 @@ void MapAreaFilterComponent::filter_points_by_area(
     area_check[area_i++] = (distance <= area_distance_check_);
   }  // for polygons
 
-  for (const auto & point : input->points) {
-    bool within = false;
-    area_i = 0;
-    for (const auto & check : area_check) {
-      if (check) {
-        if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
-          if (area_types_[area_i] == AreaType::DELETE_ALL) {
-            within = true;
-            break;
-          } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
-            if (!point.r && !point.g && !point.b) {
-              within = true;
-            }
-          }
+  const auto point_size = input->points.size();
+  std::vector<bool> within(point_size, true);
+#pragma omp parallel for
+  for (std::size_t point_i = 0; point_i < point_size; ++point_i) {
+    const auto point = input->points[point_i];
+    bool _within = false;
+    for (std::size_t area_i = 0; area_i < polygon_size; area_i++) {
+      if (!area_check[area_i]) continue;
+
+      if (boost::geometry::within(PointXY(point.x, point.y), area_polygons_[area_i])) {
+        if (area_types_[area_i] == AreaType::DELETE_ALL) {
+          _within = true;
+        } else if (area_types_[area_i] == AreaType::DELETE_STATIC) {
+          if (point_i < border) _within = true;
         }
       }
-      area_i++;
-    }  // for areas
-    if (!within) {
+    }
+
+    within[point_i] = _within;
+  }
+
+  for (std::size_t point_i = 0; point_i < point_size; ++point_i) {
+    if (!within[point_i]) {
+      const auto point = input->points[point_i];
       output->points.emplace_back(pcl::PointXYZ(point.x, point.y, point.z));
     }
-  }  // for points in cloud
+  }
 }
 
 bool MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
@@ -330,7 +336,7 @@ void MapAreaFilterComponent::filter(
     output = *input;
     return;
   }
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr map_frame_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr map_frame_cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::fromROSMsg(map_frame_cloud, *map_frame_cloud_pcl);
 
   // transform known object cloud to map frame
@@ -343,23 +349,18 @@ void MapAreaFilterComponent::filter(
                                              << " not filtering. Not including object cloud");
     }
   }
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl_temp(
-    new pcl::PointCloud<pcl::PointXYZRGB>);
-  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl_temp);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(objects_frame_cloud, *objects_cloud_pcl);
 
   // if known object cloud contains points add to the filtered cloud
-  if (!objects_cloud_pcl_temp->points.empty()) {
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects_cloud_pcl(new pcl::PointCloud<pcl::PointXYZRGB>);
-    for (const auto & point : objects_cloud_pcl_temp->points) {
-      objects_cloud_pcl->emplace_back(pcl::PointXYZRGB(point.x, point.y, point.z, 255, 255, 255));
-    }
-    *map_frame_cloud_pcl += *objects_cloud_pcl;
-  }
+  const std::size_t border = map_frame_cloud_pcl->size();
+  if (!objects_cloud_pcl->points.empty()) *map_frame_cloud_pcl += *objects_cloud_pcl;
 
   // create filtered cloud container
   pcl::PointCloud<pcl::PointXYZ>::Ptr map_frame_cloud_pcl_filtered(
     new pcl::PointCloud<pcl::PointXYZ>);
-  filter_points_by_area(map_frame_cloud_pcl, map_frame_cloud_pcl_filtered);
+  filter_points_by_area(map_frame_cloud_pcl, map_frame_cloud_pcl_filtered, border);
 
   pcl::toROSMsg(*map_frame_cloud_pcl_filtered, output);
   output.header = input->header;
