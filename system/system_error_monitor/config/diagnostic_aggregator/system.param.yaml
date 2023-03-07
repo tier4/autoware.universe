@@ -116,12 +116,6 @@
                   contains: [": Network Usage"]
                   timeout: 3.0
 
-                network_traffic:
-                  type: diagnostic_aggregator/GenericAnalyzer
-                  path: network_traffic
-                  contains: [": Network Traffic"]
-                  timeout: 3.0
-
             storage:
               type: diagnostic_aggregator/AnalyzerGroup
               path: storage
