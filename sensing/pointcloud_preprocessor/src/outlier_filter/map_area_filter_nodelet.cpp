@@ -140,6 +140,9 @@ void MapAreaFilterComponent::objects_callback(const PredictedObjects::ConstShare
 {
   std::scoped_lock lock(mutex_);
   objects_ptr_ = msg;
+
+  PredictedObjects out_objects;
+  if (filter_objects_by_area(out_objects)) filtered_objects_pub_->publish(out_objects);
 }
 
 bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
@@ -277,16 +280,11 @@ void MapAreaFilterComponent::filter_points_by_area(
 
 bool MapAreaFilterComponent::filter_objects_by_area(PredictedObjects & out_objects)
 {
-  if (!objects_ptr_) {
+  if (!objects_ptr_.has_value() || objects_ptr_.get() == nullptr) {
     return false;
   }
 
-  if (objects_ptr_.get() == nullptr) {
-    return false;
-  }
-
-  PredictedObjects in_objects;
-  in_objects = *objects_ptr_.get();
+  const PredictedObjects in_objects = *objects_ptr_.get();
   out_objects.header = in_objects.header;
 
   for (const auto & object : in_objects.objects) {
@@ -374,9 +372,6 @@ void MapAreaFilterComponent::filter(
     return;
   }
   output.header = input->header;
-
-  PredictedObjects out_objects;
-  if (filter_objects_by_area(out_objects)) filtered_objects_pub_->publish(out_objects);
 }
 
 rcl_interfaces::msg::SetParametersResult MapAreaFilterComponent::paramCallback(
