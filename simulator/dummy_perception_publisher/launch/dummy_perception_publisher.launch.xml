@@ -24,6 +24,7 @@
         <arg name="input/objects" value="/perception/object_recognition/detection/labeled_clusters"/>
         <arg name="output/objects" value="/perception/object_recognition/detection/objects_with_feature"/>
       </include>
+      <node pkg="topic_tools" exec="relay" name="obstacle_segmentation_relay" args="/perception/obstacle_segmentation/pointcloud /perception/obstacle_segmentation/voxel_grid_filtered/pointcloud"/>
     </group>
     <group unless="$(var real)">
       <node pkg="dummy_perception_publisher" exec="dummy_perception_publisher_node" name="dummy_perception_publisher" output="screen">
@@ -37,6 +38,7 @@
         <param name="enable_ray_tracing" value="false"/>
         <param name="use_object_recognition" value="$(var use_object_recognition)"/>
       </node>
+      <node pkg="topic_tools" exec="relay" name="obstacle_segmentation_relay" args="/perception/obstacle_segmentation/pointcloud /perception/obstacle_segmentation/voxel_grid_filtered/pointcloud"/>
     </group>
 
     <!-- convert DynamicObjectsWithFeatureArray to DynamicObjects -->
