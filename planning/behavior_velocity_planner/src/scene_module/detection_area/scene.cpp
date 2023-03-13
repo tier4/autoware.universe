@@ -114,6 +114,17 @@ bool DetectionAreaModule::modifyPathVelocity(PathWithLaneId * path, StopReason *
 
   setDistance(stop_dist);
 
+  // Ignore objects if braking distance is not enough
+  if (planner_param_.use_pass_judge_line) {
+    if (state_ != State::STOP && !hasEnoughBrakingDistance(self_pose, stop_point->second)) {
+      RCLCPP_WARN_THROTTLE(
+        logger_, *clock_, std::chrono::milliseconds(1000).count(),
+        "[detection_area] vehicle is over stop border x: %f, y: %f", stop_pose.position.x, stop_pose.position.y);
+      setSafe(true);
+      return true;
+    }
+  }
+
   // Check state
   setSafe(canClearStopState());
   if (isActivated()) {
@@ -158,16 +169,6 @@ bool DetectionAreaModule::modifyPathVelocity(PathWithLaneId * path, StopReason *
     return true;
   }
 
-  // Ignore objects if braking distance is not enough
-  if (planner_param_.use_pass_judge_line) {
-    if (state_ != State::STOP && !hasEnoughBrakingDistance(self_pose, stop_point->second)) {
-      RCLCPP_WARN_THROTTLE(
-        logger_, *clock_, std::chrono::milliseconds(1000).count(),
-        "[detection_area] vehicle is over stop border");
-      setSafe(true);
-      return true;
-    }
-  }
 
   // Insert stop point
   state_ = State::STOP;
