@@ -182,6 +182,15 @@ boost::optional<LateralOutput> MpcLateralController::run()
     *m_current_steering_ptr, m_current_odometry_ptr->twist.twist.linear.x, m_current_pose_ptr->pose,
     ctrl_cmd, predicted_traj, diagnostic);
 
+  // reset previous MPC result
+  // Note: When a large deviation from the trajectory occurs, the optimization stops and
+  // the vehicle will return to the path by re-planning the trajectory or external operation.
+  // After the recovery, the previous value of the optimization may deviate greatly from
+  // the actual steer angle, and it may make the optimization result unstable.
+  if (!is_mpc_solved) {
+    m_mpc.resetPrevResult(*m_current_steering_ptr);
+  }
+
   publishPredictedTraj(predicted_traj);
   publishDiagnostic(diagnostic);
 

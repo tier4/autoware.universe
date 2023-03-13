@@ -248,8 +248,13 @@ void MPC::setReferenceTrajectory(
 
 void MPC::resetPrevResult(const autoware_auto_vehicle_msgs::msg::SteeringReport & current_steer)
 {
-  m_raw_steer_cmd_prev = current_steer.steering_tire_angle;
-  m_raw_steer_cmd_pprev = current_steer.steering_tire_angle;
+  // consider limit. The prev value larger than limiation brakes the optimization constraint and
+  // resluts in optimization failure.
+  const auto clamp = [](const auto v, const auto lo, const auto hi) {
+    return std::fmin(std::fmax(v, lo), hi);
+  };
+  m_raw_steer_cmd_prev = clamp(current_steer.steering_tire_angle, -m_steer_lim, m_steer_lim);
+  m_raw_steer_cmd_pprev = clamp(current_steer.steering_tire_angle, -m_steer_lim, m_steer_lim);
 }
 
 bool8_t MPC::getData(
@@ -262,12 +267,6 @@ bool8_t MPC::getData(
   if (!trajectory_follower::MPCUtils::calcNearestPoseInterp(
         traj, current_pose, &(data->nearest_pose), &(nearest_idx), &(data->nearest_time), m_logger,
         *m_clock)) {
-    // reset previous MPC result
-    // Note: When a large deviation from the trajectory occurs, the optimization stops and
-    // the vehicle will return to the path by re-planning the trajectory or external operation.
-    // After the recovery, the previous value of the optimization may deviate greatly from
-    // the actual steer angle, and it may make the optimization result unstable.
-    resetPrevResult(current_steer);
     RCLCPP_WARN_SKIPFIRST_THROTTLE(
       m_logger, *m_clock, duration, "calculateMPC: error in calculating nearest pose. stop mpc.");
     return false;
