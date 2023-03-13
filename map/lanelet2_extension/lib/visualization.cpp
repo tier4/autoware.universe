@@ -99,7 +99,7 @@ void initLightMarker(visualization_msgs::msg::Marker * marker, const std::string
 
   marker->header.frame_id = "map";
   marker->header.stamp = rclcpp::Time();
-  marker->frame_locked = true;
+  marker->frame_locked = false;
   marker->ns = ns;
   marker->id = 0;
   marker->lifetime = rclcpp::Duration(0, 0);
@@ -160,7 +160,7 @@ void initLaneletDirectionMarker(visualization_msgs::msg::Marker * marker, const 
 
   marker->header.frame_id = "map";
   marker->header.stamp = rclcpp::Time();
-  marker->frame_locked = true;
+  marker->frame_locked = false;
   marker->ns = ns;
   marker->id = 0;
   marker->type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -296,7 +296,7 @@ visualization_msgs::msg::Marker createPolygonMarker(
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = "map";
   marker.header.stamp = rclcpp::Time();
-  marker.frame_locked = true;
+  marker.frame_locked = false;
   marker.id = 0;
   marker.ns = name_space;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -566,7 +566,7 @@ visualization_msgs::msg::MarkerArray visualization::generateTrafficLightIdMaker(
         marker.pose.orientation.w = 1.0;
         marker.color = c;
         marker.scale.z = scale;
-        marker.frame_locked = true;
+        marker.frame_locked = false;
         marker.text = std::to_string(ls.id());
         tl_id_marker_array.markers.push_back(marker);
       }
@@ -590,7 +590,7 @@ visualization_msgs::msg::MarkerArray visualization::detectionAreasAsMarkerArray(
 
   marker.header.frame_id = "map";
   marker.header.stamp = rclcpp::Time();
-  marker.frame_locked = true;
+  marker.frame_locked = false;
   marker.ns = "detection_area";
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -665,7 +665,7 @@ visualization_msgs::msg::MarkerArray visualization::noStoppingAreasAsMarkerArray
 
   marker.header.frame_id = "map";
   marker.header.stamp = rclcpp::Time();
-  marker.frame_locked = true;
+  marker.frame_locked = false;
   marker.ns = "no_stopping_area";
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -821,7 +821,7 @@ visualization_msgs::msg::MarkerArray visualization::generateLaneletIdMarker(
     marker.pose.orientation.w = 1.0;
     marker.color = c;
     marker.scale.z = scale;
-    marker.frame_locked = true;
+    marker.frame_locked = false;
     marker.text = std::to_string(ll.id());
     markers.markers.push_back(marker);
   }
@@ -961,7 +961,7 @@ visualization_msgs::msg::MarkerArray visualization::laneletsAsTriangleMarkerArra
 
   marker.header.frame_id = "map";
   marker.header.stamp = rclcpp::Time();
-  marker.frame_locked = true;
+  marker.frame_locked = false;
   marker.ns = ns;
   marker.id = 0;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -1013,7 +1013,7 @@ void visualization::initTrafficLightTriangleMarker(
 
   marker->header.frame_id = "map";
   marker->header.stamp = rclcpp::Time();
-  marker->frame_locked = true;
+  marker->frame_locked = false;
   marker->ns = ns;
   marker->id = 0;
   marker->type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -1098,7 +1098,7 @@ void visualization::initLineStringMarker(
 
   marker->header.frame_id = frame_id;
   marker->header.stamp = rclcpp::Time();
-  marker->frame_locked = true;
+  marker->frame_locked = false;
   marker->ns = ns;
   marker->action = visualization_msgs::msg::Marker::ADD;
   marker->type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
