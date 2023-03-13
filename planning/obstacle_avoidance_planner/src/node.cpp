@@ -185,6 +185,27 @@ std::tuple<std::vector<double>, std::vector<double>> calcVehicleCirclesInfo(
   return {radiuses, longitudinal_offsets};
 }
 
+std::tuple<std::vector<double>, std::vector<double>> calcVehicleCirclesByFittingUniformCircle(
+  const VehicleParam & vehicle_param, const size_t circle_num)
+{
+  if (circle_num < 2) {
+    throw std::invalid_argument("circle_num is less than 2.");
+  }
+
+  const double radius = vehicle_param.width / 2.0;
+  std::vector<double> radiuses(circle_num, radius);
+
+  const double unit_lon_length =
+    vehicle_param.length / static_cast<double>(circle_num - 1);
+  std::vector<double> longitudinal_offsets;
+  for (size_t i = 0; i < circle_num; ++i) {
+    longitudinal_offsets.push_back(unit_lon_length * i - vehicle_param.rear_overhang);
+    radiuses.push_back(radius);
+  }
+
+  return {radiuses, longitudinal_offsets};
+}
+
 [[maybe_unused]] void fillYawInTrajectoryPoint(
   std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> & traj_points)
 {
@@ -456,6 +477,12 @@ ObstacleAvoidancePlanner::ObstacleAvoidancePlanner(const rclcpp::NodeOptions & n
           calcVehicleCirclesInfo(
             vehicle_param_, vehicle_circle_num_for_calculation_,
             vehicle_circle_radius_ratios_.front(), vehicle_circle_radius_ratios_.back());
+      } else if (vehicle_circle_method_ == "fitting_uniform_circle") {
+        const double circle_num = declare_parameter<int>(
+          "advanced.mpt.collision_free_constraints.vehicle_circles.fitting_uniform_circle.num");
+        std::tie(
+          mpt_param_.vehicle_circle_radiuses, mpt_param_.vehicle_circle_longitudinal_offsets) =
+          calcVehicleCirclesByFittingUniformCircle(vehicle_param_, circle_num);
       } else {
         throw std::invalid_argument(
           "advanced.mpt.collision_free_constraints.vehicle_circles.num parameter is invalid.");
@@ -1411,6 +1438,16 @@ ObstacleAvoidancePlanner::generateFineTrajectoryPoints(
     traj_points, traj_param_.delta_arc_length_for_trajectory);
 
   // calculate yaw from x and y
+  for (size_t i = 0; i < interpolated_traj_points.size(); ++i) {
+    const size_t prev_idx = i == 0 ? i : i - 1;
+    const size_t next_idx = i == 0 ? i + 1 : i;
+    const auto & prev_point = interpolated_traj_points.at(prev_idx).pose.position;
+    const auto & next_point = interpolated_traj_points.at(next_idx).pose.position;
+    const double yaw = tier4_autoware_utils::calcAzimuthAngle(prev_point, next_point);
+    interpolated_traj_points.at(i).pose.orientation = tier4_autoware_utils::createQuaternionFromYaw(yaw);
+  }
+
+  // calculate yaw from x and y
   // NOTE: We do not use spline interpolation to yaw in behavior path since the yaw is unstable.
   //       Currently this implementation is removed since this calculation is heavy (~20ms)
   // fillYawInTrajectoryPoint(interpolated_traj_points);
@@ -1433,6 +1470,13 @@ ObstacleAvoidancePlanner::alignVelocity(
   const std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint> & traj_points) const
 {
   stop_watch_.tic(__func__);
+
+  if (fine_traj_points.size() < 2) {
+    if (traj_points.size() < 2) {
+      return points_utils::convertToTrajectoryPoints(path_points);
+    }
+    return traj_points;
+  }
 
   // insert zero velocity path index, and get optional zero_vel_path_idx
   const auto path_zero_vel_info = [&]()
