@@ -152,7 +152,23 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
   format.variable_columns(csv::VariableColumnPolicy::KEEP);
 
   csv::CSVReader reader(file_name, format);
-  for (csv::CSVRow & row : reader) {
+  std::deque<csv::CSVRow> rows;
+  for (const csv::CSVRow & row : reader) {
+    const int area_type = row[0].get<int>();
+    if (area_type == 0)
+      rows.emplace_back(row);
+    else if (area_type == 1)
+      rows.emplace_front(row);
+    else if (area_type == 2)
+      rows.emplace_back(row);
+    else {
+      RCLCPP_WARN_STREAM(
+        this->get_logger(),
+        "Invalid area type specified: " << area_type << " in CSV:" << row.to_json());
+    }
+  }
+
+  for (const csv::CSVRow & row : rows) {
     std::vector<PointXY> row_points;
     Polygon2D current_polygon;
     size_t i = 0, j = -1;
@@ -165,10 +181,6 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
           area_types_.emplace_back(AreaType::DELETE_ALL);
         } else if (field.get<int>() == 2) {
           area_types_.emplace_back(AreaType::DELETE_OBJECT);
-        } else {
-          RCLCPP_WARN_STREAM(
-            this->get_logger(),
-            "Invalid area type specified: " << field.get<int>() << " in CSV:" << row.to_json());
         }
         i++;
         j++;
@@ -187,9 +199,10 @@ bool MapAreaFilterComponent::load_areas_from_csv(const std::string & file_name)
         boost::geometry::correct(current_polygon);
       }
       RCLCPP_INFO_STREAM(  // Verbose output
-        this->get_logger(), "Polygon in row: " << boost::geometry::dsv(current_polygon)
-                                               << " has an area of "
-                                               << boost::geometry::area(current_polygon));
+        this->get_logger(),
+        "Polygon in row: " << boost::geometry::dsv(current_polygon) << " has an area of "
+                           << boost::geometry::area(current_polygon) << " and its type is "
+                           << static_cast<int>(area_types_.back()));
 
       if (boost::geometry::area(current_polygon) > 0) {
         PointXY centroid(0.f, 0.f);
@@ -246,7 +259,7 @@ void MapAreaFilterComponent::filter_points_by_area(
       (centroid.y() - current_pose_.pose.position.y) *
         (centroid.y() - current_pose_.pose.position.y));
 
-    area_check[area_i++] = (distance <= area_distance_check_);
+    area_check[area_i] = (distance <= area_distance_check_);
   }  // for polygons
 
   const auto point_size = input->points.size();
