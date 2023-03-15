@@ -47,10 +47,10 @@ target_include_directories(dummy_perception_publisher_node
     $<INSTALL_INTERFACE:include>)
 
 # random objects publisher
-# ament_auto_add_executable(random_objects_publisher
-#   src/random_objects_publisher.cpp
-#   )
-# ament_target_dependencies(random_objects_publisher ${${PROJECT_NAME}_DEPENDENCIES})
+ament_auto_add_executable(random_objects_publisher
+  src/random_objects_publisher.cpp
+  )
+ament_target_dependencies(random_objects_publisher ${${PROJECT_NAME}_DEPENDENCIES})
 # target_include_directories(random_objects_publisher
 #   PUBLIC
 #     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

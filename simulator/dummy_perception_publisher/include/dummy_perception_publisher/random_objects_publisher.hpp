@@ -31,6 +31,8 @@
 #include <lanelet2_core/geometry/Point.h>
 #include <lanelet2_routing/RoutingGraph.h>
 #include <lanelet2_traffic_rules/TrafficRulesFactory.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <memory>
 #include <random>
@@ -57,6 +59,9 @@ public:
   RandomObjectsPublisher();
 
 private:
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener tf_listener_;
+
   std::vector<VehicleObject> vehicle_objects_;
   double update_hz_;
 

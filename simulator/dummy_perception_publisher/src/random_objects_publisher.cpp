@@ -25,7 +25,7 @@
 
 namespace
 {
-geometry_msgs::msg::Pose getRandomPose()
+geometry_msgs::msg::Pose getRandomPose(const geometry_msgs::msg::Pose & base_pose)
 {
   std::mt19937 random_generator;
   std::random_device seed_gen;
@@ -34,10 +34,9 @@ geometry_msgs::msg::Pose getRandomPose()
   std::normal_distribution<> pos_random(0.0, 100.0);
   std::normal_distribution<> yaw_random(0.0, 1.0);
 
-  geometry_msgs::msg::Pose pose;
-  pose.position.x = pos_random(random_generator);
-  pose.position.y = pos_random(random_generator);
-  pose.position.z = pos_random(random_generator);
+  auto pose = tier4_autoware_utils::calcOffsetPose(
+    base_pose, pos_random(random_generator), pos_random(random_generator), 0.0);
+  pose.position.z = base_pose.position.z;
   pose.orientation = tier4_autoware_utils::createQuaternionFromYaw(yaw_random(random_generator));
 
   return pose;
@@ -119,7 +118,8 @@ std::vector<geometry_msgs::msg::Pose> convertToPoses(const lanelet::ConstLineStr
 }
 }  // namespace
 
-RandomObjectsPublisher::RandomObjectsPublisher() : Node("random_objects_publisher")
+RandomObjectsPublisher::RandomObjectsPublisher()
+: Node("random_objects_publisher"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_)
 {
   path_sub_ = create_subscription<autoware_auto_planning_msgs::msg::Path>(
     "/planning/scenario_planning/behavior_planning/path", 1,
@@ -152,8 +152,23 @@ void RandomObjectsPublisher::onMap(
 
 void RandomObjectsPublisher::onTimer()
 {
-  const size_t max_object_num = 10;
+  if (!path_ptr_) {
+    return;
+  }
 
+  tf2::Transform tf_base_link2map;
+  try {
+    geometry_msgs::msg::TransformStamped ros_base_link2map;
+    ros_base_link2map =
+      tf_buffer_.lookupTransform("base_link", "map", now(), rclcpp::Duration::from_seconds(0.5));
+    tf2::fromMsg(ros_base_link2map.transform, tf_base_link2map);
+  } catch (tf2::TransformException & ex) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "%s", ex.what());
+    return;
+  }
+
+  std::cerr << vehicle_objects_.size() << std::endl;
+  const size_t max_object_num = 10;
   if (vehicle_objects_.size() < max_object_num) {
     spawnVehicleObject();
   }
@@ -172,7 +187,22 @@ void RandomObjectsPublisher::onTimer()
     feature_object.object.classification.push_back(classification);
 
     feature_object.object.shape.type = autoware_auto_perception_msgs::msg::Shape::BOUNDING_BOX;
-    feature_object.object.kinematics.pose_with_covariance.pose = object.pose;
+
+    // pose
+    geometry_msgs::msg::Transform ros_map2moved_object;
+    ros_map2moved_object.translation.x = object.pose.position.x;
+    ros_map2moved_object.translation.y = object.pose.position.y;
+    ros_map2moved_object.translation.z = object.pose.position.z;
+    ros_map2moved_object.rotation = object.pose.orientation;
+    tf2::Transform tf_map2moved_object;
+    tf2::fromMsg(ros_map2moved_object, tf_map2moved_object);
+
+    const auto tf_base_link2moved_object = tf_base_link2map * tf_map2moved_object;
+
+    tf2::toMsg(
+      tf_base_link2moved_object, feature_object.object.kinematics.pose_with_covariance.pose);
+
+    // velocity
     feature_object.object.kinematics.twist_with_covariance.twist.linear.x = object.velocity;
     objects_msg.feature_objects.push_back(feature_object);
   }
@@ -182,7 +212,7 @@ void RandomObjectsPublisher::onTimer()
 
 void RandomObjectsPublisher::spawnVehicleObject()
 {
-  const auto random_pose = getRandomPose();
+  const auto random_pose = getRandomPose(path_ptr_->pose);
   lanelet::ConstLanelet start_lanelet;
   const bool is_found =
     lanelet::utils::query::getClosestLanelet(lanelets_, random_pose, &start_lanelet);
@@ -239,4 +269,12 @@ void RandomObjectsPublisher::validateObject()
       break;  // TODO(murooka): remove this break
     }
   }
+}
+
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<RandomObjectsPublisher>());
+  rclcpp::shutdown();
+  return 0;
 }
