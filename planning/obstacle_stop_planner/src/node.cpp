@@ -473,7 +473,8 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.expand_stop_range = declare_parameter(ns + "expand_stop_range", 0.0);               // default
     p.expand_stop_range_l = declare_parameter(ns + "expand_stop_range_l", 0.0);           // for isuzu proj
     p.expand_stop_range_r = declare_parameter(ns + "expand_stop_range_r", 0.0);           // for isuzu proj
-    p.mirror_width = declare_parameter(ns + "mirror_width", 0.0);                         // for isuzu proj
+    p.mirror_width_l = declare_parameter(ns + "mirror_width_l", 0.0);                         // for isuzu proj
+    p.mirror_width_r = declare_parameter(ns + "mirror_width_r", 0.0);                         // for isuzu proj
     p.extend_distance = declare_parameter(ns + "extend_distance", 0.0);
     p.step_length = declare_parameter(ns + "step_length", 1.0);
     p.stop_margin += i.max_longitudinal_offset_m;
@@ -487,7 +488,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     // common param
     p.normal_min_jerk = declare_parameter("normal.min_jerk", -0.3);
     p.normal_min_acc = declare_parameter("normal.min_acc", -1.0);
-    p.limit_min_jerk = declare_parameter("limit.min_jerk", -1.5);
+    p.limit_min_jerk = declare_parameter("limit.min_jerk", -1.5);  
     p.limit_min_acc = declare_parameter("limit.min_acc", -2.5);
     // slow down planner specific parameters
     p.forward_margin = declare_parameter(ns + "forward_margin", 5.0);
@@ -508,7 +509,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     p.consider_constraints = declare_parameter(ns + "consider_constraints", false);
     p.forward_margin_min = declare_parameter(ns + "forward_margin_min", 1.0);
     p.forward_margin_span = declare_parameter(ns + "forward_margin_span", -0.1);
-    p.slow_down_min_jerk = declare_parameter(ns + "jerk_min_slow_down", -0.3);
+    p.slow_down_min_jerk = declare_parameter(ns + "jerk_min_slow_down", -0.3); 
     p.jerk_start = declare_parameter(ns + "jerk_start", -0.1);
     p.jerk_span = declare_parameter(ns + "jerk_span", -0.01);
     p.slow_down_vel = declare_parameter(ns + "slow_down_vel", 1.39);
@@ -866,8 +867,8 @@ void ObstacleStopPlannerNode::searchObstacle(
           decimate_trajectory.at(i + 1).pose,
           one_step_move_vehicle_polygon, 
           vehicle_info, 
-          stop_param.expand_stop_range_l + stop_param.mirror_width, 
-          stop_param.expand_stop_range_r + stop_param.mirror_width);
+          stop_param.expand_stop_range_l + stop_param.mirror_width_l, 
+          stop_param.expand_stop_range_r + stop_param.mirror_width_r);
       }
 
       // create one step polygon for vehicle
@@ -955,6 +956,7 @@ void ObstacleStopPlannerNode::insertVelocity(
 
   // calc curvature of planned path
   std::vector<double> curvature_list = calcTrajectoryCurvature(slow_down_param_.curvature_smoothing_num, output);
+  bool dist_flag = true;
 
   if (planner_data.slow_down_require) {
     // insert slow down point
@@ -971,6 +973,12 @@ void ObstacleStopPlannerNode::insertVelocity(
       const auto vehicle_idx = std::min(planner_data.trajectory_trim_index, traj_end_idx);
       const auto dist_baselink_to_obstacle =
         calcSignedArcLength(output, vehicle_idx, index_with_dist_remain.get().first);
+      
+      if (dist_baselink_to_obstacle - index_with_dist_remain.get().second > 0){
+        dist_flag = true;
+      }else{
+        dist_flag = false;
+      }
 
       debug_ptr_->setDebugValues(
         DebugValues::TYPE::OBSTACLE_DISTANCE,
@@ -1035,8 +1043,8 @@ void ObstacleStopPlannerNode::insertVelocity(
     const auto reach_slow_down_end_point = isInFrontOfTargetPoint(planner_data.current_pose, p_end);
     const auto is_in_slow_down_section = reach_slow_down_start_point && !reach_slow_down_end_point;
     const auto index_with_dist_remain = findNearestFrontIndex(0, output, p_end);
-
-    if (is_in_slow_down_section && index_with_dist_remain) {
+  
+    if (is_in_slow_down_section && index_with_dist_remain && dist_flag) {
       const auto end_insert_point_with_idx = getBackwardInsertPointFromBasePoint(
         index_with_dist_remain.get().first, output, -index_with_dist_remain.get().second);
 
