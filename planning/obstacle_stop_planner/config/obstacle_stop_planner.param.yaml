@@ -8,7 +8,8 @@
       expand_stop_range: 0.0 # margin of vehicle footprint [m]
       expand_stop_range_l: 0.0 # margin of vehicle left footprint [m]
       expand_stop_range_r: 0.0 # margin of vehicle right footprint [m]
-      mirror_width: 0.4 # mirror width [m]
+      mirror_width_l: 0.4 # mirror width [m]
+      mirror_width_r: 0.4 # mirror width [m]
 
     slow_down_planner:
       # slow down planner parameters
@@ -22,8 +23,8 @@
       min_slow_down_vel: 4.16  #15km/h # min slow down velocity [m/s]
       max_deceleration: 2.0 # for obstacle collision checker
       passing_param: 0.000023   #[-] set bigger, deceleration become bigger. for isuzu tyokusen suretigai.
-      speed_thresh_high: 1.38 # [m/s]
-      speed_thresh_low : 0.0 # [m/s]
+      speed_thresh_high: 3.00 # [m/s]
+      speed_thresh_low : 2.77 # [m/s]
       yaw_rate_thresh: 100.0 # [rad/s] <= need tuning parameter 100=disable
       curvature_stop: True # set "True", if curvature is high and searched vehicle, become stop mode. 
       curvature_thresh: 0.002 # [1/m]

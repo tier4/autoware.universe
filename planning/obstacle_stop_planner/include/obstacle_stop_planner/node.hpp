@@ -113,7 +113,8 @@ public:
     double expand_stop_range;         // default
     double expand_stop_range_l;       // for isuzu proj
     double expand_stop_range_r;       // for isuzu proj
-    double mirror_width;              // for isuzu proj
+    double mirror_width_l;              // for isuzu proj
+    double mirror_width_r;              // for isuzu proj
     double extend_distance;           // trajectory extend_distance [m]
     double step_length;               // step length for pointcloud search range [m]
     double stop_search_radius;        // search radius for obstacle point cloud [m]
