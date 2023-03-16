@@ -141,8 +141,7 @@ PredictedPath PathGenerator::generatePathForOnLaneVehicle(
   const TrackedObject & object, const PosePath & ref_paths)
 {
   if (ref_paths.size() < 2) {
-    const PredictedPath empty_path;
-    return empty_path;
+    return generateStraightPath(object);
   }
 
   return generatePolynomialPath(object, ref_paths);
@@ -192,8 +191,7 @@ PredictedPath PathGenerator::generatePolynomialPath(
   const auto interpolated_ref_path = interpolateReferencePath(ref_path, frenet_predicted_path);
 
   if (frenet_predicted_path.size() < 2 || interpolated_ref_path.size() < 2) {
-    const PredictedPath empty_path;
-    return empty_path;
+    return generateStraightPath(object);
   }
 
   // Step4. Convert predicted trajectory from Frenet to Cartesian coordinate
