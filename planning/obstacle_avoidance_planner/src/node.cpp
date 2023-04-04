@@ -327,7 +327,18 @@ std::vector<TrajectoryPoint> ObstacleAvoidancePlanner::optimizeTrajectory(
   }
 
   if (enable_skip_optimization_) {
-    return p.traj_points;
+    // replaced by yaw with spine completion curve
+    auto traj_points_yaw_replaced = p.traj_points;
+
+    SplineInterpolationPoints2d ref_points_spline(p.traj_points);
+    ref_points_spline = SplineInterpolationPoints2d(p.traj_points);
+    const auto yaw_vec = ref_points_spline.getSplineInterpolatedYaws();
+
+    for (size_t i = 0; i < p.traj_points.size(); ++i) {
+      traj_points_yaw_replaced.at(i).pose.orientation =
+        tier4_autoware_utils::createQuaternionFromYaw(yaw_vec.at(i));
+    }
+    return traj_points_yaw_replaced;
   }
 
   // 2. smooth trajectory with elastic band
