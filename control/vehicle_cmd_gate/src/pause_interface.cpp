@@ -37,6 +37,8 @@ void PauseInterface::publish()
     IsPaused::Message msg;
     msg.stamp = node_->now();
     msg.data = is_paused_;
+    std::cout << "* [pub_is_paused] = " << msg.data << " @ "
+              << node_->get_clock()->now().nanoseconds() / 1e6 << "ms\n";
     pub_is_paused_->publish(msg);
     prev_is_paused_ = is_paused_;
   }
@@ -45,6 +47,8 @@ void PauseInterface::publish()
     IsStartRequested::Message msg;
     msg.stamp = node_->now();
     msg.data = is_start_requested_;
+    std::cout << "* [pub_is_start_requested_] = " << msg.data << " @ "
+              << node_->get_clock()->now().nanoseconds() / 1e6 << "ms\n";
     pub_is_start_requested_->publish(msg);
     prev_is_start_requested_ = is_start_requested_;
   }
@@ -53,6 +57,8 @@ void PauseInterface::publish()
 void PauseInterface::update(const AckermannControlCommand & control)
 {
   is_start_requested_ = eps < std::abs(control.longitudinal.speed);
+  std::cout << "* [update] is_start_requested_ = " << is_start_requested_ << " @ "
+            << node_->get_clock()->now().nanoseconds() / 1e6 << "ms\n";
 }
 
 void PauseInterface::on_pause(
@@ -60,6 +66,8 @@ void PauseInterface::on_pause(
 {
   is_paused_ = req->pause;
   res->status.success = true;
+  std::cout << "* [on_pause] is_paused_ = " << req->pause << " @ "
+            << node_->get_clock()->now().nanoseconds() / 1e6 << "ms\n";
 }
 
 }  // namespace vehicle_cmd_gate
