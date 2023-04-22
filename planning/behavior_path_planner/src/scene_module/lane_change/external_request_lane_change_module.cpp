@@ -486,8 +486,7 @@ bool ExternalRequestLaneChangeModule::isAbortConditionSatisfied()
     return false;
   }
 
-  Pose ego_pose_before_collision;
-  const auto is_path_safe = isApprovedPathSafe(ego_pose_before_collision);
+  const auto is_path_safe = isApprovedPathSafe();
 
   if (!is_path_safe) {
     const auto & common_parameters = planner_data_->parameters;
@@ -510,8 +509,7 @@ bool ExternalRequestLaneChangeModule::isAbortConditionSatisfied()
     }
 
     const auto found_abort_path = lane_change_utils::getAbortPaths(
-      planner_data_, status_.lane_change_path, ego_pose_before_collision, common_parameters,
-      *parameters_);
+      planner_data_, status_.lane_change_path, common_parameters, *parameters_);
 
     if (!found_abort_path && !is_abort_path_approved_) {
       current_lane_change_state_ = LaneChangeStates::Stop;
@@ -664,7 +662,7 @@ void ExternalRequestLaneChangeModule::generateExtendedDrivableArea(PathWithLaneI
   util::generateDrivableArea(path, expanded_lanes, common_parameters.vehicle_length, planner_data_);
 }
 
-bool ExternalRequestLaneChangeModule::isApprovedPathSafe(Pose & ego_pose_before_collision) const
+bool ExternalRequestLaneChangeModule::isApprovedPathSafe() const
 {
   const auto current_pose = getEgoPose();
   const auto current_twist = getEgoTwist();
@@ -685,10 +683,11 @@ bool ExternalRequestLaneChangeModule::isApprovedPathSafe(Pose & ego_pose_before_
   const size_t current_seg_idx = motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
     path.path.points, current_pose, common_parameters.ego_nearest_dist_threshold,
     common_parameters.ego_nearest_yaw_threshold);
+  bool is_object_coming_from_rear;
   return lane_change_utils::isLaneChangePathSafe(
     path, current_lanes, check_lanes, dynamic_objects, current_pose, current_seg_idx, current_twist,
     common_parameters, *parameters_, common_parameters.expected_front_deceleration_for_abort,
-    common_parameters.expected_rear_deceleration_for_abort, ego_pose_before_collision, debug_data,
+    common_parameters.expected_rear_deceleration_for_abort, is_object_coming_from_rear, debug_data,
     false, status_.lane_change_path.acceleration);
 }
 

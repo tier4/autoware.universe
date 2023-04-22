@@ -188,7 +188,7 @@ private:
   void generateExtendedDrivableArea(PathWithLaneId & path);
   void updateOutputTurnSignal(BehaviorModuleOutput & output);
   void updateSteeringFactorPtr(const BehaviorModuleOutput & output);
-  bool isApprovedPathSafe(Pose & ego_pose_before_collision) const;
+  bool isApprovedPathSafe(bool & is_object_coming_from_rear) const;
   void calcTurnSignalInfo();
 
   void updateSteeringFactorPtr(
@@ -198,15 +198,18 @@ private:
   bool isValidPath(const PathWithLaneId & path) const;
   bool isNearEndOfLane() const;
   bool isCurrentSpeedLow() const;
-  bool isAbortConditionSatisfied();
+  bool isObjectFromRear() const;
   bool hasFinishedLaneChange() const;
+  bool hasFinishedAbort() const;
   bool isAbortState() const;
+  bool isAbleToReturnCurrentLane() const;
+  bool isEgoOnPreparePhase() const;
+  bool isRequiredStop(const bool is_object_coming_from_rear) const;
 
   // getter
   Pose getEgoPose() const;
   Twist getEgoTwist() const;
   std_msgs::msg::Header getRouteHeader() const;
-  void resetPathIfAbort();
 
   // debug
   void setObjectDebugVisualization() const;

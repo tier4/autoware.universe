@@ -2384,9 +2384,9 @@ bool isObjectFront(const Pose & ego_pose, const Pose & obj_pose)
   return obj_from_ego.position.x > -1e-3;
 }
 
-bool isObjectFront(const Pose & projected_ego_pose)
+bool isObjectFront(const Pose & projected_ego_pose, const double threshold)
 {
-  return projected_ego_pose.position.x > -1e-3;
+  return projected_ego_pose.position.x > threshold;
 }
 
 double stoppingDistance(const double & vehicle_velocity, const double & vehicle_accel)
@@ -2466,7 +2466,7 @@ bool isSafeInLaneletCollisionCheck(
   const double check_start_time, const double check_end_time, const double check_time_resolution,
   const PredictedObject & target_object, const PredictedPath & target_object_path,
   const BehaviorPathPlannerParameters & common_parameters, const double front_decel,
-  const double rear_decel, Pose & ego_pose_before_collision, CollisionCheckDebug & debug)
+  const double rear_decel, CollisionCheckDebug & debug)
 {
   const auto lerp_path_reserve = (check_end_time - check_start_time) / check_time_resolution;
   if (lerp_path_reserve > 1e-3) {
@@ -2506,7 +2506,6 @@ bool isSafeInLaneletCollisionCheck(
       debug.failed_reason = "not_enough_longitudinal";
       return false;
     }
-    ego_pose_before_collision = expected_ego_pose;
   }
   return true;
 }

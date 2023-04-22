@@ -117,7 +117,7 @@ protected:
 
   bool isSafe() const;
   bool isValidPath(const PathWithLaneId & path) const;
-  bool isApprovedPathSafe(Pose & ego_pose_before_collision) const;
+  bool isApprovedPathSafe() const;
   bool isNearEndOfLane() const;
   bool isCurrentSpeedLow() const;
   bool isAbortConditionSatisfied();

@@ -96,7 +96,7 @@ bool isLaneChangePathSafe(
   const size_t current_seg_idx, const Twist & current_twist,
   const BehaviorPathPlannerParameters & common_parameters,
   const behavior_path_planner::LaneChangeParameters & lane_change_parameters,
-  const double front_decel, const double rear_decel, Pose & ego_pose_before_collision,
+  const double front_decel, const double rear_decel, bool & is_object_coming_from_rear,
   std::unordered_map<std::string, CollisionCheckDebug> & debug_data, const bool use_buffer = true,
   const double acceleration = 0.0);
 
@@ -139,7 +139,7 @@ std::vector<DrivableLanes> generateDrivableLanes(
 
 std::optional<LaneChangePath> getAbortPaths(
   const std::shared_ptr<const PlannerData> & planner_data, const LaneChangePath & selected_path,
-  const Pose & ego_lerp_pose_before_collision, const BehaviorPathPlannerParameters & common_param,
+  const BehaviorPathPlannerParameters & common_param,
   const LaneChangeParameters & lane_change_param);
 
 double getLateralShift(const LaneChangePath & path);

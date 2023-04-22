@@ -491,13 +491,13 @@ bool selectSafePath(
     const size_t current_seg_idx = motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
       path.path.points, current_pose, common_parameters.ego_nearest_dist_threshold,
       common_parameters.ego_nearest_yaw_threshold);
-    Pose ego_pose_before_collision;
+    bool is_object_coming_from_rear;
     if (isLaneChangePathSafe(
           path, current_lanes, target_lanes, dynamic_objects, current_pose, current_seg_idx,
           current_twist, common_parameters, ros_parameters,
           common_parameters.expected_front_deceleration,
-          common_parameters.expected_rear_deceleration, ego_pose_before_collision, debug_data, true,
-          path.acceleration)) {
+          common_parameters.expected_rear_deceleration, is_object_coming_from_rear, debug_data,
+          true, path.acceleration)) {
       *selected_path = path;
       return true;
     }
@@ -555,10 +555,12 @@ bool isLaneChangePathSafe(
   const size_t current_seg_idx, const Twist & current_twist,
   const BehaviorPathPlannerParameters & common_parameters,
   const LaneChangeParameters & lane_change_parameters, const double front_decel,
-  const double rear_decel, Pose & ego_pose_before_collision,
+  const double rear_decel, bool & is_object_coming_from_rear,
   std::unordered_map<std::string, CollisionCheckDebug> & debug_data, const bool use_buffer,
   const double acceleration)
 {
+  is_object_coming_from_rear = false;
+
   if (dynamic_objects == nullptr) {
     return true;
   }
@@ -631,7 +633,7 @@ bool isLaneChangePathSafe(
       if (!util::isSafeInLaneletCollisionCheck(
             current_pose, current_twist, vehicle_predicted_path, vehicle_info, check_start_time,
             check_end_time, time_resolution, obj, obj_path, common_parameters, front_decel,
-            rear_decel, ego_pose_before_collision, current_debug_data.second)) {
+            rear_decel, current_debug_data.second)) {
         appendDebugInfo(current_debug_data, false);
         return false;
       }
@@ -668,8 +670,12 @@ bool isLaneChangePathSafe(
         if (!util::isSafeInLaneletCollisionCheck(
               current_pose, current_twist, vehicle_predicted_path, vehicle_info, check_start_time,
               check_end_time, time_resolution, obj, obj_path, common_parameters, front_decel,
-              rear_decel, ego_pose_before_collision, current_debug_data.second)) {
+              rear_decel, current_debug_data.second)) {
           appendDebugInfo(current_debug_data, false);
+          const auto front_vehicle_pose = util::projectCurrentPoseToTarget(
+            current_pose, obj.kinematics.initial_pose_with_covariance.pose);
+          is_object_coming_from_rear =
+            !util::isObjectFront(front_vehicle_pose, vehicle_info.max_longitudinal_offset_m);
           return false;
         }
       }
@@ -679,6 +685,10 @@ bool isLaneChangePathSafe(
             check_end_time, time_resolution, obj, common_parameters, front_decel, rear_decel,
             current_debug_data.second)) {
         appendDebugInfo(current_debug_data, false);
+        const auto front_vehicle_pose = util::projectCurrentPoseToTarget(
+          current_pose, obj.kinematics.initial_pose_with_covariance.pose);
+        is_object_coming_from_rear =
+          !util::isObjectFront(front_vehicle_pose, vehicle_info.max_longitudinal_offset_m);
         return false;
       }
     }
@@ -912,9 +922,8 @@ std::vector<DrivableLanes> generateDrivableLanes(
 
 std::optional<LaneChangePath> getAbortPaths(
   const std::shared_ptr<const PlannerData> & planner_data, const LaneChangePath & selected_path,
-  [[maybe_unused]] const Pose & ego_pose_before_collision,
   const BehaviorPathPlannerParameters & common_param,
-  [[maybe_unused]] const LaneChangeParameters & lane_change_param)
+  const LaneChangeParameters & lane_change_param)
 {
   const auto & route_handler = planner_data->route_handler;
   const auto current_speed = util::l2Norm(planner_data->self_odometry->twist.twist.linear);
@@ -970,14 +979,6 @@ std::optional<LaneChangePath> getAbortPaths(
     RCLCPP_ERROR_STREAM(
       rclcpp::get_logger("behavior_path_planner").get_child("lane_change").get_child("util"),
       "abort start idx and return idx is equal. can't compute abort path.");
-    return std::nullopt;
-  }
-
-  if (!hasEnoughDistanceToLaneChangeAfterAbort(
-        *route_handler, reference_lanelets, current_pose, abort_return_dist, common_param)) {
-    RCLCPP_ERROR_STREAM(
-      rclcpp::get_logger("behavior_path_planner").get_child("lane_change").get_child("util"),
-      "insufficient distance to abort.");
     return std::nullopt;
   }
 
