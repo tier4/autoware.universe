@@ -61,6 +61,8 @@
 #include <thread>
 #include <vector>
 
+#include "ndt_scan_matcher/sampling_search.hpp"
+
 enum class ConvergedParamType {
   TRANSFORM_PROBABILITY = 0,
   NEAREST_VOXEL_TRANSFORMATION_LIKELIHOOD = 1
@@ -195,6 +197,8 @@ private:
   std::shared_ptr<Tf2ListenerModule> tf2_listener_module_;
   std::unique_ptr<MapModule> map_module_;
   std::unique_ptr<PoseInitializationModule> pose_init_module_;
+
+  Sampling_search sampling_search_;
 };
 
 #endif  // NDT_SCAN_MATCHER__NDT_SCAN_MATCHER_CORE_HPP_

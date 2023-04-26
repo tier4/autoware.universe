@@ -356,7 +356,8 @@ void NDTScanMatcher::callback_sensor_points(
   const Eigen::Matrix4f initial_pose_matrix =
     pose_to_matrix4f(interpolator.get_current_pose().pose.pose);
   auto output_cloud = std::make_shared<pcl::PointCloud<PointSource>>();
-  ndt_ptr_->align(*output_cloud, initial_pose_matrix);
+  // ndt_ptr_->align(*output_cloud, initial_pose_matrix);
+  ndt_ptr_->align(*output_cloud, sampling_search_.pose_update(initial_pose_matrix));
   const pclomp::NdtResult ndt_result = ndt_ptr_->getResult();
   (*state_ptr_)["state"] = "Sleeping";
 
@@ -433,6 +434,8 @@ void NDTScanMatcher::callback_sensor_points(
   } else {
     (*state_ptr_)["is_local_optimal_solution_oscillation"] = "0";
   }
+
+  sampling_search_.sampling_search(ndt_result.pose, ndt_result.transform_probability, sensor_points_baselinkTF_ptr,ndt_ptr_);
 }
 
 void NDTScanMatcher::transform_sensor_measurement(
