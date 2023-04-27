@@ -975,6 +975,11 @@ std::optional<LaneChangePath> getAbortPaths(
   const auto [abort_return_idx, abort_return_dist] =
     get_abort_idx_and_distance(abort_delta_time * 2);
 
+  if (!hasEnoughDistanceToLaneChangeAfterAbort(
+        *route_handler, reference_lanelets, current_pose, abort_return_dist, common_param)) {
+    return std::nullopt;
+  }
+
   if (abort_start_idx >= abort_return_idx) {
     RCLCPP_ERROR_STREAM(
       rclcpp::get_logger("behavior_path_planner").get_child("lane_change").get_child("util"),

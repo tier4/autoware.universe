@@ -170,7 +170,9 @@ BT::NodeStatus LaneChangeModule::updateState()
         getLogger(), *clock_, 1000,
         "[LaneChangeState] Continue lane changing (abort path not found)");
       current_state_ = BT::NodeStatus::RUNNING;
-      current_lane_change_state_ = LaneChangeStates::Normal;
+      current_lane_change_state_ = isRequiredStop(is_object_coming_from_rear)
+                                     ? LaneChangeStates::Stop
+                                     : LaneChangeStates::Normal;
       return current_state_;
     }
     RCLCPP_WARN_STREAM_THROTTLE(getLogger(), *clock_, 1000, "[LaneChangeState] Abort");
