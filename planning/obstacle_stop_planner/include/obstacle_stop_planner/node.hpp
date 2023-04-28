@@ -27,6 +27,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <signal_processing/lowpass_filter_1d.hpp>
 #include <tier4_autoware_utils/math/unit_conversion.hpp>
+#include "tier4_autoware_utils/ros/self_pose_listener.hpp"
 #include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 #include <vehicle_info_util/vehicle_info_util.hpp>
 
@@ -352,6 +353,8 @@ private:
 
   void publishDebugData(
     const PlannerData & planner_data, const double current_acc, const double current_vel);
+
+  tier4_autoware_utils::SelfPoseListener self_pose_listener_{this};
 };
 }  // namespace motion_planning
 

@@ -565,6 +565,8 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     std::bind(
       &ObstacleStopPlannerNode::externalExpandStopRangeCallback, this, std::placeholders::_1),
     createSubscriptionOptions(this));
+
+  self_pose_listener_.waitForFirstPose();
 }
 
 void ObstacleStopPlannerNode::obstaclePointcloudCallback(
@@ -680,7 +682,11 @@ void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr inpu
 
   PlannerData planner_data{};
 
-  getSelfPose(input_msg->header, tf_buffer_, planner_data.current_pose);
+  const auto current_pose_ptr = self_pose_listener_.getCurrentPose();
+  if (!current_pose_ptr) {
+    return;
+  }
+  planner_data.current_pose = current_pose_ptr->pose;
 
   Trajectory output_trajectory = *input_msg;
   TrajectoryPoints output_trajectory_points =
@@ -1629,6 +1635,7 @@ void ObstacleStopPlannerNode::createOneStepPolygon(
     one_step_move_vehicle_corner_points.push_back(cv::Point2d(
       base_step_pose.position.x + std::cos(yaw) * (wheel_base_ + front_overhang_) - std::sin(yaw) * (vehicle_width_ / 2.0 + expand_width_l),
       base_step_pose.position.y + std::sin(yaw) * (wheel_base_ + front_overhang_) + std::cos(yaw) * (vehicle_width_ / 2.0 + expand_width_l)));
+
     // front-right
     one_step_move_vehicle_corner_points.push_back(cv::Point2d(
       base_step_pose.position.x + std::cos(yaw) * (wheel_base_ + front_overhang_) - std::sin(yaw) * (-vehicle_width_ / 2.0 - expand_width_r),
@@ -1695,7 +1702,7 @@ bool ObstacleStopPlannerNode::convexHull(
   return true;
 }
 
-bool ObstacleStopPlannerNode::getSelfPose(
+[[maybe_unused]] bool ObstacleStopPlannerNode::getSelfPose(
   const std_msgs::msg::Header & header, const tf2_ros::Buffer & tf_buffer,
   geometry_msgs::msg::Pose & self_pose)
 {
