@@ -507,15 +507,34 @@ std::vector<TrajectoryPoint> ObstacleAvoidancePlanner::extendTrajectory(
 
   const auto & joint_start_pose = optimized_traj_points.back().pose;
 
-  // calculate end idx of optimized points on path points
+  // calculate start segment index of smoothly connected section
   const size_t joint_start_traj_seg_idx =
     trajectory_utils::findEgoSegmentIndex(traj_points, joint_start_pose, ego_nearest_param_);
 
-  // crop trajectory for extension
-  constexpr double joint_traj_length_for_smoothing = 5.0;
-  const auto joint_end_traj_point_idx = trajectory_utils::getPointIndexAfter(
-    traj_points, joint_start_pose.position, joint_start_traj_seg_idx,
-    joint_traj_length_for_smoothing);
+  // calculate end segment index of smoothly connected section
+  const auto joint_end_traj_point_idx = [&]() -> std::optional<size_t> {
+    constexpr double joint_traj_length_for_smoothing =
+      50.0;  // This should depend on lateral error.
+    const auto joint_end_traj_point_idx_opt = trajectory_utils::getPointIndexAfter(
+      traj_points, joint_start_pose.position, joint_start_traj_seg_idx,
+      joint_traj_length_for_smoothing);
+    if (joint_end_traj_point_idx_opt) {
+      std::cerr << "PO1" << std::endl;
+      // The input trajectory's end is after the optimization section and smoothly connected
+      // section.
+      return *joint_end_traj_point_idx_opt;
+    }
+    const double dist =
+      tier4_autoware_utils::calcDistance2d(optimized_traj_points.back(), traj_points.back());
+    if (1e-3 < dist) {
+      std::cerr << "PO2" << std::endl;
+      // The input trajectory's end is after the optimization section and within the smoothly
+      // connected section.
+      return traj_points.size() - 1;
+    }
+    // The input trajectory's end is within optimization section.
+    return std::nullopt;
+  }();
 
   // calculate full trajectory points
   const auto full_traj_points = [&]() {
@@ -531,17 +550,19 @@ std::vector<TrajectoryPoint> ObstacleAvoidancePlanner::extendTrajectory(
   auto resampled_traj_points = trajectory_utils::resampleTrajectoryPoints(
     full_traj_points, traj_param_.output_delta_arc_length);
 
-  // update velocity on joint
-  for (size_t i = joint_start_traj_seg_idx + 1; i <= joint_end_traj_point_idx; ++i) {
-    if (hasZeroVelocity(traj_points.at(i))) {
-      if (i != 0 && !hasZeroVelocity(traj_points.at(i - 1))) {
-        // Here is when current point is 0 velocity, but previous point is not 0 velocity.
-        const auto & input_stop_pose = traj_points.at(i).pose;
-        const size_t stop_seg_idx = trajectory_utils::findEgoSegmentIndex(
-          resampled_traj_points, input_stop_pose, ego_nearest_param_);
+  if (joint_end_traj_point_idx) {
+    // update velocity on joint
+    for (size_t i = joint_start_traj_seg_idx + 1; i <= *joint_end_traj_point_idx; ++i) {
+      if (hasZeroVelocity(traj_points.at(i))) {
+        if (i != 0 && !hasZeroVelocity(traj_points.at(i - 1))) {
+          // Here is when current point is 0 velocity, but previous point is not 0 velocity.
+          const auto & input_stop_pose = traj_points.at(i).pose;
+          const size_t stop_seg_idx = trajectory_utils::findEgoSegmentIndex(
+            resampled_traj_points, input_stop_pose, ego_nearest_param_);
 
-        // calculate and insert stop pose on output trajectory
-        trajectory_utils::insertStopPoint(resampled_traj_points, input_stop_pose, stop_seg_idx);
+          // calculate and insert stop pose on output trajectory
+          trajectory_utils::insertStopPoint(resampled_traj_points, input_stop_pose, stop_seg_idx);
+        }
       }
     }
   }
