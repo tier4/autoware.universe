@@ -643,6 +643,7 @@ void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr inpu
   const auto current_acc = current_acc_;
   mutex_.unlock();
 
+  PlannerData planner_data{};
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -670,6 +671,12 @@ void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr inpu
     if (input_msg->points.empty()) {
       return;
     }
+
+    const auto current_pose_ptr = self_pose_listener_.getCurrentPose();
+    if (!current_pose_ptr) {
+      return;
+    }
+    planner_data.current_pose = current_pose_ptr->pose;
   }
 
   // TODO(someone): support negative velocity
@@ -679,14 +686,6 @@ void ObstacleStopPlannerNode::pathCallback(const Trajectory::ConstSharedPtr inpu
     path_pub_->publish(*input_msg);
     return;
   }
-
-  PlannerData planner_data{};
-
-  const auto current_pose_ptr = self_pose_listener_.getCurrentPose();
-  if (!current_pose_ptr) {
-    return;
-  }
-  planner_data.current_pose = current_pose_ptr->pose;
 
   Trajectory output_trajectory = *input_msg;
   TrajectoryPoints output_trajectory_points =
