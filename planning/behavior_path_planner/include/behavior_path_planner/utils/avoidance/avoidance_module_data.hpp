@@ -235,6 +235,16 @@ struct AvoidanceParameters
   // avoidance path will be generated unless their lateral margin difference exceeds this value.
   double lateral_execution_threshold;
 
+  double quantize_filter_threshold;
+
+  double same_grad_filter_1_threshold;
+
+  double same_grad_filter_2_threshold;
+
+  double same_grad_filter_3_threshold;
+
+  double sharp_shift_filter_threshold;
+
   // target velocity matrix
   std::vector<double> target_velocity_matrix;
 
