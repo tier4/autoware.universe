@@ -236,7 +236,7 @@ struct AvoidanceParameters
   // avoidance points is greater than this threshold.
   // In multiple targets case: if there are multiple vehicles in a row to be avoided, no new
   // avoidance path will be generated unless their lateral margin difference exceeds this value.
-  double avoidance_execution_lateral_threshold;
+  double lateral_execution_threshold;
 
   // target velocity matrix
   std::vector<double> target_velocity_matrix;

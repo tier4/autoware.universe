@@ -1066,7 +1066,7 @@ void filterTargetObjects(
         continue;
       }
 
-      if (std::abs(shift_length) < parameters->avoidance_execution_lateral_threshold) {
+      if (std::abs(shift_length) < parameters->lateral_execution_threshold) {
         o.reason = "LessThanExecutionThreshold";
         data.other_objects.push_back(o);
         continue;
