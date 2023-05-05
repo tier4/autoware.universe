@@ -14,7 +14,7 @@
 
 #include "behavior_path_planner/turn_signal_decider.hpp"
 
-#include "behavior_path_planner/utilities.hpp"
+#include "behavior_path_planner/utils/utils.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <lanelet2_extension/utility/utilities.hpp>
@@ -40,21 +40,21 @@ TurnIndicatorsCommand TurnSignalDecider::getTurnSignal(
   // Data
   const double nearest_dist_threshold = planner_data->parameters.ego_nearest_dist_threshold;
   const double nearest_yaw_threshold = planner_data->parameters.ego_nearest_yaw_threshold;
-  const auto & current_pose = planner_data->self_pose->pose;
+  const auto & current_pose = planner_data->self_odometry->pose.pose;
   const double & current_vel = planner_data->self_odometry->twist.twist.linear.x;
   const auto route_handler = *(planner_data->route_handler);
 
   // Get current lanelets
   const double forward_length = planner_data->parameters.forward_path_length;
   const double backward_length = 50.0;
-  const lanelet::ConstLanelets current_lanes = util::calcLaneAroundPose(
+  const lanelet::ConstLanelets current_lanes = utils::calcLaneAroundPose(
     planner_data->route_handler, current_pose, forward_length, backward_length);
 
   if (current_lanes.empty()) {
     return turn_signal_info.turn_signal;
   }
 
-  const PathWithLaneId extended_path = util::getCenterLinePath(
+  const PathWithLaneId extended_path = utils::getCenterLinePath(
     route_handler, current_lanes, current_pose, backward_length, forward_length,
     planner_data->parameters);
 
@@ -433,9 +433,9 @@ void TurnSignalDecider::set_intersection_info(
     }
     intersection_distance_ = dist_to_intersection_required_start;
     intersection_pose_point_ = inter_required_start_point;
+  } else {
+    initialize_intersection_info();
   }
-
-  initialize_intersection_info();
 }
 
 void TurnSignalDecider::initialize_intersection_info()
