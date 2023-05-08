@@ -973,7 +973,7 @@ std::optional<LaneChangePath> getAbortPaths(
   const auto abort_delta_time = lane_change_param.abort_delta_time;
   const auto [abort_start_idx, abort_start_dist] = get_abort_idx_and_distance(abort_delta_time);
   const auto [abort_return_idx, abort_return_dist] =
-    get_abort_idx_and_distance(abort_delta_time * 2);
+    get_abort_idx_and_distance(abort_delta_time * 3);
 
   if (!hasEnoughDistanceToLaneChangeAfterAbort(
         *route_handler, reference_lanelets, current_pose, abort_return_dist, common_param)) {
