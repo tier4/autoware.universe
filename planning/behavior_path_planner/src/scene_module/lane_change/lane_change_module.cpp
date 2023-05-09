@@ -227,11 +227,15 @@ bool LaneChangeModule::isRequiredStop(const bool is_object_coming_from_rear) con
     if (!isCurrentSpeedLow()) {
       RCLCPP_WARN_STREAM_THROTTLE(
         getLogger(), *clock_, 1000, "[LaneChangeState] Continue lane changing (can not stop)");
+      return false;
     }
     if (!is_object_coming_from_rear) {
       RCLCPP_WARN_STREAM_THROTTLE(
         getLogger(), *clock_, 1000, "[LaneChangeState] Continue lane changing (no need to stop)");
+      return false;
     }
+    RCLCPP_WARN_STREAM_THROTTLE(getLogger(), *clock_, 1000, "[LaneChangeState] Stop lane changing");
+    return true;
   }
 
   return isNearEndOfLane() && isCurrentSpeedLow() && is_object_coming_from_rear;
@@ -525,11 +529,20 @@ bool LaneChangeModule::isValidPath(const PathWithLaneId & path) const
 
 bool LaneChangeModule::isNearEndOfLane() const
 {
+  const auto & route_handler = planner_data_->route_handler;
   const auto & current_pose = getEgoPose();
   const double threshold = util::calcTotalLaneChangeDistance(planner_data_->parameters);
 
-  return std::max(0.0, util::getDistanceToEndOfLane(current_pose, status_.current_lanes)) <
-         threshold;
+  auto distance_to_end = util::getDistanceToEndOfLane(current_pose, status_.current_lanes);
+
+  if (route_handler->isInGoalRouteSection(status_.lane_change_lanes.back())) {
+    distance_to_end = std::min(
+      distance_to_end,
+      util::getSignedDistance(current_pose, route_handler->getGoalPose(), status_.current_lanes));
+  }
+
+  return (std::max(0.0, distance_to_end) - threshold) <
+         planner_data_->parameters.backward_length_buffer_for_end_of_lane;
 }
 
 bool LaneChangeModule::isCurrentSpeedLow() const

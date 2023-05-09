@@ -19,8 +19,9 @@
 
 VehicleCmdFilter::VehicleCmdFilter() {}
 
-void VehicleCmdFilter::limitLongitudinalWithVel(
-  autoware_auto_control_msgs::msg::AckermannControlCommand & input) const
+VehicleCmdFilter::VehicleCmdFilter() {}
+
+void VehicleCmdFilter::limitLongitudinalWithVel(AckermannControlCommand & input) const
 {
   input.longitudinal.speed = std::max(
     std::min(static_cast<double>(input.longitudinal.speed), param_.vel_lim), -param_.vel_lim);
