@@ -2805,6 +2805,19 @@ BehaviorModuleOutput AvoidanceModule::plan()
 
   updateRegisteredRTCStatus(avoidance_path.path);
 
+  // TODO(Satoshi OTA): remove this workaround
+  if (!planner_data_->route_handler->isInGoalRouteSection(data.current_lanelets.back())) {
+    constexpr double THRESHOLD = 100.0;
+    const auto to_path_end = calcSignedArcLength(
+      data.reference_path.points, getEgoPosition(), getPoint(data.reference_path.points.back()));
+    if (to_path_end < THRESHOLD) {
+      clearWaitingApproval();
+      removeCandidateRTCStatus();
+      avoidance_data_.safe_new_sl.clear();
+      std::cout << "LOCK PATH!!!" << std::endl;
+    }
+  }
+
   return output;
 }
 
