@@ -269,6 +269,7 @@ DynamicAvoidanceModule::calcTargetObjects() const
 
     // Ignore object that will cut into the ego lane
     const bool will_object_cut_in = [&]() {
+      return false;
       const double path_projected_vel =
         calcObstacleProjectedVelocity(prev_module_path->points, object);
       if (path_projected_vel < 0) {
