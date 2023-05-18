@@ -425,6 +425,7 @@ void AvoidanceModule::fillShiftLine(AvoidancePlanningData & data, DebugData & de
     if (o.avoid_required && enough_space) {
       data.avoid_required = true;
       data.stop_target_object = o;
+      data.to_stop_line = calcDistanceToStopLine(o);
       break;
     }
   }
@@ -449,7 +450,7 @@ void AvoidanceModule::fillShiftLine(AvoidancePlanningData & data, DebugData & de
     data.candidate_path = utils::avoidance::toShiftedPath(data.reference_path);
     RCLCPP_WARN_THROTTLE(
       getLogger(), *clock_, 5000,
-      "found safe avoidance path, but it is not safe. canceling avoidance path...");
+      "found avoidance path, but it is not safe. canceling avoidance path...");
   }
 
   /**
@@ -3433,21 +3434,11 @@ double AvoidanceModule::getRelativeLengthFromPath(const AvoidLine & avoid_line) 
   return avoid_line.end_shift_length - current_shift_length;
 }
 
-void AvoidanceModule::insertWaitPoint(
-  const bool use_constraints_for_decel, ShiftedPath & shifted_path) const
+double AvoidanceModule::calcDistanceToStopLine(const ObjectData & object) const
 {
   const auto & p = parameters_;
-  const auto & data = avoidance_data_;
   const auto & base_link2front = planner_data_->parameters.base_link2front;
   const auto & vehicle_width = planner_data_->parameters.vehicle_width;
-
-  if (!data.stop_target_object) {
-    return;
-  }
-
-  if (data.avoiding_now) {
-    return;
-  }
 
   //         D5
   //      |<---->|                               D4
@@ -3464,29 +3455,42 @@ void AvoidanceModule::insertWaitPoint(
   // D4: o_front.longitudinal
   // D5: base_link2front
 
-  const auto o_front = data.stop_target_object.get();
-  const auto t = utils::getHighestProbLabel(o_front.object.classification);
+  const auto t = utils::getHighestProbLabel(object.object.classification);
   const auto object_parameter = parameters_->object_parameters.at(t);
 
   const auto avoid_margin =
     object_parameter.safety_buffer_lateral + p->lateral_collision_margin + 0.5 * vehicle_width;
   const auto variable = getMinimumAvoidanceDistance(
-    getShiftLength(o_front, utils::avoidance::isOnRight(o_front), avoid_margin));
+    getShiftLength(object, utils::avoidance::isOnRight(object), avoid_margin));
   const auto constant =
     p->min_prepare_distance + object_parameter.safety_buffer_longitudinal + base_link2front;
-  const auto start_longitudinal =
-    o_front.longitudinal -
-    std::clamp(variable + constant, p->stop_min_distance, p->stop_max_distance);
+
+  return object.longitudinal -
+         std::clamp(variable + constant, p->stop_min_distance, p->stop_max_distance);
+}
+
+void AvoidanceModule::insertWaitPoint(
+  const bool use_constraints_for_decel, ShiftedPath & shifted_path) const
+{
+  const auto & data = avoidance_data_;
+
+  if (!data.stop_target_object) {
+    return;
+  }
+
+  if (data.avoiding_now) {
+    return;
+  }
 
   if (!use_constraints_for_decel) {
     utils::avoidance::insertDecelPoint(
-      getEgoPosition(), start_longitudinal, 0.0, shifted_path.path, stop_pose_);
+      getEgoPosition(), data.to_stop_line, 0.0, shifted_path.path, stop_pose_);
     return;
   }
 
   const auto stop_distance = getMildDecelDistance(0.0);
   if (stop_distance) {
-    const auto insert_distance = std::max(start_longitudinal, *stop_distance);
+    const auto insert_distance = std::max(data.to_stop_line, *stop_distance);
     utils::avoidance::insertDecelPoint(
       getEgoPosition(), insert_distance, 0.0, shifted_path.path, stop_pose_);
   }

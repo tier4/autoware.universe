@@ -291,6 +291,8 @@ private:
    */
   void updateAvoidanceDebugData(std::vector<AvoidanceDebugMsg> & avoidance_debug_msg_array) const;
 
+  double calcDistanceToStopLine(const ObjectData & object) const;
+
   double getLateralMarginFromVelocity(const double velocity) const;
 
   double getRSSLongitudinalDistance(

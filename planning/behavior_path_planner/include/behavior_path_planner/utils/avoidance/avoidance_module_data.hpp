@@ -433,6 +433,8 @@ struct AvoidancePlanningData
   bool yield_required{false};
 
   bool found_avoidance_path{false};
+
+  double to_stop_line{std::numeric_limits<double>::max()};
 };
 
 /*
