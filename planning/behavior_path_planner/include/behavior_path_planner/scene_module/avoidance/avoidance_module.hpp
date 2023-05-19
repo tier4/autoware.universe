@@ -220,6 +220,7 @@ private:
     const AvoidLineArray & base_lines, const AvoidLineArray & added_lines) const;
 
   // shift point generation: merger
+  AvoidLineArray fillGap(const AvoidLineArray & shift_lines) const;
   AvoidLineArray mergeShiftLines(const AvoidLineArray & raw_shift_lines, DebugData & debug) const;
   void generateTotalShiftLine(
     const AvoidLineArray & avoid_points, ShiftLineData & shift_line_data) const;
@@ -423,10 +424,10 @@ private:
       findNearestIndex(prev_output_.path.points, getEgoPosition()));
   }
 
-  double getCurrentLinearShift() const
+  double getCurrentLinearShift(const Point & position) const
   {
     return prev_linear_shift_path_.shift_length.at(
-      findNearestIndex(prev_linear_shift_path_.path.points, getEgoPosition()));
+      findNearestIndex(prev_linear_shift_path_.path.points, position));
   }
 
   double getCurrentBaseShift() const { return path_shifter_.getBaseOffset(); }
