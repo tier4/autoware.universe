@@ -252,6 +252,8 @@ private:
   // -- for new shift point approval --
   AvoidLineArray findNewShiftLine(
     const AvoidLineArray & shift_lines, const PathShifter & shifter) const;
+  bool isValidShiftLine(
+    const AvoidLineArray & new_shift_lines, const PathShifter & path_shifter) const;
   void addShiftLineIfApproved(const AvoidLineArray & point);
   void addNewShiftLines(PathShifter & path_shifter, const AvoidLineArray & shift_lines) const;
 

@@ -391,7 +391,11 @@ void AvoidanceModule::fillShiftLine(AvoidancePlanningData & data, DebugData & de
    * STEP 3
    * Find new shift point
    */
-  data.unapproved_new_sl = findNewShiftLine(processed_raw_sp, path_shifter);
+  const auto new_sp = findNewShiftLine(processed_raw_sp, path_shifter);
+  if (isValidShiftLine(new_sp, path_shifter)) {
+    data.unapproved_new_sl = new_sp;
+  }
+
   const auto found_new_sl = data.unapproved_new_sl.size() > 0;
   const auto registered = path_shifter.getShiftLines().size() > 0;
   data.found_avoidance_path = found_new_sl || registered;
@@ -3094,6 +3098,41 @@ AvoidLineArray AvoidanceModule::findNewShiftLine(
   return {};
 }
 
+bool AvoidanceModule::isValidShiftLine(
+  const AvoidLineArray & new_shift_lines, const PathShifter & path_shifter) const
+{
+  if (new_shift_lines.empty()) {
+    return false;
+  }
+
+  auto shifter_for_validate = path_shifter;
+
+  addNewShiftLines(shifter_for_validate, new_shift_lines);
+
+  ShiftedPath new_linear_shift_path;
+  shifter_for_validate.generate(&new_linear_shift_path);
+  debug_data_.new_shift_path = new_linear_shift_path;
+
+  // check offset between new shift path and ego position.
+  {
+    const auto new_idx = planner_data_->findEgoIndex(new_linear_shift_path.path.points);
+    const auto new_shift_length = new_linear_shift_path.shift_length.at(new_idx);
+
+    const auto old_idx = planner_data_->findEgoIndex(prev_output_.path.points);
+    const auto old_shift_length = prev_output_.shift_length.at(old_idx);
+
+    constexpr double THRESHOLD = 0.1;
+    const auto offset = std::abs(new_shift_length - old_shift_length);
+    if (offset > THRESHOLD) {
+      RCLCPP_WARN_THROTTLE(
+        getLogger(), *clock_, 1000, "new shift line is invalid. [HUGE OFFSET (%.2f)]", offset);
+      return false;
+    }
+  }
+
+  return true;  // valid shift line.
+}
+
 ShiftedPath AvoidanceModule::generateAvoidancePath(PathShifter & path_shifter) const
 {
   DEBUG_PRINT("path_shifter: base shift = %f", getCurrentBaseShift());
@@ -3375,12 +3414,16 @@ void AvoidanceModule::updateDebugMarker(
   addAvoidLine(debug.extra_return_shift, "p_extra_return_shift", 0.0, 0.5, 0.8);
 
   // merged shift
-  const auto & linear_shift = prev_linear_shift_path_.shift_length;
   add(createShiftLengthMarkerArray(debug.pos_shift, path, "m_pos_shift_line", 0, 0.7, 0.5));
   add(createShiftLengthMarkerArray(debug.neg_shift, path, "m_neg_shift_line", 0, 0.5, 0.7));
   add(createShiftLengthMarkerArray(debug.total_shift, path, "m_total_shift_line", 0.99, 0.4, 0.2));
   add(createShiftLengthMarkerArray(debug.output_shift, path, "m_output_shift_line", 0.8, 0.8, 0.2));
-  add(createShiftLengthMarkerArray(linear_shift, path, "m_output_linear_line", 0.9, 0.3, 0.3));
+
+  // shift path
+  add(createShiftLengthMarkerArray(
+    prev_linear_shift_path_.shift_length, path, "registered_linear_path", 0.9, 0.3, 0.3));
+  add(createShiftLengthMarkerArray(
+    debug.new_shift_path.shift_length, path, "proposed_spline_path", 1.0, 1.0, 1.0));
 
   // child shift points
   addAvoidLine(debug.merged, "c_0_merged", 0.345, 0.968, 1.0);

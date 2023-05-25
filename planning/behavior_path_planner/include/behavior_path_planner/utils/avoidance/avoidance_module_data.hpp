@@ -529,6 +529,8 @@ struct DebugData
   // tmp for plot
   PathWithLaneId center_line;
 
+  ShiftedPath new_shift_path;
+
   AvoidanceDebugMsgArray avoidance_debug_msg_array;
 };
 
