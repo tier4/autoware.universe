@@ -3019,28 +3019,41 @@ void AvoidanceModule::addNewShiftLines(
 AvoidLineArray AvoidanceModule::findNewShiftLine(
   const AvoidLineArray & candidates, const PathShifter & shifter) const
 {
-  (void)shifter;
-
   if (candidates.empty()) {
-    DEBUG_PRINT("shift candidates is empty. return None.");
     return {};
   }
 
-  printShiftLines(candidates, "findNewShiftLine: candidates");
+  // add small shift lines at once.
+  const auto THRESHOLD = parameters_->quantize_filter_threshold + 1e-2;
 
-  // Retrieve the subsequent linear shift point from the given index point.
-  const auto getShiftLineWithSubsequentStraight = [this, &candidates](size_t i) {
-    AvoidLineArray subsequent{candidates.at(i)};
-    for (size_t j = i + 1; j < candidates.size(); ++j) {
-      const auto next_shift = candidates.at(j);
-      if (std::abs(next_shift.getRelativeLength()) < 1.0e-2) {
-        subsequent.push_back(next_shift);
-        DEBUG_PRINT("j = %lu, relative shift is zero. add together.", j);
-      } else {
-        DEBUG_PRINT("j = %lu, relative shift is not zero = %f.", j, next_shift.getRelativeLength());
+  // add small shift lines.
+  const auto add_straight_shift = [&, this](auto & subsequent, const size_t start_idx) {
+    for (size_t i = start_idx; i < candidates.size(); ++i) {
+      if (std::abs(candidates.at(i).getRelativeLength()) > THRESHOLD) {
         break;
       }
+
+      subsequent.push_back(candidates.at(i));
     }
+
+    return subsequent;
+  };
+
+  // get subsequent shift lines.
+  const auto get_subsequent_shift = [&, this](size_t i) {
+    AvoidLineArray subsequent{candidates.at(i)};
+
+    if (candidates.size() == i + 1) {
+      return subsequent;
+    }
+
+    if (std::abs(candidates.at(i).getRelativeLength()) < THRESHOLD) {
+      subsequent.push_back(candidates.at(i + 1));
+      add_straight_shift(subsequent, i + 2);
+    } else {
+      add_straight_shift(subsequent, i + 1);
+    }
+
     return subsequent;
   };
 
@@ -3049,15 +3062,15 @@ AvoidLineArray AvoidanceModule::findNewShiftLine(
       al.getRelativeLength(), al.getRelativeLongitudinal(), getSharpAvoidanceEgoSpeed());
   };
 
+  if (prev_reference_.points.size() != prev_linear_shift_path_.shift_length.size()) {
+    throw std::logic_error("prev_reference_ and prev_linear_shift_path_ must have same size.");
+  }
+
   for (size_t i = 0; i < candidates.size(); ++i) {
     const auto & candidate = candidates.at(i);
     std::stringstream ss;
     ss << "i = " << i << ", id = " << candidate.id;
     const auto pfx = ss.str().c_str();
-
-    if (prev_reference_.points.size() != prev_linear_shift_path_.shift_length.size()) {
-      throw std::logic_error("prev_reference_ and prev_linear_shift_path_ must have same size.");
-    }
 
     // new shift points must exist in front of Ego
     // this value should be larger than -eps consider path shifter calculation error.
@@ -3090,7 +3103,7 @@ AvoidLineArray AvoidanceModule::findNewShiftLine(
       DEBUG_PRINT(
         "%s, New shift point is found!!! shift change: %f -> %f", pfx, current_shift,
         candidate.end_shift_length);
-      return getShiftLineWithSubsequentStraight(i);
+      return get_subsequent_shift(i);
     }
   }
 
