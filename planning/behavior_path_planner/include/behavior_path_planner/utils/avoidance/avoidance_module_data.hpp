@@ -509,6 +509,10 @@ struct DebugData
   AvoidLineArray trim_too_sharp_shift;
   std::vector<double> pos_shift;
   std::vector<double> neg_shift;
+  std::vector<double> pos_grad;
+  std::vector<double> neg_grad;
+  std::vector<double> forward_grad;
+  std::vector<double> backward_grad;
   std::vector<double> total_shift;
   std::vector<double> output_shift;
 

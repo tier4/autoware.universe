@@ -1215,6 +1215,15 @@ AvoidLineArray AvoidanceModule::extractShiftLinesFromLine(ShiftLineData & shift_
       DEBUG_PRINT("end and start point found at i = %lu", i);
     }
   }
+
+  if (std::abs(getBwdGrad(N - 1)) > CREATE_SHIFT_GRAD_THR) {
+    const auto & p = path.points.at(N - 1).point.pose;
+    const auto shift = sl.shift_line.at(N - 1);
+    utils::avoidance::setEndData(al, shift, p, N - 1, arcs.at(N - 1));
+    al.id = getOriginalShiftLineUniqueId();
+    merged_avoid_lines.push_back(al);
+  }
+
   return merged_avoid_lines;
 }
 
@@ -1240,6 +1249,10 @@ AvoidLineArray AvoidanceModule::mergeShiftLines(
   {
     debug.pos_shift = shift_line_data.pos_shift_line;
     debug.neg_shift = shift_line_data.neg_shift_line;
+    debug.pos_grad = shift_line_data.pos_shift_line_grad;
+    debug.neg_grad = shift_line_data.neg_shift_line_grad;
+    debug.forward_grad = shift_line_data.forward_grad;
+    debug.backward_grad = shift_line_data.backward_grad;
     debug.total_shift = shift_line_data.shift_line;
   }
 
@@ -3381,6 +3394,7 @@ void AvoidanceModule::updateDebugMarker(
   using marker_utils::createObjectsMarkerArray;
   using marker_utils::createPathMarkerArray;
   using marker_utils::createPoseMarkerArray;
+  using marker_utils::createShiftGradMarkerArray;
   using marker_utils::createShiftLengthMarkerArray;
   using marker_utils::createShiftLineMarkerArray;
   using marker_utils::avoidance_marker::createAvoidLineMarkerArray;
@@ -3458,6 +3472,10 @@ void AvoidanceModule::updateDebugMarker(
   add(createShiftLengthMarkerArray(debug.neg_shift, path, "m_neg_shift_line", 0, 0.5, 0.7));
   add(createShiftLengthMarkerArray(debug.total_shift, path, "m_total_shift_line", 0.99, 0.4, 0.2));
   add(createShiftLengthMarkerArray(debug.output_shift, path, "m_output_shift_line", 0.8, 0.8, 0.2));
+  add(createShiftGradMarkerArray(debug.pos_grad, path, "m_pos_grad", 0.0, 0.7, 0.5));
+  add(createShiftGradMarkerArray(debug.neg_grad, path, "m_neg_grad", 0.0, 0.5, 0.7));
+  add(createShiftGradMarkerArray(debug.forward_grad, path, "m_forward_grad", 0.99, 0.4, 0.2));
+  add(createShiftGradMarkerArray(debug.backward_grad, path, "m_backward_grad", 0.99, 0.2, 0.4));
 
   // shift path
   add(createShiftLengthMarkerArray(
