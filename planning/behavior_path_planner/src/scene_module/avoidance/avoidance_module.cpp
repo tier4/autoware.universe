@@ -468,7 +468,7 @@ void AvoidanceModule::fillShiftLine(AvoidancePlanningData & data, DebugData & de
    * Even if it is determined that a yield is necessary, the yield maneuver is not executed
    * if the avoidance has already been initiated.
    */
-  constexpr double THRESHOLD = -0.5;
+  constexpr double THRESHOLD = -0.2;
   const auto exceed_stop_line = data.to_stop_line < THRESHOLD;
   if (!data.safe && (data.avoiding_now || exceed_stop_line)) {
     data.yield_required = false;
