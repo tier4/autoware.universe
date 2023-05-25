@@ -111,9 +111,9 @@ PathWithLaneId NormalLaneChange::generatePlannedPath(
     return path;
   }
 
-  if (isStopState()) {
-    const auto stop_point = utils::insertStopPoint(0.1, path);
-  }
+  // if (isStopState()) {
+  //   const auto stop_point = utils::insertStopPoint(0.1, path);
+  // }
 
   return path;
 }
