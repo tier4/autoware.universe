@@ -2841,7 +2841,7 @@ BehaviorModuleOutput AvoidanceModule::plan()
 
   // TODO(Satoshi OTA): remove this workaround
   {
-    constexpr double THRESHOLD = 0.5;
+    constexpr double THRESHOLD = 1.0;
     const size_t ego_seg_idx = planner_data_->findEgoSegmentIndex(output.path->points);
     const auto offset =
       motion_utils::calcLateralOffset(output.path->points, getEgoPosition(), ego_seg_idx);
