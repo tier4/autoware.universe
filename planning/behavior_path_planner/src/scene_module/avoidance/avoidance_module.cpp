@@ -145,6 +145,9 @@ ModuleStatus AvoidanceModule::updateState()
   const auto is_plan_running = isAvoidancePlanRunning();
   const bool has_avoidance_target = !avoidance_data_.target_objects.empty();
 
+  DEBUG_PRINT(
+    "is_plan_running = %d, has_avoidance_target = %d", is_plan_running, has_avoidance_target);
+
   if (!is_plan_running && !has_avoidance_target) {
     current_state_ = ModuleStatus::SUCCESS;
   } else if (
@@ -154,6 +157,13 @@ ModuleStatus AvoidanceModule::updateState()
     current_state_ = ModuleStatus::SUCCESS;
   } else {
     current_state_ = ModuleStatus::RUNNING;
+  }
+
+  const auto path = avoidance_data_.reference_path;
+  const auto idx = planner_data_->findEgoIndex(path.points);
+  if (idx == path.points.size() - 1) {
+    RCLCPP_WARN_THROTTLE(getLogger(), *clock_, 500, "reach path end point. exit avoidance module.");
+    current_state_ = ModuleStatus::SUCCESS;
   }
 
   DEBUG_PRINT(
