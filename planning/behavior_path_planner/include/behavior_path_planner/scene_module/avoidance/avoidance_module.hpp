@@ -245,7 +245,7 @@ private:
     AvoidLineArray & shift_lines, const bool recalculate_start_length = true) const;
   AvoidLineArray fillAdditionalInfo(const AvoidLineArray & shift_lines) const;
   AvoidLine fillAdditionalInfo(const AvoidLine & shift_line) const;
-  AvoidLine getNonStraightShiftLine(const AvoidLineArray & shift_lines) const;
+  AvoidLine getMainShiftLine(const AvoidLineArray & shift_lines) const;
   void fillAdditionalInfoFromPoint(AvoidLineArray & shift_lines) const;
   void fillAdditionalInfoFromLongitudinal(AvoidLineArray & shift_lines) const;
 

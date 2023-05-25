@@ -966,15 +966,18 @@ AvoidLine AvoidanceModule::fillAdditionalInfo(const AvoidLine & shift_line) cons
   return ret.front();
 }
 
-AvoidLine AvoidanceModule::getNonStraightShiftLine(const AvoidLineArray & shift_lines) const
+AvoidLine AvoidanceModule::getMainShiftLine(const AvoidLineArray & shift_lines) const
 {
-  for (const auto & sl : shift_lines) {
-    if (fabs(getRelativeLengthFromPath(sl)) > 0.01) {
-      return sl;
-    }
+  const auto itr = std::max_element(
+    shift_lines.begin(), shift_lines.end(), [this](const auto & a, const auto & b) {
+      return std::abs(getRelativeLengthFromPath(a)) < std::abs(getRelativeLengthFromPath(b));
+    });
+
+  if (itr == shift_lines.end()) {
+    return {};
   }
 
-  return {};
+  return *itr;
 }
 
 void AvoidanceModule::fillAdditionalInfoFromPoint(AvoidLineArray & shift_lines) const
@@ -2791,7 +2794,7 @@ BehaviorModuleOutput AvoidanceModule::plan()
     DEBUG_PRINT("new_shift_lines size = %lu", data.safe_new_sl.size());
     printShiftLines(data.safe_new_sl, "new_shift_lines");
 
-    const auto sl = getNonStraightShiftLine(data.safe_new_sl);
+    const auto sl = getMainShiftLine(data.safe_new_sl);
     if (getRelativeLengthFromPath(sl) > 0.0) {
       removePreviousRTCStatusRight();
     } else if (getRelativeLengthFromPath(sl) < 0.0) {
@@ -2897,7 +2900,7 @@ CandidateOutput AvoidanceModule::planCandidate() const
       shifted_path.path, data.safe_new_sl.front().start_idx, std::numeric_limits<double>::max(),
       0.0);
 
-    const auto sl = getNonStraightShiftLine(data.safe_new_sl);
+    const auto sl = getMainShiftLine(data.safe_new_sl);
     const auto sl_front = data.safe_new_sl.front();
     const auto sl_back = data.safe_new_sl.back();
 
@@ -2961,7 +2964,7 @@ void AvoidanceModule::addShiftLineIfApproved(const AvoidLineArray & shift_lines)
     // register original points for consistency
     registerRawShiftLines(shift_lines);
 
-    const auto sl = getNonStraightShiftLine(shift_lines);
+    const auto sl = getMainShiftLine(shift_lines);
     const auto sl_front = shift_lines.front();
     const auto sl_back = shift_lines.back();
 
