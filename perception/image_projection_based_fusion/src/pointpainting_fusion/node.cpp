@@ -102,6 +102,7 @@ void PointPaintingFusionNode::preprocess(sensor_msgs::msg::PointCloud2 & painted
   // set fields
   sensor_msgs::PointCloud2Modifier pcd_modifier(painted_pointcloud_msg);
   pcd_modifier.clear();
+  pcd_modifier.reserve(tmp.width);
   painted_pointcloud_msg.width = tmp.width;
   constexpr int num_fields = 7;
   pcd_modifier.setPointCloud2Fields(
@@ -148,6 +149,11 @@ void PointPaintingFusionNode::fuseOnSingleImage(
   const sensor_msgs::msg::CameraInfo & camera_info,
   sensor_msgs::msg::PointCloud2 & painted_pointcloud_msg)
 {
+  auto num_bbox = (input_roi_msg.feature_objects).size();
+  if (num_bbox == 0) {
+    return;
+  }
+
   std::vector<sensor_msgs::msg::RegionOfInterest> debug_image_rois;
   std::vector<Eigen::Vector2d> debug_image_points;
 
