@@ -347,6 +347,9 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
           return a.confidence < b.confidence;
         });
 
+      const double dist_from_path_to_obj =
+        motion_utils::calcLateralOffset(prev_module_path->points, object.pose.position);
+
       // Ignore object that will cut into the ego lane
       const bool will_object_cut_in = [&]() {
         if (object.vel < 0) {
@@ -354,6 +357,7 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
           return false;
         }
 
+        // check if the highest predicted path will cut into the ego lane
         for (const auto & predicted_path_point : reliable_predicted_path->path) {
           const double paths_lat_diff = motion_utils::calcLateralOffset(
             prev_module_path->points, predicted_path_point.position);
@@ -361,6 +365,32 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
             return true;
           }
         }
+
+        // check if the object will still cut into the ego lane without highest predicted path
+        // information
+        constexpr double cut_in_prediction_time = 2.0;
+        const double predicted_dist_from_path_to_obj =
+          dist_from_path_to_obj + object.lat_vel * cut_in_prediction_time;
+        constexpr double cut_in_thresh_margin = 1.5;  // NOTE: for object's center to edge
+        const double cut_in_thresh_abs_dist_from_path_to_obj =
+          planner_data_->parameters.vehicle_width / 2.0 + parameters_->max_lat_offset_to_avoid +
+          cut_in_thresh_margin;
+        std::cerr << predicted_dist_from_path_to_obj << " "
+                  << cut_in_thresh_abs_dist_from_path_to_obj << std::endl;
+        if (is_left) {
+          if (
+            object.lat_vel < -0.3 &&
+            predicted_dist_from_path_to_obj < cut_in_thresh_abs_dist_from_path_to_obj) {
+            return true;
+          }
+        } else {
+          if (
+            0.3 < object.lat_vel &&
+            -cut_in_thresh_abs_dist_from_path_to_obj < predicted_dist_from_path_to_obj) {
+            return true;
+          }
+        }
+
         return false;
       }();
       if (will_object_cut_in) {
@@ -375,8 +405,6 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
         }
 
         constexpr double cut_out_prediction_time = 1.0;
-        const double dist_from_path_to_obj =
-          motion_utils::calcLateralOffset(prev_module_path->points, object.pose.position);
         const double predicted_dist_from_path_to_obj =
           dist_from_path_to_obj + object.lat_vel * cut_out_prediction_time;
         constexpr double cut_out_thresh_margin = 0.5;  // NOTE: for object's center to edge
