@@ -383,15 +383,16 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
         const double cut_out_thresh_abs_dist_from_path_to_obj =
           planner_data_->parameters.vehicle_width / 2.0 + parameters_->max_lat_offset_to_avoid +
           cut_out_thresh_margin;
+        const double obj_vel_angle = std::atan2(object.lat_vel, object.vel);
         if (is_left) {
           if (
-            0.3 < object.lat_vel &&
+            0.3 < object.lat_vel && 0.2 < obj_vel_angle &&
             cut_out_thresh_abs_dist_from_path_to_obj < predicted_dist_from_path_to_obj) {
             return true;
           }
         } else {
           if (
-            object.lat_vel < -0.3 &&
+            object.lat_vel < -0.3 && obj_vel_angle < -0.2 &&
             predicted_dist_from_path_to_obj < -cut_out_thresh_abs_dist_from_path_to_obj) {
             return true;
           }
@@ -522,31 +523,41 @@ std::optional<tier4_autoware_utils::Polygon2d> DynamicAvoidanceModule::calcDynam
 
     // calculate time to collision and apply it to drivable area extraction
     const double relative_velocity = getEgoSpeed() - object.vel;
-    const double time_to_collision = [&]() {
+    const auto time_to_collision = [&]() -> std::optional<double> {
       const auto prev_module_path = getPreviousModuleOutput().path;
       const size_t ego_seg_idx = planner_data_->findEgoSegmentIndex(prev_module_path->points);
       const size_t obj_seg_idx =
         motion_utils::findNearestSegmentIndex(prev_module_path->points, object.pose.position);
       const double signed_lon_length = motion_utils::calcSignedArcLength(
         prev_module_path->points, getEgoPosition(), ego_seg_idx, object.pose.position, obj_seg_idx);
-      const double positive_relative_velocity = std::max(relative_velocity, 1.0);
-      return signed_lon_length / positive_relative_velocity;
+      if (0 < signed_lon_length) {
+        const double positive_relative_velocity = std::max(relative_velocity, 1.0);
+        const double time_to_collision = signed_lon_length / positive_relative_velocity;
+        if (40.0 < time_to_collision) {
+          return std::nullopt;
+        }
+        return time_to_collision;
+      }
+      const double negative_relative_velocity = std::min(relative_velocity, -1.0);
+      return signed_lon_length / negative_relative_velocity;
     }();
 
-    if (time_to_collision < -parameters_->duration_to_hold_avoidance_overtaking_object) {
+    if (
+      !time_to_collision ||
+      time_to_collision < -parameters_->duration_to_hold_avoidance_overtaking_object) {
       return std::nullopt;
     }
 
     if (0 <= object.vel) {
       const double limited_time_to_collision =
-        std::min(parameters_->max_time_to_collision_overtaking_object, time_to_collision);
+        std::min(parameters_->max_time_to_collision_overtaking_object, *time_to_collision);
       return std::make_pair(
         raw_min_obj_lon_offset + object.vel * limited_time_to_collision,
         raw_max_obj_lon_offset + object.vel * limited_time_to_collision);
     }
 
     const double limited_time_to_collision =
-      std::min(parameters_->max_time_to_collision_oncoming_object, time_to_collision);
+      std::min(parameters_->max_time_to_collision_oncoming_object, *time_to_collision);
     return std::make_pair(
       raw_min_obj_lon_offset + object.vel * limited_time_to_collision, raw_max_obj_lon_offset);
   }();
