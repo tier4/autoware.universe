@@ -218,7 +218,7 @@ std::vector<PolygonPoint> generatePolygonInsideBounds(
   const std::vector<Point> & bound, const std::vector<Point> & edge_points,
   const bool is_object_right)
 {
-  constexpr double invalid_lat_dist_to_bound = 10.0;
+  constexpr double invalid_lat_dist_to_bound = 20.0;
 
   std::vector<PolygonPoint> full_polygon;
   for (const auto & edge_point : edge_points) {
