@@ -307,7 +307,7 @@ void reactRTCApprovalByDecisionResult(
     debug_data->collision_stop_wall_pose =
       planning_utils::getAheadPose(stop_line_idx, baselink2front, *path);
   }
-  if (!rtc_occlusion_approved) {
+  if (!rtc_occlusion_approved && !decision_result.is_detection_area_empty) {
     const auto occlusion_stop_line_idx = decision_result.stop_lines.occlusion_peeking_stop_line;
     planning_utils::setVelocityFromIndex(occlusion_stop_line_idx, 0.0, path);
     debug_data->occlusion_stop_wall_pose =
@@ -599,9 +599,9 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
   const auto & dummy_first_attention_area =
     first_attention_area ? first_attention_area.value() : first_conflicting_area;
   const auto intersection_stop_lines_opt = util::generateIntersectionStopLines(
-    first_conflicting_area, dummy_first_attention_area, planner_data_,
-    interpolated_path_info, planner_param_.stuck_vehicle.use_stuck_stopline,
-    planner_param_.common.stop_line_margin, planner_param_.occlusion.peeking_offset, path);
+    first_conflicting_area, dummy_first_attention_area, planner_data_, interpolated_path_info,
+    planner_param_.stuck_vehicle.use_stuck_stopline, planner_param_.common.stop_line_margin,
+    planner_param_.occlusion.peeking_offset, path);
   if (!intersection_stop_lines_opt) {
     RCLCPP_DEBUG(logger_, "failed to generate intersection_stop_lines");
     return IntersectionModule::Indecisive{};
@@ -763,12 +763,12 @@ bool IntersectionModule::checkStuckVehicle(
     util::isOverTargetIndex(input_path, closest_idx, current_pose, stuck_line_idx) &&
     (dist_stuck_stopline > planner_param_.common.stop_overshoot_margin);
 
-  if (is_over_stuck_stopline) {
-    return false;
-  }
-  return util::checkStuckVehicleInIntersection(
-                                               objects_ptr, stuck_vehicle_detect_area, planner_param_.stuck_vehicle.stuck_vehicle_vel_thr,
-                                               &debug_data_);
+  const bool is_stuck = is_over_stuck_stopline
+                          ? false
+                          : util::checkStuckVehicleInIntersection(
+                              objects_ptr, stuck_vehicle_detect_area,
+                              planner_param_.stuck_vehicle.stuck_vehicle_vel_thr, &debug_data_);
+  return is_stuck;
 }
 
 bool IntersectionModule::checkCollision(

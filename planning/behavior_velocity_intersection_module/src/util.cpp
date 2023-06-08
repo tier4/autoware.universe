@@ -134,10 +134,7 @@ std::optional<std::pair<size_t, size_t>> findLaneIdsInterval(
     }
   }
   start = start > 0 ? start - 1 : 0;  // the idx of last point before the interval
-  if (found) {
-    return std::make_pair(start, end);
-  }
-  return std::nullopt;
+  return found ? std::make_optional(std::make_pair(start, end)) : std::nullopt;
 }
 
 /**
