@@ -48,6 +48,9 @@ PidLongitudinalController::PidLongitudinalController(rclcpp::Node & node)
   m_enable_keep_stopped_until_steer_convergence =
     node_->declare_parameter<bool>("enable_keep_stopped_until_steer_convergence");
 
+  m_acc_threshold_to_prevent_brake_lamp_switching =
+    node_->declare_parameter<double>("acc_threshold_to_prevent_brake_lamp_switching");
+
   // parameters for state transition
   {
     auto & p = m_state_transition_params;
@@ -388,7 +391,14 @@ trajectory_follower::LongitudinalOutput PidLongitudinalController::run(
   updateControlState(control_data);
 
   // calculate control command
-  const Motion ctrl_cmd = calcCtrlCmd(current_pose, control_data);
+  Motion ctrl_cmd = calcCtrlCmd(current_pose, control_data);
+
+  // prevent brake lamp switching
+  if (control_data.current_motion.vel > 1.0) {
+    if (m_acc_threshold_to_prevent_brake_lamp_switching < ctrl_cmd.acc && ctrl_cmd.acc < 0.0) {
+      ctrl_cmd.acc = 0.0;
+    }
+  }
 
   // publish control command
   const auto cmd_msg = createCtrlCmdMsg(ctrl_cmd, control_data.current_motion.vel);

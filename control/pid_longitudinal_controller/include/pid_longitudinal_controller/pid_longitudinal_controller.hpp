@@ -185,6 +185,8 @@ private:
   double m_ego_nearest_dist_threshold;
   double m_ego_nearest_yaw_threshold;
 
+  double m_acc_threshold_to_prevent_brake_lamp_switching;
+
   // buffer of send command
   std::vector<autoware_auto_control_msgs::msg::LongitudinalCommand> m_ctrl_cmd_vec;
 
