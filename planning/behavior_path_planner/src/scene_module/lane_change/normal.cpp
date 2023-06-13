@@ -442,7 +442,7 @@ bool NormalLaneChange::getLaneChangePaths(
       min_a, -std::abs(min_longitudinal_acc), -std::numeric_limits<double>::epsilon());
   });
   const auto maximum_acceleration = utils::lane_change::calcMaximumAcceleration(
-    prev_module_path_, getEgoPose(), current_velocity, max_longitudinal_acc, common_parameter);
+    *prev_module_path_, getEgoPose(), current_velocity, max_longitudinal_acc, common_parameter);
 
   // get sampling acceleration values
   const auto longitudinal_acc_sampling_values = utils::lane_change::getAccelerationValues(
