@@ -143,6 +143,8 @@ public:
 
   const BehaviorPathPlannerParameters & getCommonParam() const { return planner_data_->parameters; }
 
+  LaneChangeParameters getLaneChangeParam() const { return *lane_change_parameters_; }
+
   bool isCancelEnabled() const { return lane_change_parameters_->enable_cancel_lane_change; }
 
   bool isAbortEnabled() const { return lane_change_parameters_->enable_abort_lane_change; }
@@ -168,6 +170,12 @@ public:
   std::shared_ptr<RouteHandler> getRouteHandler() const { return planner_data_->route_handler; }
 
   std_msgs::msg::Header getRouteHeader() const { return getRouteHandler()->getRouteHeader(); }
+
+  std::string getModuleTypeStr() const { return std::string{magic_enum::enum_name(type_)}; }
+
+  LaneChangeModuleType getModuleType() const { return type_; }
+
+  TurnSignalDecider getTurnSignalDecider() { return planner_data_->turn_signal_decider; }
 
   Direction getDirection() const
   {
@@ -203,8 +211,6 @@ protected:
 
   virtual lanelet::ConstLanelets getLaneChangeLanes(
     const lanelet::ConstLanelets & current_lanes, Direction direction) const = 0;
-
-  std::string getModuleTypeStr() const { return std::string{magic_enum::enum_name(type_)}; }
 
   LaneChangeStatus status_{};
   PathShifter path_shifter_{};
