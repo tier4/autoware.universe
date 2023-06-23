@@ -143,6 +143,7 @@ double SmoothStop::calculate(
     if (time_to_stop && *time_to_stop > m_params.weak_stop_time + delay_time) {
       return m_strong_acc;
     } else if (!time_to_stop && is_fast_vel) {
+      std::cerr << "is_fast_vel!!!!" << std::endl;
       return m_strong_acc;
     }
 
