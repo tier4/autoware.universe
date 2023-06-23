@@ -492,8 +492,6 @@ AckermannControlCommand VehicleCmdGate::filterControlCommand(const AckermannCont
   const double dt = getDt();
   const auto mode = current_operation_mode_;
   const auto current_status_cmd = getActualStatusAsCommand();
-  const auto ego_is_stopped = std::abs(current_status_cmd.longitudinal.speed) < 1e-3;
-  const auto input_cmd_is_stopping = in.longitudinal.acceleration < 0.0;
 
   // Apply transition_filter when transiting from MANUAL to AUTO.
   if (mode.is_in_transition) {
@@ -521,7 +519,7 @@ AckermannControlCommand VehicleCmdGate::filterControlCommand(const AckermannCont
   // use the actual vehicle longitudinal state for the next filtering
   // this is to prevent the jerk limits being applied on the "stop acceleration"
   // which may be negative and cause delays when restarting the vehicle.
-  if (ego_is_stopped && input_cmd_is_stopping) {
+  if (adapi_pause_->is_paused()) {
     prev_values.longitudinal = current_status_cmd.longitudinal;
   }
 
