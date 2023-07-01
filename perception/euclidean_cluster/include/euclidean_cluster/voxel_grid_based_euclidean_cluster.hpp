@@ -16,6 +16,7 @@
 
 #include "euclidean_cluster/euclidean_cluster_interface.hpp"
 #include "euclidean_cluster/utils.hpp"
+#include "tier4_autoware_utils/system/stop_watch.hpp"
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
@@ -47,6 +48,10 @@ private:
   float tolerance_;
   float voxel_leaf_size_;
   int min_points_number_per_voxel_;
+
+  tier4_autoware_utils::StopWatch<
+    std::chrono::milliseconds, std::chrono::microseconds, std::chrono::steady_clock>
+    stop_watch_;
 };
 
 }  // namespace euclidean_cluster

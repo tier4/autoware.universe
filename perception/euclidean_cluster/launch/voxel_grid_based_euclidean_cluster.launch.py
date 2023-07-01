@@ -170,7 +170,7 @@ def launch_setup(context, *args, **kwargs):
         plugin="euclidean_cluster::VoxelGridBasedEuclideanClusterNode",
         name="euclidean_cluster",
         remappings=[
-            ("input", "downsampled/concatenated/pointcloud"),
+            ("input", "/perception/obstacle_segmentation/pointcloud"),
             ("output", LaunchConfiguration("output_clusters")),
         ],
         parameters=[load_composable_node_param("voxel_grid_based_euclidean_param_path")],
