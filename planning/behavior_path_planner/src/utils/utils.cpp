@@ -320,7 +320,7 @@ std::vector<PolygonPoint> concatenateTwoPolygons(
   };
 
   std::vector<PolygonPoint> concatenated_polygon;
-  while (rclcpp::ok()) {
+  for (size_t loop_idx = 0; loop_idx < 100; ++loop_idx) {
     concatenated_polygon.push_back(get_out_poly().at(outside_idx));
     if (outside_idx == get_out_poly().size() - 1) {
       break;
@@ -342,6 +342,10 @@ std::vector<PolygonPoint> concatenateTwoPolygons(
       }
     }
     outside_idx += 1;
+
+    if (99 <= loop_idx) {
+      return front_polygon;
+    }
   }
 
   return concatenated_polygon;
