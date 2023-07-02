@@ -344,6 +344,7 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
   // 4. check if object will not cut into the ego lane or cut out to the next lane,
   //    or close to the ego's path considering ego's lane change.
   // NOTE: The oncoming object will be ignored.
+  std::cerr << "====================================" << std::endl;
   constexpr double epsilon_path_lat_diff = 0.3;
   std::vector<DynamicAvoidanceObjectCandidate> output_objects_candidate;
   for (const bool is_left : {true, false}) {
@@ -371,6 +372,7 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
         return false;
       }();
       if (will_object_cut_in) {
+        std::cerr << object.uuid << " cut in" << std::endl;
         continue;
       }
 
@@ -394,6 +396,7 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
         return false;
       }();
       if (will_object_cut_out) {
+        std::cerr << object.uuid << " cut out " << object.lat_vel << std::endl;
         continue;
       }
 
@@ -405,6 +408,8 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
                                          parameters_->min_obj_lat_offset_to_ego_path) {
         continue;
       }
+
+      std::cerr << object.uuid << std::endl;
 
       // get previous object if it exists
       const auto prev_target_object_candidate = DynamicAvoidanceObjectCandidate::getObjectFromUuid(
@@ -446,13 +451,25 @@ std::pair<lanelet::ConstLanelets, lanelet::ConstLanelets> DynamicAvoidanceModule
   lanelet::ConstLanelets left_lanes;
   for (const auto & lane : ego_succeeding_lanes) {
     // left lane
-    const auto opt_left_lane = rh->getLeftLanelet(lane);
+    const auto opt_left_lane = [&]() -> boost::optional<lanelet::ConstLanelet> {
+      lanelet::ConstLanelet neighboring_lane{};
+      if (rh->getLeftShoulderLanelet(lane, &neighboring_lane)) {
+        return neighboring_lane;
+      }
+      return rh->getLeftLanelet(lane);
+    }();
     if (opt_left_lane) {
       left_lanes.push_back(opt_left_lane.get());
     }
 
     // right lane
-    const auto opt_right_lane = rh->getRightLanelet(lane);
+    const auto opt_right_lane = [&]() -> boost::optional<lanelet::ConstLanelet> {
+      lanelet::ConstLanelet neighboring_lane{};
+      if (rh->getRightShoulderLanelet(lane, &neighboring_lane)) {
+        return neighboring_lane;
+      }
+      return rh->getRightLanelet(lane);
+    }();
     if (opt_right_lane) {
       right_lanes.push_back(opt_right_lane.get());
     }
