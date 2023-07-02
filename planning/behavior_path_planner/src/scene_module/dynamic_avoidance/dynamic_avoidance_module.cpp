@@ -51,7 +51,7 @@ bool isCentroidWithinLanelets(
   return false;
 }
 
-std::vector<DynamicAvoidanceModule::DynamicAvoidanceObject> getObjectsInLanes(
+[[maybe_unused]] std::vector<DynamicAvoidanceModule::DynamicAvoidanceObject> getObjectsInLanes(
   const std::vector<DynamicAvoidanceModule::DynamicAvoidanceObject> & objects,
   const lanelet::ConstLanelets & target_lanes)
 {
@@ -142,6 +142,26 @@ std::pair<double, double> projectObstacleVelocityToTrajectory(
 
   return std::make_pair(
     obj_vel * std::cos(obj_yaw - path_yaw), obj_vel * std::sin(obj_yaw - path_yaw));
+}
+
+double calcObstacleMaxLength(const autoware_auto_perception_msgs::msg::Shape & shape)
+{
+  if (shape.type == autoware_auto_perception_msgs::msg::Shape::BOUNDING_BOX) {
+    return std::hypot(shape.dimensions.x / 2.0, shape.dimensions.y / 2.0);
+  } else if (shape.type == autoware_auto_perception_msgs::msg::Shape::CYLINDER) {
+    return shape.dimensions.x / 2.0;
+  } else if (shape.type == autoware_auto_perception_msgs::msg::Shape::POLYGON) {
+    double max_length_to_point = 0.0;
+    for (const auto rel_point : shape.footprint.points) {
+      const double length_to_point = std::hypot(rel_point.x, rel_point.y);
+      if (max_length_to_point < length_to_point) {
+        max_length_to_point = length_to_point;
+      }
+    }
+    return max_length_to_point;
+  }
+
+  throw std::logic_error("The shape type is not supported in obstacle_cruise_planner.");
 }
 }  // namespace
 
@@ -314,9 +334,14 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
   const auto prev_module_path = getPreviousModuleOutput().path;
   const auto & predicted_objects = planner_data_->dynamic_object->objects;
 
+  const auto [right_lanes, left_lanes] = getAdjacentLanes(100.0, 50.0);
+
   // 1. convert predicted objects to dynamic avoidance objects
-  std::vector<DynamicAvoidanceObject> input_objects;
+  std::vector<DynamicAvoidanceObject> objects_in_right_lanes;
+  std::vector<DynamicAvoidanceObject> objects_in_left_lanes;
   for (const auto & predicted_object : predicted_objects) {
+    const auto & obj_pose = predicted_object.kinematics.initial_pose_with_covariance.pose;
+
     // check label
     const bool is_label_target_obstacle =
       isLabelTargetObstacle(predicted_object.classification.front().label);
@@ -331,15 +356,41 @@ DynamicAvoidanceModule::calcTargetObjectsCandidate() const
       continue;
     }
 
-    input_objects.push_back(DynamicAvoidanceObject(predicted_object, tangent_vel, normal_vel));
+    // check if object is in ego's right/left lanes to keep backward objects
+    const bool is_object_in_right_lanes = isCentroidWithinLanelets(obj_pose.position, right_lanes);
+    const bool is_object_in_left_lanes = isCentroidWithinLanelets(obj_pose.position, left_lanes);
+
+    // check if lateral distance is smaller than threshold
+    const double min_obj_lat_dist_to_path = [&]() {
+      const double obj_lat_dist_to_path =
+        motion_utils::calcLateralOffset(prev_module_path->points, obj_pose.position);
+      const double obj_max_length = calcObstacleMaxLength(predicted_object.shape);
+      return std::abs(obj_lat_dist_to_path) - planner_data_->parameters.vehicle_width / 2.0 -
+             obj_max_length;
+    }();
+    const bool is_object_far_from_path =
+      1.0 < min_obj_lat_dist_to_path;  // TODO(murooka) use rosparam
+
+    if (is_object_far_from_path && !is_object_in_right_lanes && !is_object_in_right_lanes) {
+      continue;
+    }
+
+    const DynamicAvoidanceObject dynamic_avoidance_object{
+      predicted_object, tangent_vel, normal_vel};
+    if (is_object_in_right_lanes) {
+      objects_in_right_lanes.push_back(dynamic_avoidance_object);
+    } else if (is_object_in_left_lanes) {
+      objects_in_left_lanes.push_back(dynamic_avoidance_object);
+    } else {
+      const double obj_lat_dist_to_path =
+        motion_utils::calcLateralOffset(prev_module_path->points, obj_pose.position);
+      if (0.0 < obj_lat_dist_to_path) {
+        objects_in_left_lanes.push_back(dynamic_avoidance_object);
+      } else {
+        objects_in_right_lanes.push_back(dynamic_avoidance_object);
+      }
+    }
   }
-
-  // 2. calculate target lanes to filter obstacles
-  const auto [right_lanes, left_lanes] = getAdjacentLanes(100.0, 50.0);
-
-  // 3. filter obstacles for dynamic avoidance
-  const auto objects_in_right_lanes = getObjectsInLanes(input_objects, right_lanes);
-  const auto objects_in_left_lanes = getObjectsInLanes(input_objects, left_lanes);
 
   // 4. check if object will not cut into the ego lane or cut out to the next lane,
   //    or close to the ego's path considering ego's lane change.
@@ -499,6 +550,7 @@ std::optional<tier4_autoware_utils::Polygon2d> DynamicAvoidanceModule::calcDynam
     return std::nullopt;
   }
 
+  // TODO(murooka) deal with the low-pass filter of lat distance when ego moves to the next lane
   auto path_with_backward_margin = [&]() {
     constexpr double forward_length = 100.0;
     const double backward_length = 50.0;
@@ -629,11 +681,16 @@ std::optional<tier4_autoware_utils::Polygon2d> DynamicAvoidanceModule::calcDynam
 
   // filter min_bound_lat_offset
   const auto prev_min_bound_lat_offset = prev_objects_min_bound_lat_offset_.get(object.uuid);
+  const double filtered_min_bound_lat_offset = min_bound_lat_offset;
+  /*
   const double filtered_min_bound_lat_offset =
     prev_min_bound_lat_offset
-      ? signal_processing::lowpassFilter(min_bound_lat_offset, *prev_min_bound_lat_offset, 0.3)
+      ? signal_processing::lowpassFilter(min_bound_lat_offset, *prev_min_bound_lat_offset, 0.9)
       : min_bound_lat_offset;
+  */
   prev_objects_min_bound_lat_offset_.update(object.uuid, filtered_min_bound_lat_offset);
+  std::cerr << object.uuid << " " << filtered_min_bound_lat_offset << " " << min_bound_lat_offset
+            << " " << (prev_min_bound_lat_offset ? *prev_min_bound_lat_offset : 0.0) << std::endl;
 
   // create inner/outer bound points
   std::vector<geometry_msgs::msg::Point> obj_inner_bound_points;
