@@ -62,7 +62,7 @@ Controller::Controller(const rclcpp::NodeOptions & node_options) : Node("control
       longitudinal_controller_ =
         std::make_shared<constant_acceleration_controller::ConstantAccelerationController>(*this);
       break;
-   }
+    }
     default:
       throw std::domain_error("[LongitudinalController] invalid algorithm");
   }

@@ -16,8 +16,8 @@
 #define CONSTANT_ACCELERATION_CONTROLLER__CONSTANT_ACCELERATION_CONTROLLER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-
 #include <trajectory_follower_base/longitudinal_controller_base.hpp>
+
 #include <tier4_debug_msgs/msg/float32_stamped.hpp>
 
 namespace autoware::motion::control::constant_acceleration_controller

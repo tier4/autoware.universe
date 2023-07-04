@@ -16,8 +16,7 @@
 
 namespace autoware::motion::control::constant_acceleration_controller
 {
-ConstantAccelerationController::ConstantAccelerationController(rclcpp::Node & node)
-: node_{&node}
+ConstantAccelerationController::ConstantAccelerationController(rclcpp::Node & node) : node_{&node}
 {
   // Subscriber
   using std::placeholders::_1;
@@ -51,4 +50,4 @@ trajectory_follower::LongitudinalOutput ConstantAccelerationController::run(
 
   return output;
 }
-} // namespace autoware::motion::control::constant_acceleration_controller
+}  // namespace autoware::motion::control::constant_acceleration_controller
