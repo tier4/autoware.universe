@@ -199,7 +199,7 @@ private:
     const std::shared_ptr<BehaviorTreeManager> & bt_manager);
 #else
   PathWithLaneId::SharedPtr getPath(
-    const BehaviorModuleOutput & bt_out, const std::shared_ptr<PlannerData> & planner_data,
+    const BehaviorModuleOutput & output, const std::shared_ptr<PlannerData> & planner_data,
     const std::shared_ptr<PlannerManager> & planner_manager);
 #endif
 
