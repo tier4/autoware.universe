@@ -105,7 +105,7 @@ protected:
     const lanelet::ConstLanelets & target_lanelets, Direction direction,
     LaneChangePaths * candidate_paths, const bool check_safety = true) const override;
 
-  void calcTurnSignalInfo() override;
+  TurnSignalInfo calcTurnSignalInfo() override;
 
   bool isValidPath(const PathWithLaneId & path) const override;
 
