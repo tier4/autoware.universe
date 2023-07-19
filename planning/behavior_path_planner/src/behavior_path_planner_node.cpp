@@ -789,6 +789,8 @@ LaneChangeParameters BehaviorPathPlannerNode::getLaneChangeParam()
   p.use_predicted_path_outside_lanelet =
     declare_parameter<bool>(parameter("use_predicted_path_outside_lanelet"));
   p.use_all_predicted_path = declare_parameter<bool>(parameter("use_all_predicted_path"));
+  p.use_objects_on_current_lanes =
+    declare_parameter<bool>(parameter("use_objects_on_current_lanes"));
 
   // target object
   {

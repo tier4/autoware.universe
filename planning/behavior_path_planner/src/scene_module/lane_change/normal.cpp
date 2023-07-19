@@ -1078,10 +1078,13 @@ PathSafetyStatus NormalLaneChange::isLaneChangePathSafe(
     utils::lane_change::convertToPredictedPath(ego_predicted_path, time_resolution);
 
   auto collision_check_objects = target_objects.target_lane;
-  collision_check_objects.insert(
-    collision_check_objects.end(), target_objects.current_lane.begin(),
-    target_objects.current_lane.end());
 
+  const bool use_objects_on_current_lanes = lane_change_parameters_->use_objects_on_current_lanes;
+  if (use_objects_on_current_lanes) {
+    collision_check_objects.insert(
+      collision_check_objects.end(), target_objects.current_lane.begin(),
+      target_objects.current_lane.end());
+  }
   if (lane_change_parameters_->use_predicted_path_outside_lanelet) {
     collision_check_objects.insert(
       collision_check_objects.end(), target_objects.other_lane.begin(),
