@@ -251,6 +251,9 @@ AutowareErrorMonitor::AutowareErrorMonitor()
   sub_control_mode_ = create_subscription<autoware_auto_vehicle_msgs::msg::ControlModeReport>(
     "~/input/control_mode", rclcpp::QoS{1},
     std::bind(&AutowareErrorMonitor::onControlMode, this, _1));
+  sub_mrm_trigger_ = create_subscription<tier4_debug_msgs::msg::BoolStamped>(
+    "~/input/mrm_trigger", rclcpp::QoS{1},
+    std::bind(&AutowareErrorMonitor::onMrmTrigger, this, _1));
 
   // Publisher
   pub_hazard_status_ = create_publisher<autoware_auto_system_msgs::msg::HazardStatusStamped>(
@@ -386,6 +389,12 @@ void AutowareErrorMonitor::onControlMode(
   control_mode_stamp_ = this->now();
 }
 
+void AutowareErrorMonitor::onMrmTrigger(
+  const tier4_debug_msgs::msg::BoolStamped::ConstSharedPtr msg)
+{
+  current_mrm_trigger_ = msg;
+}
+
 bool AutowareErrorMonitor::isDataReady()
 {
   if (!diag_array_) {
@@ -470,6 +479,12 @@ void AutowareErrorMonitor::onTimer()
                     : KeyName::external_control;
 
   updateHazardStatus();
+  if (current_mrm_trigger_) {
+    if (current_mrm_trigger_->data) {
+      hazard_status_.emergency = true;
+      hazard_status_.level = autoware_auto_system_msgs::msg::HazardStatus::SINGLE_POINT_FAULT;
+    }
+  }
   publishHazardStatus(hazard_status_);
 }
 

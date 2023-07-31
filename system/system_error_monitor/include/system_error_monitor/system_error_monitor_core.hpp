@@ -24,6 +24,7 @@
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <tier4_control_msgs/msg/gate_mode.hpp>
+#include <tier4_debug_msgs/msg/bool_stamped.hpp>
 
 #include <boost/optional.hpp>
 
@@ -103,10 +104,12 @@ private:
   rclcpp::Subscription<tier4_control_msgs::msg::GateMode>::SharedPtr sub_current_gate_mode_;
   rclcpp::Subscription<autoware_auto_vehicle_msgs::msg::ControlModeReport>::SharedPtr
     sub_control_mode_;
+  rclcpp::Subscription<tier4_debug_msgs::msg::BoolStamped>::SharedPtr sub_mrm_trigger_;
   void onAutowareState(const autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr msg);
   void onCurrentGateMode(const tier4_control_msgs::msg::GateMode::ConstSharedPtr msg);
   void onControlMode(const autoware_auto_vehicle_msgs::msg::ControlModeReport::ConstSharedPtr msg);
   void onDiagArray(const diagnostic_msgs::msg::DiagnosticArray::ConstSharedPtr msg);
+  void onMrmTrigger(const tier4_debug_msgs::msg::BoolStamped::ConstSharedPtr msg);
 
   const size_t diag_buffer_size_ = 100;
   std::unordered_map<std::string, DiagBuffer> diag_buffer_map_;
@@ -114,6 +117,7 @@ private:
   autoware_auto_system_msgs::msg::AutowareState::ConstSharedPtr autoware_state_;
   tier4_control_msgs::msg::GateMode::ConstSharedPtr current_gate_mode_;
   autoware_auto_vehicle_msgs::msg::ControlModeReport::ConstSharedPtr control_mode_;
+  tier4_debug_msgs::msg::BoolStamped::ConstSharedPtr current_mrm_trigger_;
 
   // Publisher
   rclcpp::Publisher<autoware_auto_system_msgs::msg::HazardStatusStamped>::SharedPtr

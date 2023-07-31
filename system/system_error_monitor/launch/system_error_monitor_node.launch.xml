@@ -16,6 +16,7 @@
     <remap from="~/input/autoware_state" to="/autoware/state"/>
     <remap from="~/input/current_gate_mode" to="/control/current_gate_mode"/>
     <remap from="~/input/control_mode" to="/vehicle/status/control_mode"/>
+    <remap from="~/input/mrm_trigger" to="/debug/mrm_trigger"/>
     <remap from="~/output/hazard_status" to="/system/emergency/hazard_status"/>
     <remap from="~/output/diagnostics_err" to="/diagnostics_err"/>
     <remap from="service/clear_emergency" to="/system/clear_emergency"/>

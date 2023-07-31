@@ -19,6 +19,7 @@
   <depend>std_srvs</depend>
   <depend>tier4_autoware_utils</depend>
   <depend>tier4_control_msgs</depend>
+  <depend>tier4_debug_msgs</depend>
 
   <exec_depend>diagnostic_aggregator</exec_depend>
   <exec_depend>rqt_robot_monitor</exec_depend>
