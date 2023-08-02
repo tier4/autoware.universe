@@ -159,17 +159,38 @@ void NormalLaneChange::extendOutputDrivableArea(BehaviorModuleOutput & output)
     utils::combineDrivableAreaInfo(current_drivable_area_info, prev_drivable_area_info_);
 }
 
-void NormalLaneChange::insertStopPoint(PathWithLaneId & path)
+void NormalLaneChange::insertStopPoint(
+  const lanelet::ConstLanelets & lanelets, PathWithLaneId & path)
 {
-  const auto shift_intervals = getRouteHandler()->getLateralIntervalsToPreferredLane(
-    status_.lane_change_path.info.reference_lanelets.back());
+  if (lanelets.empty()) {
+    return;
+  }
+
+  const auto & route_handler = getRouteHandler();
+
+  if (route_handler->getNumLaneToPreferredLane(lanelets.back()) == 0) {
+    return;
+  }
+
+  const auto shift_intervals = route_handler->getLateralIntervalsToPreferredLane(lanelets.back());
   const double lane_change_buffer =
     utils::calcMinimumLaneChangeLength(getCommonParam(), shift_intervals, 0.0);
-  constexpr double stop_point_buffer{1.0};
-  const auto stopping_distance = std::max(
-    motion_utils::calcArcLength(path.points) - lane_change_buffer - stop_point_buffer, 0.0);
 
-  const auto stop_point = utils::insertStopPoint(stopping_distance, path);
+  // If lanelets.back() is in goal route section, get distance to goal.
+  // Otherwise, get distance to end of lane.
+  double distance_to_terminal = 0.0;
+  if (route_handler->isInGoalRouteSection(lanelets.back())) {
+    const auto goal = route_handler->getGoalPose();
+    distance_to_terminal = utils::getSignedDistance(path.points.front().point.pose, goal, lanelets);
+  } else {
+    distance_to_terminal = utils::getDistanceToEndOfLane(path.points.front().point.pose, lanelets);
+  }
+
+  const double stop_point_buffer = getCommonParam().backward_length_buffer_for_end_of_lane;
+  const double stopping_distance = distance_to_terminal - lane_change_buffer - stop_point_buffer;
+  if (stopping_distance > 0.0) {
+    const auto stop_point = utils::insertStopPoint(stopping_distance, path);
+  }
 }
 
 PathWithLaneId NormalLaneChange::getReferencePath() const
@@ -272,11 +293,16 @@ bool NormalLaneChange::isNearEndOfLane() const
 bool NormalLaneChange::hasFinishedLaneChange() const
 {
   const auto & current_pose = getEgoPose();
-  const auto & lane_change_path = status_.lane_change_path.path;
   const auto & lane_change_end = status_.lane_change_path.info.shift_line.end;
-  const double dist_to_lane_change_end = motion_utils::calcSignedArcLength(
-    lane_change_path.points, current_pose.position, lane_change_end.position);
-  const double finish_judge_buffer = planner_data_->parameters.lane_change_finish_judge_buffer;
+  const double dist_to_lane_change_end = utils::getSignedDistance(
+    current_pose, lane_change_end, status_.lane_change_path.info.target_lanelets);
+  double finish_judge_buffer = planner_data_->parameters.lane_change_finish_judge_buffer;
+
+  // If ego velocity is low, relax finish judge buffer
+  const double ego_velocity = getEgoVelocity();
+  if (std::abs(ego_velocity) < 1.0) {
+    finish_judge_buffer = 0.0;
+  }
 
   const auto reach_lane_change_end = dist_to_lane_change_end + finish_judge_buffer < 0.0;
   if (!reach_lane_change_end) {
@@ -560,6 +586,7 @@ bool NormalLaneChange::getLaneChangePaths(
     std::max(common_parameter.min_acc, lane_change_parameters_->min_longitudinal_acc);
   const auto max_longitudinal_acc =
     std::min(common_parameter.max_acc, lane_change_parameters_->max_longitudinal_acc);
+  const auto finish_judge_buffer = common_parameter.lane_change_finish_judge_buffer;
 
   // get velocity
   const auto current_velocity = getEgoTwist().linear.x;
@@ -693,8 +720,12 @@ bool NormalLaneChange::getLaneChangePaths(
           lanelet::utils::getArcCoordinates(target_lanelets, lane_changing_start_pose).length;
         const double s_goal =
           lanelet::utils::getArcCoordinates(target_lanelets, route_handler.getGoalPose()).length;
+        const auto num =
+          std::abs(route_handler.getNumLaneToPreferredLane(target_lanelets.back(), direction));
+        const double backward_buffer =
+          num == 0 ? 0.0 : common_parameter.backward_length_buffer_for_end_of_lane;
         if (
-          s_start + lane_changing_length + common_parameter.lane_change_finish_judge_buffer +
+          s_start + lane_changing_length + finish_judge_buffer + backward_buffer +
             next_lane_change_buffer >
           s_goal) {
           RCLCPP_DEBUG(logger_, "length of lane changing path is longer than length to goal!!");
