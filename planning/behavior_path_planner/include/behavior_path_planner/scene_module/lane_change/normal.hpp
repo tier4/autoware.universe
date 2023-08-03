@@ -74,6 +74,10 @@ public:
 
   bool isNearEndOfLane() const override;
 
+  bool isNearEndOfCurrentLanes(
+    const lanelet::ConstLanelets & current_lanes, const lanelet::ConstLanelets & target_lanes,
+    const double threshold) const;
+
   bool hasFinishedLaneChange() const override;
 
   bool isAbleToReturnCurrentLane() const override;
@@ -95,6 +99,14 @@ protected:
     const lanelet::ConstLanelets & current_lanes, Direction direction) const override;
 
   int getNumToPreferredLane(const lanelet::ConstLanelet & lane) const override;
+
+  std::vector<double> sampleLongitudinalAccValues(
+    const lanelet::ConstLanelets & current_lanes,
+    const lanelet::ConstLanelets & target_lanes) const;
+
+  double calcPrepareDuration(
+    const lanelet::ConstLanelets & current_lanes,
+    const lanelet::ConstLanelets & target_lanes) const;
 
   LaneChangeTargetObjects getTargetObjects(
     const lanelet::ConstLanelets & current_lanes,
