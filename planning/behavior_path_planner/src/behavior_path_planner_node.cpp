@@ -196,8 +196,6 @@ BehaviorPathPlannerNode::BehaviorPathPlannerNode(const rclcpp::NodeOptions & nod
   }
 #else
   {
-    RCLCPP_INFO(get_logger(), "not use behavior tree.");
-
     const std::string path_candidate_name_space = "/planning/path_candidate/";
     const std::string path_reference_name_space = "/planning/path_reference/";
 
@@ -406,8 +404,6 @@ BehaviorPathPlannerParameters BehaviorPathPlannerNode::getCommonParam()
     declare_parameter<double>("lane_change.minimum_lane_changing_velocity");
   p.minimum_lane_changing_velocity =
     std::min(p.minimum_lane_changing_velocity, p.max_acc * p.lane_change_prepare_duration);
-  p.minimum_prepare_length =
-    0.5 * p.max_acc * p.lane_change_prepare_duration * p.lane_change_prepare_duration;
   p.lane_change_finish_judge_buffer =
     declare_parameter<double>("lane_change.lane_change_finish_judge_buffer");
 
@@ -793,6 +789,8 @@ LaneChangeParameters BehaviorPathPlannerNode::getLaneChangeParam()
   p.use_predicted_path_outside_lanelet =
     declare_parameter<bool>(parameter("use_predicted_path_outside_lanelet"));
   p.use_all_predicted_path = declare_parameter<bool>(parameter("use_all_predicted_path"));
+  p.use_objects_on_current_lanes =
+    declare_parameter<bool>(parameter("use_objects_on_current_lanes"));
 
   // target object
   {
@@ -1209,32 +1207,31 @@ void BehaviorPathPlannerNode::run()
     planner_data_->route_handler->setMap(*map_ptr);
   }
 
-  std::unique_lock<std::mutex> lk_manager(mutex_manager_);  // for bt_manager_ or planner_manager_
+  std::unique_lock<std::mutex> lk_manager(mutex_manager_);  // for planner_manager_
 
   // update route
   const bool is_first_time = !(planner_data_->route_handler->isHandlerReady());
   if (route_ptr) {
     planner_data_->route_handler->setRoute(*route_ptr);
+    planner_manager_->resetRootLanelet(planner_data_);
+
+    // uuid is not changed when rerouting with modified goal,
+    // in this case do not need to rest modules.
+    const bool has_same_route_id =
+      planner_data_->prev_route_id && route_ptr->uuid == planner_data_->prev_route_id;
     // Reset behavior tree when new route is received,
     // so that the each modules do not have to care about the "route jump".
-    if (!is_first_time) {
-      RCLCPP_DEBUG(get_logger(), "new route is received. reset behavior tree.");
-#ifdef USE_OLD_ARCHITECTURE
-      bt_manager_->resetBehaviorTree();
-#else
+    if (!is_first_time && !has_same_route_id) {
       planner_manager_->reset();
-#endif
     }
   }
 
-#ifndef USE_OLD_ARCHITECTURE
   const auto controlled_by_autoware_autonomously =
     planner_data_->operation_mode->mode == OperationModeState::AUTONOMOUS &&
     planner_data_->operation_mode->is_autoware_control_enabled;
   if (!controlled_by_autoware_autonomously) {
     planner_manager_->resetRootLanelet(planner_data_);
   }
-#endif
 
   // run behavior planner
 #ifdef USE_OLD_ARCHITECTURE
@@ -1525,17 +1522,15 @@ PathWithLaneId::SharedPtr BehaviorPathPlannerNode::getPath(
   const std::shared_ptr<BehaviorTreeManager> & bt_manager)
 #else
 PathWithLaneId::SharedPtr BehaviorPathPlannerNode::getPath(
-  const BehaviorModuleOutput & bt_output, const std::shared_ptr<PlannerData> & planner_data,
+  const BehaviorModuleOutput & output, const std::shared_ptr<PlannerData> & planner_data,
   const std::shared_ptr<PlannerManager> & planner_manager)
 #endif
 {
   // TODO(Horibe) do some error handling when path is not available.
 
-  auto path = bt_output.path ? bt_output.path : planner_data->prev_output_path;
+  auto path = output.path ? output.path : planner_data->prev_output_path;
   path->header = planner_data->route_handler->getRouteHeader();
   path->header.stamp = this->now();
-  RCLCPP_DEBUG(
-    get_logger(), "BehaviorTreeManager: output is %s.", bt_output.path ? "FOUND" : "NOT FOUND");
 
   PathWithLaneId connected_path;
 #ifdef USE_OLD_ARCHITECTURE

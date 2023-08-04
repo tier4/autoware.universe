@@ -255,8 +255,6 @@ BehaviorModuleOutput StartPlannerModule::plan()
   }
 
   const auto target_drivable_lanes = getNonOverlappingExpandedLanes(path, status_.lanes);
-  utils::generateDrivableArea(
-    path, target_drivable_lanes, false, planner_data_->parameters.vehicle_length, planner_data_);
 
   DrivableAreaInfo current_drivable_area_info;
   current_drivable_area_info.drivable_lanes = target_drivable_lanes;
@@ -391,8 +389,6 @@ BehaviorModuleOutput StartPlannerModule::planWaitingApproval()
   const auto expanded_lanes = utils::expandLanelets(
     drivable_lanes, dp.drivable_area_left_bound_offset, dp.drivable_area_right_bound_offset,
     dp.drivable_area_types_to_skip);
-  utils::generateDrivableArea(
-    stop_path, expanded_lanes, false, planner_data_->parameters.vehicle_length, planner_data_);
   for (auto & p : stop_path.points) {
     p.point.longitudinal_velocity_mps = 0.0;
   }
@@ -403,7 +399,6 @@ BehaviorModuleOutput StartPlannerModule::planWaitingApproval()
     current_drivable_area_info, getPreviousModuleOutput().drivable_area_info);
 
   output.path = std::make_shared<PathWithLaneId>(stop_path);
-  output.drivable_area_info.drivable_lanes = status_.lanes;
   output.reference_path = getPreviousModuleOutput().reference_path;
   output.turn_signal_info = calcTurnSignalInfo();
   path_candidate_ = std::make_shared<PathWithLaneId>(getFullPath());
@@ -585,10 +580,6 @@ PathWithLaneId StartPlannerModule::generateStopPath() const
 
   // generate drivable area
   const auto target_drivable_lanes = getNonOverlappingExpandedLanes(path, status_.lanes);
-
-  // for old architecture
-  utils::generateDrivableArea(
-    path, target_drivable_lanes, false, planner_data_->parameters.vehicle_length, planner_data_);
 
   return path;
 }

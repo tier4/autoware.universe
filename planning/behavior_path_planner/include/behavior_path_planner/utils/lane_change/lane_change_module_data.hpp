@@ -106,6 +106,7 @@ struct LaneChangeParameters
   double prepare_segment_ignore_object_velocity_thresh{0.1};
   bool use_predicted_path_outside_lanelet{false};
   bool use_all_predicted_path{false};
+  bool use_objects_on_current_lanes{false};
 
   // true by default
   bool check_car{true};         // check object car
@@ -144,6 +145,25 @@ struct LaneChangePhaseInfo
   : prepare(_prepare), lane_changing(_lane_changing)
   {
   }
+};
+
+struct LaneChangeInfo
+{
+  LaneChangePhaseInfo longitudinal_acceleration{0.0, 0.0};
+  LaneChangePhaseInfo velocity{0.0, 0.0};
+  LaneChangePhaseInfo duration{0.0, 0.0};
+  LaneChangePhaseInfo length{0.0, 0.0};
+
+  lanelet::ConstLanelets reference_lanelets{};
+  lanelet::ConstLanelets target_lanelets{};
+
+  Pose lane_changing_start{};
+  Pose lane_changing_end{};
+
+  ShiftLine shift_line{};
+
+  double lateral_acceleration{0.0};
+  double terminal_lane_changing_velocity{0.0};
 };
 
 struct LaneChangeTargetObjectIndices

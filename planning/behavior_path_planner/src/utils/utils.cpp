@@ -967,7 +967,6 @@ BehaviorModuleOutput createGoalAroundPath(const std::shared_ptr<const PlannerDat
 {
   BehaviorModuleOutput output;
 
-  const auto & p = planner_data->parameters;
   const auto & route_handler = planner_data->route_handler;
   const auto & modified_goal = planner_data->prev_modified_goal;
 
@@ -1001,9 +1000,6 @@ BehaviorModuleOutput createGoalAroundPath(const std::shared_ptr<const PlannerDat
   const auto expanded_lanes = expandLanelets(
     shorten_lanes, dp.drivable_area_left_bound_offset, dp.drivable_area_right_bound_offset,
     dp.drivable_area_types_to_skip);
-
-  // for old architecture
-  generateDrivableArea(reference_path, expanded_lanes, false, p.vehicle_length, planner_data);
 
   output.path = std::make_shared<PathWithLaneId>(reference_path);
   output.reference_path = std::make_shared<PathWithLaneId>(reference_path);
@@ -2273,9 +2269,6 @@ std::shared_ptr<PathWithLaneId> generateCenterLinePath(
 
   centerline_path->header = route_handler->getRouteHeader();
 
-  utils::generateDrivableArea(
-    *centerline_path, drivable_lanes, false, p.vehicle_length, planner_data);
-
   return centerline_path;
 }
 
@@ -2801,12 +2794,15 @@ double calcMinimumLaneChangeLength(
   const double & max_lateral_acc = lat_acc.second;
   const double & lateral_jerk = common_param.lane_changing_lateral_jerk;
   const double & finish_judge_buffer = common_param.lane_change_finish_judge_buffer;
+  const auto prepare_length = 0.5 * common_param.max_acc *
+                              common_param.lane_change_prepare_duration *
+                              common_param.lane_change_prepare_duration;
 
   double accumulated_length = length_to_intersection;
   for (const auto & shift_interval : shift_intervals) {
     const double t =
       PathShifter::calcShiftTimeFromJerk(shift_interval, lateral_jerk, max_lateral_acc);
-    accumulated_length += vel * t + common_param.minimum_prepare_length + finish_judge_buffer;
+    accumulated_length += vel * t + prepare_length + finish_judge_buffer;
   }
   accumulated_length +=
     common_param.backward_length_buffer_for_end_of_lane * (shift_intervals.size() - 1.0);
