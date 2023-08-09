@@ -202,7 +202,7 @@ DynamicAvoidanceModule::DynamicAvoidanceModule(
   std::shared_ptr<DynamicAvoidanceParameters> parameters,
   const std::unordered_map<std::string, std::shared_ptr<RTCInterface>> & rtc_interface_ptr_map)
 : SceneModuleInterface{name, node, rtc_interface_ptr_map},
-  parameters_{std::move(parameters)} parameters_{std::move(parameters)},
+  parameters_{std::move(parameters)},
   target_objects_manager_{TargetObjectsManager(
     parameters_->successive_num_to_entry_dynamic_avoidance_condition,
     parameters_->successive_num_to_exit_dynamic_avoidance_condition)}
@@ -497,7 +497,7 @@ void DynamicAvoidanceModule::updateTargetObjects()
 
     // 2.f. calculate which side object will be against ego's path
     const auto future_obj_pose =
-      object_recognition_utils::calcInterpolatedPose(obj_path, time_to_collision);
+      perception_utils::calcInterpolatedPose(obj_path, time_to_collision);
     const bool is_collision_left = future_obj_pose
                                      ? isLeft(prev_module_path->points, future_obj_pose->position)
                                      : is_object_left;
@@ -530,7 +530,7 @@ DynamicAvoidanceModule::calcCollisionSection(
 
     const auto future_ego_pose = ego_path.at(i);
     const auto future_obj_pose =
-      object_recognition_utils::calcInterpolatedPose(obj_path, elapsed_time);
+      perception_utils::calcInterpolatedPose(obj_path, elapsed_time);
 
     if (future_obj_pose) {
       const double dist_ego_to_obj =
