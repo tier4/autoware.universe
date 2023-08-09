@@ -373,6 +373,11 @@ bool TrafficLightModule::findValidTrafficSignal(TrafficSignal & valid_traffic_si
     return false;
   }
 
+  if (traffic_signal_stamped->signal.empty()) {
+    // traffic signals array is empty.
+    return false;
+  }
+
   valid_traffic_signal = traffic_signal_stamped->signal;
   return true;
 }
