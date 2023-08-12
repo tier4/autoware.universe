@@ -99,6 +99,8 @@ void DynamicAvoidanceModuleManager::updateModuleParams(
   {  // drivable_area_generation
     const std::string ns = "dynamic_avoidance.drivable_area_generation.";
 
+    updateParam<std::string>(
+      parameters, ns + "polygon_generation_method", p->polygon_generation_method);
     updateParam<double>(parameters, ns + "lat_offset_from_obstacle", p->lat_offset_from_obstacle);
     updateParam<double>(parameters, ns + "max_lat_offset_to_avoid", p->max_lat_offset_to_avoid);
     updateParam<double>(
