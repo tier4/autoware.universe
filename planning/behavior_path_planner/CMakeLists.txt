@@ -43,7 +43,6 @@ set(common_src
   src/utils/drivable_area_expansion/map_utils.cpp
   src/utils/drivable_area_expansion/footprints.cpp
   src/utils/drivable_area_expansion/expansion.cpp
-  src/utils/drivable_area_expansion/one_step_polygons.cpp
   src/utils/geometric_parallel_parking/geometric_parallel_parking.cpp
   src/utils/occupancy_grid_based_collision_detector/occupancy_grid_based_collision_detector.cpp
   src/marker_util/debug_utilities.cpp
