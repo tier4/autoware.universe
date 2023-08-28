@@ -57,12 +57,42 @@ BehaviorVelocityPlannerManager::BehaviorVelocityPlannerManager()
 void BehaviorVelocityPlannerManager::launchScenePlugin(
   rclcpp::Node & node, const std::string & name)
 {
+  for (const auto & plugin : scene_manager_plugins_) {
+    if (plugin->getModuleName() == name) {
+      RCLCPP_INFO_STREAM(node.get_logger(), "The plugin '" << name << "' is already loaded.");
+      return;
+    }
+  }
+
   if (plugin_loader_.isClassAvailable(name)) {
     const auto plugin = plugin_loader_.createSharedInstance(name);
     plugin->init(node);
     scene_manager_plugins_.push_back(plugin);
   } else {
     RCLCPP_ERROR_STREAM(node.get_logger(), "The scene plugin '" << name << "' is not available.");
+  }
+}
+
+void BehaviorVelocityPlannerManager::removeScenePlugin(
+  rclcpp::Node & node, const std::string & name)
+{
+  // --- debug print ---
+  for (const auto & p : scene_manager_plugins_) {
+    std::cerr << "received plugin names: " << p->getModuleName() << std::endl;
+  }
+  // -------------------
+
+  auto it = std::remove_if(
+    scene_manager_plugins_.begin(), scene_manager_plugins_.end(),
+    [&](const std::shared_ptr<behavior_velocity_planner::PluginInterface> plugin) {
+      return plugin->getModuleName() == name;
+    });
+
+  if (it == scene_manager_plugins_.end()) {
+    RCLCPP_WARN_STREAM(
+      node.get_logger(), "The scene plugin '" << name << "' is not loaded. Could not remove.");
+  } else {
+    scene_manager_plugins_.erase(it, scene_manager_plugins_.end());
   }
 }
 
@@ -75,7 +105,9 @@ autoware_auto_planning_msgs::msg::PathWithLaneId BehaviorVelocityPlannerManager:
   int first_stop_path_point_index = static_cast<int>(output_path_msg.points.size() - 1);
   std::string stop_reason_msg("path_end");
 
+  std::cerr << "scene_manager_plugins_ : " << &scene_manager_plugins_ << std::endl;
   for (const auto & plugin : scene_manager_plugins_) {
+    std::cerr << "  --  plugin: " << plugin->getModuleName() << ", " << plugin << std::endl;
     plugin->updateSceneModuleInstances(planner_data, input_path_msg);
     plugin->plan(&output_path_msg);
     boost::optional<int> firstStopPathPointIndex = plugin->getFirstStopPathPointIndex();
