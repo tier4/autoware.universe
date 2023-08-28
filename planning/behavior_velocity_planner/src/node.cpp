@@ -155,6 +155,7 @@ void BehaviorVelocityPlannerNode::onLoadPlugin(
   const LoadPlugin::Request::SharedPtr request,
   [[maybe_unused]] const LoadPlugin::Response::SharedPtr response)
 {
+  std::cerr << "\n\n onLoadPlugin \n\n " << std::endl;
   std::unique_lock<std::mutex> lk(mutex_);
   planner_manager_.launchScenePlugin(*this, request->plugin_name);
 }
@@ -163,6 +164,7 @@ void BehaviorVelocityPlannerNode::onUnloadPlugin(
   const UnloadPlugin::Request::SharedPtr request,
   [[maybe_unused]] const UnloadPlugin::Response::SharedPtr response)
 {
+  std::cerr << "\n\n onUnloadPlugin \n\n " << std::endl;
   std::unique_lock<std::mutex> lk(mutex_);
   planner_manager_.removeScenePlugin(*this, request->plugin_name);
 }

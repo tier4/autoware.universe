@@ -58,6 +58,7 @@ void BehaviorVelocityPlannerManager::launchScenePlugin(
   rclcpp::Node & node, const std::string & name)
 {
   for (const auto & plugin : scene_manager_plugins_) {
+    // TODO(horibe): module name is not same as the given launch module name. Need fix.
     if (plugin->getModuleName() == name) {
       RCLCPP_INFO_STREAM(node.get_logger(), "The plugin '" << name << "' is already loaded.");
       return;
@@ -105,9 +106,15 @@ autoware_auto_planning_msgs::msg::PathWithLaneId BehaviorVelocityPlannerManager:
   int first_stop_path_point_index = static_cast<int>(output_path_msg.points.size() - 1);
   std::string stop_reason_msg("path_end");
 
-  std::cerr << "scene_manager_plugins_ : " << &scene_manager_plugins_ << std::endl;
+  static int count = 0;
+  ++count;
+  count = count % 10;
+  int num = 1;
   for (const auto & plugin : scene_manager_plugins_) {
-    std::cerr << "  --  plugin: " << plugin->getModuleName() << ", " << plugin << std::endl;
+    if (count == 0) {
+      std::cerr << "  --  plugin: " << num++ << " " << plugin->getModuleName() << ", " << plugin
+                << std::endl;
+    }
     plugin->updateSceneModuleInstances(planner_data, input_path_msg);
     plugin->plan(&output_path_msg);
     boost::optional<int> firstStopPathPointIndex = plugin->getFirstStopPathPointIndex();

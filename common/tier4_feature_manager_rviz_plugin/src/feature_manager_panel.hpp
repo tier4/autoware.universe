@@ -76,6 +76,9 @@ private:
   rclcpp::Client<behavior_velocity_planner::srv::UnloadPlugin>::SharedPtr
     behavior_velocity_unload_client_;
 
+  void loadOrUnloadBehaviorVelocityModule(
+    const bool load, const std::string & load_name, const std::string & unload_name);
+
 protected:
   rclcpp::Node::SharedPtr raw_node_;
 };
