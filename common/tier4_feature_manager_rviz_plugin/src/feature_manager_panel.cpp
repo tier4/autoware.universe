@@ -29,86 +29,153 @@ FeatureManager::FeatureManager(QWidget * parent) : rviz_common::Panel(parent)
   QWidget * contentWidget = new QWidget;
   contentWidget->setLayout(layout);
 
-  const auto addCheckbox = [&](auto & name, const auto & title, const auto callback) {
-    auto * checkbox = new QCheckBox(title);
-    layout->addWidget(checkbox);
-    checkbox->setChecked(true);  // initialize
-    connect(checkbox, &QCheckBox::toggled, this, callback);
-    checkbox_storage_.emplace(name, checkbox);
-  };
+  const auto addCheckbox =
+    [&](auto & name, const auto & displayed_title, const auto & tooltip, const auto callback) {
+      auto * checkbox = new QCheckBox(displayed_title);
+      checkbox->setToolTip(tooltip);  // Set the tooltip
+      layout->addWidget(checkbox);
+      checkbox->setChecked(true);  // initialize
+      connect(checkbox, &QCheckBox::toggled, this, callback);
+      checkbox_storage_.emplace(name, checkbox);
+    };
 
-  const auto addCheckbox_UnSupported = [&](auto & name, const auto & title, const auto callback) {
-    auto * checkbox = new QCheckBox(title);
-    layout->addWidget(checkbox);
-    checkbox->setChecked(true);
-    checkbox->setEnabled(false);  // gray out (disabled)
-    connect(checkbox, &QCheckBox::toggled, this, callback);
-    checkbox_storage_.emplace(name, checkbox);
-  };
+  const auto addCheckbox_UnSupported =
+    [&](auto & name, const auto & displayed_title, const auto & tooltip, const auto callback) {
+      auto * checkbox = new QCheckBox(displayed_title);
+      checkbox->setToolTip(tooltip);  // Set the tooltip
+      layout->addWidget(checkbox);
+      checkbox->setChecked(true);
+      checkbox->setEnabled(false);  // gray out (disabled)
+      connect(checkbox, &QCheckBox::toggled, this, callback);
+      checkbox_storage_.emplace(name, checkbox);
+    };
 
   const auto addLabel = [&](const QString & label_str) {
     auto * label = new QLabel(label_str);
     layout->addWidget(label);
   };
 
-  addLabel("===== Planning =====");
+  addLabel("=========== Planning ===========");
+
+  addLabel("---------- mission planner ----------");
+  addCheckbox_UnSupported(
+    "goal_validation", "[WIP] Goal Validation",
+    "rejects the invalid goal, e.g. the foot print is not in the lane.",
+    &FeatureManager::onCheckGoalValidation);
 
   // behavior path planner
-  addLabel("----- behavior path planner -----");
-  addCheckbox_UnSupported("start_planner", "[WIP] Start", &FeatureManager::onCheckStart);
-  addCheckbox_UnSupported("goal_planner", "[WIP] Goal", &FeatureManager::onCheckGoal);
-  addCheckbox_UnSupported("lane_change", "[WIP] Lane Change", &FeatureManager::onCheckLaneChange);
-  addCheckbox_UnSupported("avoidance", "[WIP] Avoidance", &FeatureManager::onCheckAvoidance);
-  addCheckbox_UnSupported("side_shift", "[WIP] Side Shift", &FeatureManager::onCheckSideShift);
+  addLabel("---------- behavior path planner ----------");
+  addCheckbox_UnSupported(
+    "start_planner", "[WIP] Start",
+    "generate efficient and smooth starting path (pull out, freespace, etc) with safety check.",
+    &FeatureManager::onCheckStart);
+  addCheckbox_UnSupported(
+    "goal_planner", "[WIP] Goal",
+    "generate efficient and smooth goal path (pull over, freespace, etc) with safety check.",
+    &FeatureManager::onCheckGoal);
+  addCheckbox_UnSupported(
+    "lane_change", "[WIP] Lane Change",
+    "automatically generate lane change path with safety check when it is needed.",
+    &FeatureManager::onCheckLaneChange);
+  addCheckbox_UnSupported(
+    "avoidance", "[WIP] Avoidance",
+    "automatically generate avoidance path to avoid the collision with detected objects.",
+    &FeatureManager::onCheckAvoidance);
+  addCheckbox_UnSupported(
+    "side_shift", "[WIP] Side Shift",
+    "generate shifted path on the lateral direction with the instructed direction and distance.",
+    &FeatureManager::onCheckSideShift);
 
   // behavior velocity planner
-  addLabel("----- behavior velocity planner -----");
-  addCheckbox("crosswalk", "Crosswalk", &FeatureManager::onCheckCrosswalk);
-  addCheckbox("walkway", "Walkway", &FeatureManager::onCheckWalkway);
-  addCheckbox("traffic_light", "Traffic Light", &FeatureManager::onCheckTrafficLight);
-  addCheckbox("intersection", "Intersection", &FeatureManager::onCheckIntersection);
-  addCheckbox("merge_from_private", "Merge From Private", &FeatureManager::onCheckMergeFromPrivate);
-  addCheckbox("blind_spot", "Blind Spot", &FeatureManager::onCheckBlindSpot);
-  addCheckbox("detection_area", "Detection Area", &FeatureManager::onCheckDetectionArea);
+  addLabel("---------- behavior velocity planner ----------");
   addCheckbox(
-    "virtual_traffic_light", "Virtual Traffic Light", &FeatureManager::onCheckVirtualTrafficLight);
-  addCheckbox("no_stopping_area", "No Stopping Area", &FeatureManager::onCheckNoStoppingArea);
-  addCheckbox("stop_line", "Stop Line", &FeatureManager::onCheckStopLine);
-  addCheckbox("occlusion_spot", "Occlusion Spot", &FeatureManager::onCheckOcclusionSpot);
-  addCheckbox("run_out", "Run Out", &FeatureManager::onCheckRunOut);
-  addCheckbox("speed_bump", "Speed Bump", &FeatureManager::onCheckSpeedBump);
-  addCheckbox("out_of_lane", "Out of Lane", &FeatureManager::onCheckOutOfLane);
-  addCheckbox("no_drivable_lane", "No Drivable Lane", &FeatureManager::onCheckNoDrivableLane);
+    "crosswalk", "Crosswalk", "stop or decelerate around a crosswalk considering the situation.",
+    &FeatureManager::onCheckCrosswalk);
+  addCheckbox(
+    "walkway", "Walkway", "stop once and go if the walkway is free.",
+    &FeatureManager::onCheckWalkway);
+  addCheckbox(
+    "traffic_light", "Traffic Light", "stop when the traffic light indicates stop.",
+    &FeatureManager::onCheckTrafficLight);
+  addCheckbox(
+    "intersection", "Intersection",
+    "stop and decelerate around intersection considering the oncoming vehicle.",
+    &FeatureManager::onCheckIntersection);
+  addCheckbox(
+    "intersection_stuck", "Intersection Stuck Vehicle",
+    "stop in front of the intersection if another vehicle is stopped in the intersection.",
+    &FeatureManager::onCheckIntersection);
+  addCheckbox(
+    "intersection_occlusion", "Intersection Occlusion",
+    "Go slowly to see the occluded area in the intersection. Go into the intersection after the "
+    "safety is confirmed.",
+    &FeatureManager::onCheckIntersection);
+  addCheckbox(
+    "merge_from_private", "Merge From Private",
+    "stop once and go after the safety is confirmed on the merging.",
+    &FeatureManager::onCheckMergeFromPrivate);
+  addCheckbox(
+    "blind_spot", "Blind Spot",
+    "check the blind spot when the vehicle entries into the intersection. Stop if it detects a "
+    "danger situation.",
+    &FeatureManager::onCheckBlindSpot);
+  addCheckbox(
+    "detection_area", "Detection Area",
+    "Stop at a pre-defined stop line when any obstacle in on the pre-defined detection area.",
+    &FeatureManager::onCheckDetectionArea);
+  addCheckbox(
+    "virtual_traffic_light", "Virtual Traffic Light", "write me...",
+    &FeatureManager::onCheckVirtualTrafficLight);
+  addCheckbox(
+    "no_stopping_area", "No Stopping Area", "write me...", &FeatureManager::onCheckNoStoppingArea);
+  addCheckbox("stop_line", "Stop Line", "write me...", &FeatureManager::onCheckStopLine);
+  addCheckbox(
+    "occlusion_spot", "Occlusion Spot", "write me...", &FeatureManager::onCheckOcclusionSpot);
+  addCheckbox("run_out", "Run Out", "write me...", &FeatureManager::onCheckRunOut);
+  addCheckbox("speed_bump", "Speed Bump", "write me...", &FeatureManager::onCheckSpeedBump);
+  addCheckbox("out_of_lane", "Out of Lane", "write me...", &FeatureManager::onCheckOutOfLane);
+  addCheckbox(
+    "no_drivable_lane", "No Drivable Lane", "write me...", &FeatureManager::onCheckNoDrivableLane);
 
   // motion
-  addLabel("----- motion planner -----");
+  addLabel("---------- motion planner ----------");
 
   addCheckbox_UnSupported(
-    "path_smoothing", "[WIP] Path Smoothing", &FeatureManager::onCheckPathSmoothing);
+    "path_smoothing", "[WIP] Path Smoothing", "write me...", &FeatureManager::onCheckPathSmoothing);
   addCheckbox_UnSupported(
-    "obstacle_cruise", "[WIP] Obstacle Cruise", &FeatureManager::onCheckObstacleCruise);
+    "obstacle_cruise", "[WIP] Obstacle Cruise", "write me...",
+    &FeatureManager::onCheckObstacleCruise);
   addCheckbox_UnSupported(
-    "obstacle_stop", "[WIP] Obstacle Stop", &FeatureManager::onCheckObstacleStop);
+    "obstacle_stop", "[WIP] Obstacle Stop", "write me...", &FeatureManager::onCheckObstacleStop);
   addCheckbox_UnSupported(
-    "obstacle_decel", "[WIP] Obstacle Decel", &FeatureManager::onCheckObstacleDecel);
+    "obstacle_decel", "[WIP] Obstacle Decel", "write me...", &FeatureManager::onCheckObstacleDecel);
   addCheckbox_UnSupported(
-    "decel_on_curve", "[WIP] Decel on Curve", &FeatureManager::onCheckDecelOnCurve);
+    "decel_on_curve", "[WIP] Decel on Curve", "write me...", &FeatureManager::onCheckDecelOnCurve);
   addCheckbox_UnSupported(
-    "decel_on_curve_for_obstacle", "[WIP] Decel on Curve for Obstacles",
+    "decel_on_curve_for_obstacle", "[WIP] Decel on Curve for Obstacles", "write me...",
     &FeatureManager::onCheckDecelOnCurveForObstacles);
   addCheckbox_UnSupported(
-    "surround_check", "[WIP] Surround Check", &FeatureManager::onCheckSurroundCheck);
+    "surround_check", "[WIP] Surround Check", "write me...", &FeatureManager::onCheckSurroundCheck);
 
   addCheckbox_UnSupported(
-    "planing_validator", "[WIP] Trajectory Validation",
+    "planing_validator", "[WIP] Trajectory Validation", "write me...",
     &FeatureManager::onCheckTrajectoryValidation);
 
-  addLabel("===== Control =====");
+  // Add horizontal line here
+  QFrame * line = new QFrame(this);
+  line->setFrameShape(QFrame::HLine);
+  line->setFrameShadow(QFrame::Sunken);
+  layout->addWidget(line);
+
+  addLabel("=========== Control ===========");
 
   addCheckbox_UnSupported(
-    "slope_compensation", "[WIP] Slope Compensation", &FeatureManager::onCheckSlopeCompensation);
+    "slope_compensation", "[WIP] Slope Compensation",
+    "Modify the target acceleration considering the slope angle.",
+    &FeatureManager::onCheckSlopeCompensation);
   addCheckbox_UnSupported(
-    "steer_offset", "[WIP] Steering Offset Remove", &FeatureManager::onCheckSteerOffsetRemover);
+    "steer_offset", "[WIP] Steering Offset Removal", "Compensate the steering offset.",
+    &FeatureManager::onCheckSteerOffsetRemover);
 
   // Add a stretch at the end to push everything to the top
   layout->addStretch(1);
@@ -123,6 +190,13 @@ FeatureManager::FeatureManager(QWidget * parent) : rviz_common::Panel(parent)
   mainLayout->addWidget(scrollArea);
 
   setLayout(mainLayout);
+}
+
+// ***************** mission planner ************************
+void FeatureManager::onCheckGoalValidation(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
 
 // ***************** behavior path planner ************************

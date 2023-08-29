@@ -17,6 +17,7 @@
 
 // Qt
 #include <QCheckBox>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMainWindow>
@@ -47,6 +48,9 @@ public:
   void load(const rviz_common::Config & config) override;
 
 public Q_SLOTS:
+  // planning mission planner
+  void onCheckGoalValidation(bool checked);
+
   // planning behavior path planner
   void onCheckStart(bool checked);
   void onCheckGoal(bool checked);
