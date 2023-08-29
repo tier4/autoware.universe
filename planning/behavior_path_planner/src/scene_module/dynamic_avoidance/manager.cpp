@@ -101,6 +101,9 @@ void DynamicAvoidanceModuleManager::updateModuleParams(
 
     updateParam<std::string>(
       parameters, ns + "polygon_generation_method", p->polygon_generation_method);
+    updateParam<double>(
+      parameters, ns + "object_path_base.min_longitudinal_polygon_margin",
+      p->min_obj_path_based_lon_polygon_margin);
     updateParam<double>(parameters, ns + "lat_offset_from_obstacle", p->lat_offset_from_obstacle);
     updateParam<double>(parameters, ns + "max_lat_offset_to_avoid", p->max_lat_offset_to_avoid);
     updateParam<double>(
