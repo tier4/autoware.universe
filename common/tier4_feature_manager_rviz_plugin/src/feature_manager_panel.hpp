@@ -48,6 +48,12 @@ public:
   void load(const rviz_common::Config & config) override;
 
 public Q_SLOTS:
+  // localization
+  void onCheckLocalizationErrorMonitor(bool checked);
+
+  // perception
+  void onCheckMapBasedPrediction(bool checked);
+
   // planning mission planner
   void onCheckGoalValidation(bool checked);
 

@@ -23,173 +23,234 @@ using std::placeholders::_2;
 
 FeatureManager::FeatureManager(QWidget * parent) : rviz_common::Panel(parent)
 {
-  auto * layout = new QVBoxLayout;
+  // Create main layout for the scroll area
+  QVBoxLayout * mainLayout = new QVBoxLayout;
 
-  // Your widget for the QScrollArea
+  // Create a content widget and layout for the items
   QWidget * contentWidget = new QWidget;
-  contentWidget->setLayout(layout);
+  QVBoxLayout * contentLayout = new QVBoxLayout;
 
-  const auto addCheckbox =
-    [&](auto & name, const auto & displayed_title, const auto & tooltip, const auto callback) {
-      auto * checkbox = new QCheckBox(displayed_title);
-      checkbox->setToolTip(tooltip);  // Set the tooltip
-      layout->addWidget(checkbox);
-      checkbox->setChecked(true);  // initialize
-      connect(checkbox, &QCheckBox::toggled, this, callback);
-      checkbox_storage_.emplace(name, checkbox);
-    };
+  const auto addCheckbox_impl = [&](
+                                  QLayout * layout, auto & name, const auto & displayed_title,
+                                  const auto & tooltip, const auto callback, const bool enable) {
+    auto * checkbox = new QCheckBox(displayed_title);
+    checkbox->setToolTip(tooltip);  // Set the tooltip
+    layout->addWidget(checkbox);
+    checkbox->setChecked(true);    // initialize
+    checkbox->setEnabled(enable);  // gray out (disabled)
+    connect(checkbox, &QCheckBox::toggled, this, callback);
+    checkbox_storage_.emplace(name, checkbox);
+  };
 
-  const auto addCheckbox_UnSupported =
-    [&](auto & name, const auto & displayed_title, const auto & tooltip, const auto callback) {
-      auto * checkbox = new QCheckBox(displayed_title);
-      checkbox->setToolTip(tooltip);  // Set the tooltip
-      layout->addWidget(checkbox);
-      checkbox->setChecked(true);
-      checkbox->setEnabled(false);  // gray out (disabled)
-      connect(checkbox, &QCheckBox::toggled, this, callback);
-      checkbox_storage_.emplace(name, checkbox);
-    };
+  const auto addCheckbox_UnSupported = [&](
+                                         QLayout * layout, auto & name,
+                                         const auto & displayed_title, const auto & tooltip,
+                                         const auto callback) {
+    addCheckbox_impl(layout, name, displayed_title, tooltip, callback, false);
+  };
 
-  const auto addLabel = [&](const QString & label_str) {
+  const auto addCheckbox = [&](
+                             QLayout * layout, auto & name, const auto & displayed_title,
+                             const auto & tooltip, const auto callback) {
+    addCheckbox_impl(layout, name, displayed_title, tooltip, callback, true);
+  };
+
+  const auto addLabel = [&](QLayout * layout, const QString & label_str) {
     auto * label = new QLabel(label_str);
     layout->addWidget(label);
   };
 
-  addLabel("=========== Planning ===========");
+  // ========== Localization Group ==========
+  QGroupBox * LocalizationGroup = new QGroupBox("Localization");
+  QVBoxLayout * LocalizationLayout = new QVBoxLayout;
 
-  addLabel("---------- mission planner ----------");
   addCheckbox_UnSupported(
-    "goal_validation", "[WIP] Goal Validation",
+    LocalizationLayout, "localization_error_monitor", "[WIP] Localization Error Monitor",
+    "Diagnose the status of your localization module and report the results.",
+    &FeatureManager::onCheckLocalizationErrorMonitor);
+
+  LocalizationGroup->setLayout(LocalizationLayout);
+  contentLayout->addWidget(LocalizationGroup);
+
+  // ========== Perception Group ==========
+  QGroupBox * PerceptionGroup = new QGroupBox("Perception");
+  QVBoxLayout * PerceptionLayout = new QVBoxLayout;
+
+  addCheckbox_UnSupported(
+    PerceptionLayout, "map_based_prediction", "[WIP] Map Based Prediction",
+    "calculates the predicted path for all detected objects based on the load connection "
+    "information.",
+    &FeatureManager::onCheckMapBasedPrediction);
+
+  PerceptionGroup->setLayout(PerceptionLayout);
+  contentLayout->addWidget(PerceptionGroup);
+
+  // ========== Control Group ==========
+  QGroupBox * planningGroup = new QGroupBox("Planning");
+  QVBoxLayout * planningLayout = new QVBoxLayout;
+
+  // mission planner
+  addLabel(planningLayout, "---------- mission planner ----------");
+  addCheckbox_UnSupported(
+    planningLayout, "goal_validation", "[WIP] Goal Validation",
     "rejects the invalid goal, e.g. the foot print is not in the lane.",
     &FeatureManager::onCheckGoalValidation);
 
   // behavior path planner
-  addLabel("---------- behavior path planner ----------");
+  addLabel(planningLayout, "---------- behavior path planner ----------");
   addCheckbox_UnSupported(
-    "start_planner", "[WIP] Start",
+    planningLayout, "start_planner", "[WIP] Start",
     "generate efficient and smooth starting path (pull out, freespace, etc) with safety check.",
     &FeatureManager::onCheckStart);
   addCheckbox_UnSupported(
-    "goal_planner", "[WIP] Goal",
+    planningLayout, "goal_planner", "[WIP] Goal",
     "generate efficient and smooth goal path (pull over, freespace, etc) with safety check.",
     &FeatureManager::onCheckGoal);
   addCheckbox_UnSupported(
-    "lane_change", "[WIP] Lane Change",
+    planningLayout, "lane_change", "[WIP] Lane Change",
     "automatically generate lane change path with safety check when it is needed.",
     &FeatureManager::onCheckLaneChange);
   addCheckbox_UnSupported(
-    "avoidance", "[WIP] Avoidance",
+    planningLayout, "avoidance", "[WIP] Avoidance",
     "automatically generate avoidance path to avoid the collision with detected objects.",
     &FeatureManager::onCheckAvoidance);
   addCheckbox_UnSupported(
-    "side_shift", "[WIP] Side Shift",
+    planningLayout, "side_shift", "[WIP] Side Shift",
     "generate shifted path on the lateral direction with the instructed direction and distance.",
     &FeatureManager::onCheckSideShift);
 
   // behavior velocity planner
-  addLabel("---------- behavior velocity planner ----------");
+  addLabel(planningLayout, "---------- behavior velocity planner ----------");
   addCheckbox(
-    "crosswalk", "Crosswalk", "stop or decelerate around a crosswalk considering the situation.",
+    planningLayout, "crosswalk", "Crosswalk",
+    "stop or decelerate around a crosswalk considering the situation.",
     &FeatureManager::onCheckCrosswalk);
   addCheckbox(
-    "walkway", "Walkway", "stop once and go if the walkway is free.",
+    planningLayout, "walkway", "Walkway", "stop once and go if the walkway is free.",
     &FeatureManager::onCheckWalkway);
   addCheckbox(
-    "traffic_light", "Traffic Light", "stop when the traffic light indicates stop.",
+    planningLayout, "traffic_light", "Traffic Light", "stop when the traffic light indicates stop.",
     &FeatureManager::onCheckTrafficLight);
   addCheckbox(
-    "intersection", "Intersection",
+    planningLayout, "intersection", "Intersection",
     "stop and decelerate around intersection considering the oncoming vehicle.",
     &FeatureManager::onCheckIntersection);
   addCheckbox(
-    "intersection_stuck", "Intersection Stuck Vehicle",
+    planningLayout, "intersection_stuck", "Intersection Stuck Vehicle",
     "stop in front of the intersection if another vehicle is stopped in the intersection.",
     &FeatureManager::onCheckIntersection);
   addCheckbox(
-    "intersection_occlusion", "Intersection Occlusion",
+    planningLayout, "intersection_occlusion", "Intersection Occlusion",
     "Go slowly to see the occluded area in the intersection. Go into the intersection after the "
     "safety is confirmed.",
     &FeatureManager::onCheckIntersection);
   addCheckbox(
-    "merge_from_private", "Merge From Private",
+    planningLayout, "merge_from_private", "Merge From Private",
     "stop once and go after the safety is confirmed on the merging.",
     &FeatureManager::onCheckMergeFromPrivate);
   addCheckbox(
-    "blind_spot", "Blind Spot",
+    planningLayout, "blind_spot", "Blind Spot",
     "check the blind spot when the vehicle entries into the intersection. Stop if it detects a "
     "danger situation.",
     &FeatureManager::onCheckBlindSpot);
   addCheckbox(
-    "detection_area", "Detection Area",
+    planningLayout, "detection_area", "Detection Area",
     "Stop at a pre-defined stop line when any obstacle in on the pre-defined detection area.",
     &FeatureManager::onCheckDetectionArea);
   addCheckbox(
-    "virtual_traffic_light", "Virtual Traffic Light", "write me...",
+    planningLayout, "virtual_traffic_light", "Virtual Traffic Light", "write me...",
     &FeatureManager::onCheckVirtualTrafficLight);
   addCheckbox(
-    "no_stopping_area", "No Stopping Area", "write me...", &FeatureManager::onCheckNoStoppingArea);
-  addCheckbox("stop_line", "Stop Line", "write me...", &FeatureManager::onCheckStopLine);
+    planningLayout, "no_stopping_area", "No Stopping Area", "write me...",
+    &FeatureManager::onCheckNoStoppingArea);
   addCheckbox(
-    "occlusion_spot", "Occlusion Spot", "write me...", &FeatureManager::onCheckOcclusionSpot);
-  addCheckbox("run_out", "Run Out", "write me...", &FeatureManager::onCheckRunOut);
-  addCheckbox("speed_bump", "Speed Bump", "write me...", &FeatureManager::onCheckSpeedBump);
-  addCheckbox("out_of_lane", "Out of Lane", "write me...", &FeatureManager::onCheckOutOfLane);
+    planningLayout, "stop_line", "Stop Line", "write me...", &FeatureManager::onCheckStopLine);
   addCheckbox(
-    "no_drivable_lane", "No Drivable Lane", "write me...", &FeatureManager::onCheckNoDrivableLane);
+    planningLayout, "occlusion_spot", "Occlusion Spot", "write me...",
+    &FeatureManager::onCheckOcclusionSpot);
+  addCheckbox(planningLayout, "run_out", "Run Out", "write me...", &FeatureManager::onCheckRunOut);
+  addCheckbox(
+    planningLayout, "speed_bump", "Speed Bump", "write me...", &FeatureManager::onCheckSpeedBump);
+  addCheckbox(
+    planningLayout, "out_of_lane", "Out of Lane", "write me...", &FeatureManager::onCheckOutOfLane);
+  addCheckbox(
+    planningLayout, "no_drivable_lane", "No Drivable Lane", "write me...",
+    &FeatureManager::onCheckNoDrivableLane);
 
   // motion
-  addLabel("---------- motion planner ----------");
+  addLabel(planningLayout, "---------- motion planner ----------");
 
   addCheckbox_UnSupported(
-    "path_smoothing", "[WIP] Path Smoothing", "write me...", &FeatureManager::onCheckPathSmoothing);
+    planningLayout, "path_smoothing", "[WIP] Path Smoothing", "write me...",
+    &FeatureManager::onCheckPathSmoothing);
   addCheckbox_UnSupported(
-    "obstacle_cruise", "[WIP] Obstacle Cruise", "write me...",
+    planningLayout, "obstacle_cruise", "[WIP] Obstacle Cruise", "write me...",
     &FeatureManager::onCheckObstacleCruise);
   addCheckbox_UnSupported(
-    "obstacle_stop", "[WIP] Obstacle Stop", "write me...", &FeatureManager::onCheckObstacleStop);
+    planningLayout, "obstacle_stop", "[WIP] Obstacle Stop", "write me...",
+    &FeatureManager::onCheckObstacleStop);
   addCheckbox_UnSupported(
-    "obstacle_decel", "[WIP] Obstacle Decel", "write me...", &FeatureManager::onCheckObstacleDecel);
+    planningLayout, "obstacle_decel", "[WIP] Obstacle Decel", "write me...",
+    &FeatureManager::onCheckObstacleDecel);
   addCheckbox_UnSupported(
-    "decel_on_curve", "[WIP] Decel on Curve", "write me...", &FeatureManager::onCheckDecelOnCurve);
+    planningLayout, "decel_on_curve", "[WIP] Decel on Curve", "write me...",
+    &FeatureManager::onCheckDecelOnCurve);
   addCheckbox_UnSupported(
-    "decel_on_curve_for_obstacle", "[WIP] Decel on Curve for Obstacles", "write me...",
-    &FeatureManager::onCheckDecelOnCurveForObstacles);
+    planningLayout, "decel_on_curve_for_obstacle", "[WIP] Decel on Curve for Obstacles",
+    "write me...", &FeatureManager::onCheckDecelOnCurveForObstacles);
   addCheckbox_UnSupported(
-    "surround_check", "[WIP] Surround Check", "write me...", &FeatureManager::onCheckSurroundCheck);
+    planningLayout, "surround_check", "[WIP] Surround Check", "write me...",
+    &FeatureManager::onCheckSurroundCheck);
 
   addCheckbox_UnSupported(
-    "planing_validator", "[WIP] Trajectory Validation", "write me...",
+    planningLayout, "planing_validator", "[WIP] Trajectory Validation", "write me...",
     &FeatureManager::onCheckTrajectoryValidation);
 
-  // Add horizontal line here
-  QFrame * line = new QFrame(this);
-  line->setFrameShape(QFrame::HLine);
-  line->setFrameShadow(QFrame::Sunken);
-  layout->addWidget(line);
+  planningGroup->setLayout(planningLayout);
+  contentLayout->addWidget(planningGroup);
 
-  addLabel("=========== Control ===========");
+  // ========== Control Group ==========
+  QGroupBox * controlGroup = new QGroupBox("Control");
+  QVBoxLayout * controlLayout = new QVBoxLayout;
 
   addCheckbox_UnSupported(
-    "slope_compensation", "[WIP] Slope Compensation",
+    controlLayout, "slope_compensation", "[WIP] Slope Compensation",
     "Modify the target acceleration considering the slope angle.",
     &FeatureManager::onCheckSlopeCompensation);
   addCheckbox_UnSupported(
-    "steer_offset", "[WIP] Steering Offset Removal", "Compensate the steering offset.",
-    &FeatureManager::onCheckSteerOffsetRemover);
+    controlLayout, "steer_offset", "[WIP] Steering Offset Removal",
+    "Compensate the steering offset.", &FeatureManager::onCheckSteerOffsetRemover);
 
-  // Add a stretch at the end to push everything to the top
-  layout->addStretch(1);
+  controlGroup->setLayout(controlLayout);
+  contentLayout->addWidget(controlGroup);
+
+  // After adding all the groups to contentLayout, add a stretch at the end.
+  // This will make the Layout "top-stuffed".
+  contentLayout->addStretch(1);
+
+  // Assign content layout to content widget
+  contentWidget->setLayout(contentLayout);
 
   // Create the scroll area and set contentWidget as its child
-  QScrollArea * scrollArea = new QScrollArea(this);
+  QScrollArea * scrollArea = new QScrollArea;
   scrollArea->setWidget(contentWidget);
   scrollArea->setWidgetResizable(true);
-
-  // New main layout for the parent widget
-  QVBoxLayout * mainLayout = new QVBoxLayout;
   mainLayout->addWidget(scrollArea);
 
   setLayout(mainLayout);
+}
+// ***************** localization ************************
+void FeatureManager::onCheckLocalizationErrorMonitor(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
+}
+
+// ***************** perception ************************
+void FeatureManager::onCheckMapBasedPrediction(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
 
 // ***************** mission planner ************************
