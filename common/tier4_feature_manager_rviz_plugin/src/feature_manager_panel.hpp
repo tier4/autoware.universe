@@ -16,121 +16,82 @@
 #define FEATURE_MANAGER_PANEL_HPP_
 
 // Qt
-#include <QApplication>
-#include <QDesktopWidget>
-#include <QDir>
-#include <QFileDialog>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QMainWindow>
 #include <QPushButton>
 #include <QScreen>
-#include <QSpinBox>
-#include <QTimer>
-
-// horibe
-#include <QCheckBox>
+#include <QScrollArea>
 #include <behavior_velocity_planner/srv/load_plugin.hpp>
 #include <behavior_velocity_planner/srv/unload_plugin.hpp>
-
-// rviz
 #include <rviz_common/display_context.hpp>
 #include <rviz_common/panel.hpp>
-#include <rviz_common/render_panel.hpp>
-#include <rviz_common/ros_integration/ros_node_abstraction_iface.hpp>
-#include <rviz_common/view_manager.hpp>
-#include <rviz_rendering/render_window.hpp>
 
 #include <memory>
 #include <string>
 #include <vector>
 
-class QLineEdit;
+using behavior_velocity_planner::srv::LoadPlugin;
+using behavior_velocity_planner::srv::UnloadPlugin;
 
-class AutowareFeatureManagerPanel : public rviz_common::Panel
+class FeatureManager : public rviz_common::Panel
 {
   Q_OBJECT
 
 public:
-  explicit AutowareFeatureManagerPanel(QWidget * parent = nullptr);
-  ~AutowareFeatureManagerPanel() override;
+  explicit FeatureManager(QWidget * parent = nullptr);
+  ~FeatureManager() override;
   void onInitialize() override;
   void save(rviz_common::Config config) const override;
   void load(const rviz_common::Config & config) override;
 
 public Q_SLOTS:
-  // behavior path planner
-  void onCheckStartFeature(bool checked);
-  void onCheckGoalFeature(bool checked);
-  void onCheckLaneChangeFeature(bool checked);
-  void onCheckAvoidanceFeature(bool checked);
-  void onCheckSideShiftFeature(bool checked);
+  // planning behavior path planner
+  void onCheckStart(bool checked);
+  void onCheckGoal(bool checked);
+  void onCheckLaneChange(bool checked);
+  void onCheckAvoidance(bool checked);
+  void onCheckSideShift(bool checked);
 
-  // behavior velocity planner
-  void onCheckCrosswalkFeature(bool checked);
-  void onCheckWalkwayFeature(bool checked);
-  void onCheckTrafficLightFeature(bool checked);
-  void onCheckIntersectionFeature(bool checked);
-  void onCheckMergeFromPrivateFeature(bool checked);
-  void onCheckBlindSpotFeature(bool checked);
-  void onCheckDetectionAreaFeature(bool checked);
-  void onCheckVirtualTrafficLightFeature(bool checked);
-  void onCheckNoStoppingAreaFeature(bool checked);
-  void onCheckStopLineFeature(bool checked);
-  void onCheckOcclusionSpotFeature(bool checked);
-  void onCheckRunOutFeature(bool checked);
-  void onCheckSpeedBumpFeature(bool checked);
-  void onCheckOutOfLaneFeature(bool checked);
-  void onCheckNoDrivableLaneFeature(bool checked);
+  // planning behavior velocity planner
+  void onCheckCrosswalk(bool checked);
+  void onCheckWalkway(bool checked);
+  void onCheckTrafficLight(bool checked);
+  void onCheckIntersection(bool checked);
+  void onCheckMergeFromPrivate(bool checked);
+  void onCheckBlindSpot(bool checked);
+  void onCheckDetectionArea(bool checked);
+  void onCheckVirtualTrafficLight(bool checked);
+  void onCheckNoStoppingArea(bool checked);
+  void onCheckStopLine(bool checked);
+  void onCheckOcclusionSpot(bool checked);
+  void onCheckRunOut(bool checked);
+  void onCheckSpeedBump(bool checked);
+  void onCheckOutOfLane(bool checked);
+  void onCheckNoDrivableLane(bool checked);
 
-  // motion
-  void onCheckPathSmoothingFeature(bool checked);
-  void onCheckObstacleCruiseFeature(bool checked);
-  void onCheckObstacleStopFeature(bool checked);
-  void onCheckObstacleDecelFeature(bool checked);
-  void onCheckDecelOnCurveFeature(bool checked);
-  void onCheckDecelOnCurveForObstaclesFeature(bool checked);
-  void onCheckSurroundCheckFeature(bool checked);
+  // planning motion
+  void onCheckPathSmoothing(bool checked);
+  void onCheckObstacleCruise(bool checked);
+  void onCheckObstacleStop(bool checked);
+  void onCheckObstacleDecel(bool checked);
+  void onCheckDecelOnCurve(bool checked);
+  void onCheckDecelOnCurveForObstacles(bool checked);
+  void onCheckSurroundCheck(bool checked);
+
+  // planning others
+  void onCheckTrajectoryValidation(bool checked);
+
+  // control
+  void onCheckSlopeCompensation(bool checked);
+  void onCheckSteerOffsetRemover(bool checked);
 
 private:
-  // behavior path planner
-  QCheckBox * checkbox_start_;
-  QCheckBox * checkbox_goal_;
-  QCheckBox * checkbox_lane_change_;
-  QCheckBox * checkbox_avoidance_;
-  QCheckBox * checkbox_side_shift_;
+  std::unordered_map<std::string, QCheckBox *> checkbox_storage_;
 
-  // behavior velocity planner
-  QCheckBox * checkbox_crosswalk_;
-  QCheckBox * checkbox_walkway_;
-  QCheckBox * checkbox_traffic_light_;
-  QCheckBox * checkbox_intersection_;
-  QCheckBox * checkbox_merge_from_private_;
-  QCheckBox * checkbox_blind_spot_;
-  QCheckBox * checkbox_detection_area_;
-  QCheckBox * checkbox_virtual_traffic_light_;
-  QCheckBox * checkbox_no_stopping_area_;
-  QCheckBox * checkbox_stop_line_;
-  QCheckBox * checkbox_occlusion_spot_;
-  QCheckBox * checkbox_run_out_;
-  QCheckBox * checkbox_speed_bump_;
-  QCheckBox * checkbox_out_of_lane_;
-  QCheckBox * checkbox_no_drivable_lane_;
-
-  // motion
-  QCheckBox * checkbox_path_smoothing_;
-  QCheckBox * checkbox_obstacle_cruise_;
-  QCheckBox * checkbox_obstacle_stop_;
-  QCheckBox * checkbox_obstacle_decel_;
-  QCheckBox * checkbox_decel_on_curve_;
-  QCheckBox * checkbox_decel_on_curve_for_obstacle_;
-  QCheckBox * checkbox_surround_check_;
-
-  rclcpp::Client<behavior_velocity_planner::srv::LoadPlugin>::SharedPtr
-    behavior_velocity_load_client_;
-  rclcpp::Client<behavior_velocity_planner::srv::UnloadPlugin>::SharedPtr
-    behavior_velocity_unload_client_;
+  rclcpp::Client<LoadPlugin>::SharedPtr behavior_velocity_load_client_;
+  rclcpp::Client<UnloadPlugin>::SharedPtr behavior_velocity_unload_client_;
 
   void loadOrUnloadBehaviorVelocityModule(
     const bool load, const std::string & load_name, const std::string & unload_name);

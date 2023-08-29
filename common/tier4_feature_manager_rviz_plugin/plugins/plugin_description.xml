@@ -1,9 +1,9 @@
 <library path="tier4_feature_manager_rviz_plugin">
 
   <class
-    type="AutowareFeatureManagerPanel"
+    type="FeatureManager"
     base_class_type="rviz_common::Panel">
-    <description>AutowareFeatureManagerPanel</description>
+    <description>FeatureManager</description>
   </class>
 
 </library>

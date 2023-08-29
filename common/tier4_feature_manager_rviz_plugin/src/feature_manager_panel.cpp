@@ -16,223 +16,214 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include <ctime>
-#include <filesystem>
 #include <iostream>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-AutowareFeatureManagerPanel::AutowareFeatureManagerPanel(QWidget * parent)
-: rviz_common::Panel(parent)
+FeatureManager::FeatureManager(QWidget * parent) : rviz_common::Panel(parent)
 {
   auto * layout = new QVBoxLayout;
 
-  const auto addCheckbox = [&](auto & checkbox, const auto & title, const auto callback) {
-    checkbox = new QCheckBox(title);
+  // Your widget for the QScrollArea
+  QWidget * contentWidget = new QWidget;
+  contentWidget->setLayout(layout);
+
+  const auto addCheckbox = [&](auto & name, const auto & title, const auto callback) {
+    auto * checkbox = new QCheckBox(title);
     layout->addWidget(checkbox);
     checkbox->setChecked(true);  // initialize
     connect(checkbox, &QCheckBox::toggled, this, callback);
+    checkbox_storage_.emplace(name, checkbox);
   };
 
-  const auto addCheckbox_UnSupported = [&](
-                                         auto & checkbox, const auto & title, const auto callback) {
-    checkbox = new QCheckBox(title);
+  const auto addCheckbox_UnSupported = [&](auto & name, const auto & title, const auto callback) {
+    auto * checkbox = new QCheckBox(title);
     layout->addWidget(checkbox);
     checkbox->setChecked(true);
     checkbox->setEnabled(false);  // gray out (disabled)
     connect(checkbox, &QCheckBox::toggled, this, callback);
+    checkbox_storage_.emplace(name, checkbox);
   };
 
+  const auto addLabel = [&](const QString & label_str) {
+    auto * label = new QLabel(label_str);
+    layout->addWidget(label);
+  };
+
+  addLabel("===== Planning =====");
+
   // behavior path planner
-  addCheckbox_UnSupported(
-    checkbox_start_, "[WIP] behavior_path_planner: Start",
-    &AutowareFeatureManagerPanel::onCheckStartFeature);
-  addCheckbox_UnSupported(
-    checkbox_goal_, "[WIP] behavior_path_planner: Goal",
-    &AutowareFeatureManagerPanel::onCheckGoalFeature);
-  addCheckbox_UnSupported(
-    checkbox_lane_change_, "[WIP] behavior_path_planner: Lane Change",
-    &AutowareFeatureManagerPanel::onCheckLaneChangeFeature);
-  addCheckbox_UnSupported(
-    checkbox_avoidance_, "[WIP] behavior_path_planner: Avoidance",
-    &AutowareFeatureManagerPanel::onCheckAvoidanceFeature);
-  addCheckbox_UnSupported(
-    checkbox_side_shift_, "[WIP] behavior_path_planner: Side Shift",
-    &AutowareFeatureManagerPanel::onCheckSideShiftFeature);
+  addLabel("----- behavior path planner -----");
+  addCheckbox_UnSupported("start_planner", "[WIP] Start", &FeatureManager::onCheckStart);
+  addCheckbox_UnSupported("goal_planner", "[WIP] Goal", &FeatureManager::onCheckGoal);
+  addCheckbox_UnSupported("lane_change", "[WIP] Lane Change", &FeatureManager::onCheckLaneChange);
+  addCheckbox_UnSupported("avoidance", "[WIP] Avoidance", &FeatureManager::onCheckAvoidance);
+  addCheckbox_UnSupported("side_shift", "[WIP] Side Shift", &FeatureManager::onCheckSideShift);
 
   // behavior velocity planner
+  addLabel("----- behavior velocity planner -----");
+  addCheckbox("crosswalk", "Crosswalk", &FeatureManager::onCheckCrosswalk);
+  addCheckbox("walkway", "Walkway", &FeatureManager::onCheckWalkway);
+  addCheckbox("traffic_light", "Traffic Light", &FeatureManager::onCheckTrafficLight);
+  addCheckbox("intersection", "Intersection", &FeatureManager::onCheckIntersection);
+  addCheckbox("merge_from_private", "Merge From Private", &FeatureManager::onCheckMergeFromPrivate);
+  addCheckbox("blind_spot", "Blind Spot", &FeatureManager::onCheckBlindSpot);
+  addCheckbox("detection_area", "Detection Area", &FeatureManager::onCheckDetectionArea);
   addCheckbox(
-    checkbox_crosswalk_, "behavior_velocity_planner: Crosswalk",
-    &AutowareFeatureManagerPanel::onCheckCrosswalkFeature);
-  addCheckbox(
-    checkbox_walkway_, "behavior_velocity_planner: Walkway",
-    &AutowareFeatureManagerPanel::onCheckWalkwayFeature);
-  addCheckbox(
-    checkbox_traffic_light_, "behavior_velocity_planner: Traffic Light",
-    &AutowareFeatureManagerPanel::onCheckTrafficLightFeature);
-  addCheckbox(
-    checkbox_intersection_, "behavior_velocity_planner: Intersection",
-    &AutowareFeatureManagerPanel::onCheckIntersectionFeature);
-  addCheckbox(
-    checkbox_merge_from_private_, "behavior_velocity_planner: Merge From Private",
-    &AutowareFeatureManagerPanel::onCheckMergeFromPrivateFeature);
-  addCheckbox(
-    checkbox_blind_spot_, "behavior_velocity_planner: Blind Spot",
-    &AutowareFeatureManagerPanel::onCheckBlindSpotFeature);
-  addCheckbox(
-    checkbox_detection_area_, "behavior_velocity_planner: Detection Area",
-    &AutowareFeatureManagerPanel::onCheckDetectionAreaFeature);
-  addCheckbox(
-    checkbox_virtual_traffic_light_, "behavior_velocity_planner: Virtual Traffic Light",
-    &AutowareFeatureManagerPanel::onCheckVirtualTrafficLightFeature);
-  addCheckbox(
-    checkbox_no_stopping_area_, "behavior_velocity_planner: No Stopping Area",
-    &AutowareFeatureManagerPanel::onCheckNoStoppingAreaFeature);
-  addCheckbox(
-    checkbox_stop_line_, "behavior_velocity_planner: Stop Line",
-    &AutowareFeatureManagerPanel::onCheckStopLineFeature);
-  addCheckbox(
-    checkbox_occlusion_spot_, "behavior_velocity_planner: Occlusion Spot",
-    &AutowareFeatureManagerPanel::onCheckOcclusionSpotFeature);
-  addCheckbox(
-    checkbox_run_out_, "behavior_velocity_planner: Run Out",
-    &AutowareFeatureManagerPanel::onCheckRunOutFeature);
-  addCheckbox(
-    checkbox_speed_bump_, "behavior_velocity_planner: Speed Bump",
-    &AutowareFeatureManagerPanel::onCheckSpeedBumpFeature);
-  addCheckbox(
-    checkbox_out_of_lane_, "behavior_velocity_planner: Out of Lane",
-    &AutowareFeatureManagerPanel::onCheckOutOfLaneFeature);
-  addCheckbox(
-    checkbox_no_drivable_lane_, "behavior_velocity_planner: No Drivable Lane",
-    &AutowareFeatureManagerPanel::onCheckNoDrivableLaneFeature);
+    "virtual_traffic_light", "Virtual Traffic Light", &FeatureManager::onCheckVirtualTrafficLight);
+  addCheckbox("no_stopping_area", "No Stopping Area", &FeatureManager::onCheckNoStoppingArea);
+  addCheckbox("stop_line", "Stop Line", &FeatureManager::onCheckStopLine);
+  addCheckbox("occlusion_spot", "Occlusion Spot", &FeatureManager::onCheckOcclusionSpot);
+  addCheckbox("run_out", "Run Out", &FeatureManager::onCheckRunOut);
+  addCheckbox("speed_bump", "Speed Bump", &FeatureManager::onCheckSpeedBump);
+  addCheckbox("out_of_lane", "Out of Lane", &FeatureManager::onCheckOutOfLane);
+  addCheckbox("no_drivable_lane", "No Drivable Lane", &FeatureManager::onCheckNoDrivableLane);
 
   // motion
-  addCheckbox_UnSupported(
-    checkbox_path_smoothing_, "[WIP] Path Smoothing",
-    &AutowareFeatureManagerPanel::onCheckPathSmoothingFeature);
-  addCheckbox_UnSupported(
-    checkbox_obstacle_cruise_, "[WIP] Obstacle Cruise",
-    &AutowareFeatureManagerPanel::onCheckObstacleCruiseFeature);
-  addCheckbox_UnSupported(
-    checkbox_obstacle_stop_, "[WIP] Obstacle Stop",
-    &AutowareFeatureManagerPanel::onCheckObstacleStopFeature);
-  addCheckbox_UnSupported(
-    checkbox_obstacle_decel_, "[WIP] Obstacle Decel",
-    &AutowareFeatureManagerPanel::onCheckObstacleDecelFeature);
-  addCheckbox_UnSupported(
-    checkbox_decel_on_curve_, "[WIP] Decel on Curve",
-    &AutowareFeatureManagerPanel::onCheckDecelOnCurveFeature);
-  addCheckbox_UnSupported(
-    checkbox_decel_on_curve_for_obstacle_, "[WIP] Decel on Curve for Obstacles",
-    &AutowareFeatureManagerPanel::onCheckDecelOnCurveForObstaclesFeature);
-  addCheckbox_UnSupported(
-    checkbox_surround_check_, "[WIP] Surround Check",
-    &AutowareFeatureManagerPanel::onCheckSurroundCheckFeature);
+  addLabel("----- motion planner -----");
 
-  setLayout(layout);
+  addCheckbox_UnSupported(
+    "path_smoothing", "[WIP] Path Smoothing", &FeatureManager::onCheckPathSmoothing);
+  addCheckbox_UnSupported(
+    "obstacle_cruise", "[WIP] Obstacle Cruise", &FeatureManager::onCheckObstacleCruise);
+  addCheckbox_UnSupported(
+    "obstacle_stop", "[WIP] Obstacle Stop", &FeatureManager::onCheckObstacleStop);
+  addCheckbox_UnSupported(
+    "obstacle_decel", "[WIP] Obstacle Decel", &FeatureManager::onCheckObstacleDecel);
+  addCheckbox_UnSupported(
+    "decel_on_curve", "[WIP] Decel on Curve", &FeatureManager::onCheckDecelOnCurve);
+  addCheckbox_UnSupported(
+    "decel_on_curve_for_obstacle", "[WIP] Decel on Curve for Obstacles",
+    &FeatureManager::onCheckDecelOnCurveForObstacles);
+  addCheckbox_UnSupported(
+    "surround_check", "[WIP] Surround Check", &FeatureManager::onCheckSurroundCheck);
+
+  addCheckbox_UnSupported(
+    "planing_validator", "[WIP] Trajectory Validation",
+    &FeatureManager::onCheckTrajectoryValidation);
+
+  addLabel("===== Control =====");
+
+  addCheckbox_UnSupported(
+    "slope_compensation", "[WIP] Slope Compensation", &FeatureManager::onCheckSlopeCompensation);
+  addCheckbox_UnSupported(
+    "steer_offset", "[WIP] Steering Offset Remove", &FeatureManager::onCheckSteerOffsetRemover);
+
+  // Add a stretch at the end to push everything to the top
+  layout->addStretch(1);
+
+  // Create the scroll area and set contentWidget as its child
+  QScrollArea * scrollArea = new QScrollArea(this);
+  scrollArea->setWidget(contentWidget);
+  scrollArea->setWidgetResizable(true);
+
+  // New main layout for the parent widget
+  QVBoxLayout * mainLayout = new QVBoxLayout;
+  mainLayout->addWidget(scrollArea);
+
+  setLayout(mainLayout);
 }
 
 // ***************** behavior path planner ************************
-void AutowareFeatureManagerPanel::onCheckStartFeature(bool checked)
+void FeatureManager::onCheckStart(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckGoalFeature(bool checked)
+void FeatureManager::onCheckGoal(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckLaneChangeFeature(bool checked)
+void FeatureManager::onCheckLaneChange(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckAvoidanceFeature(bool checked)
+void FeatureManager::onCheckAvoidance(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckSideShiftFeature(bool checked)
+void FeatureManager::onCheckSideShift(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
 
 // ***************** behavior velocity planner ************************
-void AutowareFeatureManagerPanel::onCheckCrosswalkFeature(bool checked)
+void FeatureManager::onCheckCrosswalk(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::CrosswalkModulePlugin", "crosswalk");
 }
-void AutowareFeatureManagerPanel::onCheckWalkwayFeature(bool checked)
+void FeatureManager::onCheckWalkway(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::WalkwayModulePlugin", "walkway");
 }
-void AutowareFeatureManagerPanel::onCheckTrafficLightFeature(bool checked)
+void FeatureManager::onCheckTrafficLight(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::TrafficLightModulePlugin", "traffic_light");
 }
-void AutowareFeatureManagerPanel::onCheckIntersectionFeature(bool checked)
+void FeatureManager::onCheckIntersection(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::IntersectionModulePlugin", "intersection");
 }
-void AutowareFeatureManagerPanel::onCheckMergeFromPrivateFeature(bool checked)
+void FeatureManager::onCheckMergeFromPrivate(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::MergeFromPrivateModulePlugin", "merge_from_private");
 }
-void AutowareFeatureManagerPanel::onCheckBlindSpotFeature(bool checked)
+void FeatureManager::onCheckBlindSpot(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::BlindSpotModulePlugin", "blind_spot");
 }
-void AutowareFeatureManagerPanel::onCheckDetectionAreaFeature(bool checked)
+void FeatureManager::onCheckDetectionArea(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::DetectionAreaModulePlugin", "detection_area");
 }
-void AutowareFeatureManagerPanel::onCheckVirtualTrafficLightFeature(bool checked)
+void FeatureManager::onCheckVirtualTrafficLight(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::VirtualTrafficLightModulePlugin", "virtual_traffic_light");
 }
-void AutowareFeatureManagerPanel::onCheckNoStoppingAreaFeature(bool checked)
+void FeatureManager::onCheckNoStoppingArea(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::NoStoppingAreaModulePlugin", "no_stopping_area");
 }
-void AutowareFeatureManagerPanel::onCheckStopLineFeature(bool checked)
+void FeatureManager::onCheckStopLine(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::StopLineModulePlugin", "stop_line");
 }
-void AutowareFeatureManagerPanel::onCheckOcclusionSpotFeature(bool checked)
+void FeatureManager::onCheckOcclusionSpot(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::OcclusionSpotModulePlugin", "occlusion_spot");
 }
-void AutowareFeatureManagerPanel::onCheckRunOutFeature(bool checked)
+void FeatureManager::onCheckRunOut(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::RunOutModulePlugin", "run_out");
 }
-void AutowareFeatureManagerPanel::onCheckSpeedBumpFeature(bool checked)
+void FeatureManager::onCheckSpeedBump(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::SpeedBumpModulePlugin", "speed_bump");
 }
-void AutowareFeatureManagerPanel::onCheckOutOfLaneFeature(bool checked)
+void FeatureManager::onCheckOutOfLane(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::OutOfLaneModulePlugin", "out_of_lane");
 }
-void AutowareFeatureManagerPanel::onCheckNoDrivableLaneFeature(bool checked)
+void FeatureManager::onCheckNoDrivableLane(bool checked)
 {
   loadOrUnloadBehaviorVelocityModule(
     checked, "behavior_velocity_planner::NoDrivableLaneModulePlugin", "no_drivable_lane");
@@ -240,93 +231,106 @@ void AutowareFeatureManagerPanel::onCheckNoDrivableLaneFeature(bool checked)
 
 // ***************** motion planner ************************
 
-void AutowareFeatureManagerPanel::onCheckPathSmoothingFeature(bool checked)
+void FeatureManager::onCheckPathSmoothing(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckObstacleCruiseFeature(bool checked)
+void FeatureManager::onCheckObstacleCruise(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckObstacleStopFeature(bool checked)
+void FeatureManager::onCheckObstacleStop(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckObstacleDecelFeature(bool checked)
+void FeatureManager::onCheckObstacleDecel(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckDecelOnCurveFeature(bool checked)
+void FeatureManager::onCheckDecelOnCurve(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckDecelOnCurveForObstaclesFeature(bool checked)
+void FeatureManager::onCheckDecelOnCurveForObstacles(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
-void AutowareFeatureManagerPanel::onCheckSurroundCheckFeature(bool checked)
+void FeatureManager::onCheckSurroundCheck(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
+}
+void FeatureManager::onCheckTrajectoryValidation(bool checked)
 {
   (void)checked;
   std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
 }
 
-void AutowareFeatureManagerPanel::onInitialize()
+// ***************** control ************************
+void FeatureManager::onCheckSlopeCompensation(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
+}
+void FeatureManager::onCheckSteerOffsetRemover(bool checked)
+{
+  (void)checked;
+  std::cerr << __func__ << ": NOT SUPPORTED YET" << std::endl;
+}
+
+void FeatureManager::onInitialize()
 {
   raw_node_ = this->getDisplayContext()->getRosNodeAbstraction().lock()->get_raw_node();
 
   const std::string behavior_velocity_ns =
     "/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/";
   behavior_velocity_load_client_ =
-    raw_node_->create_client<behavior_velocity_planner::srv::LoadPlugin>(
-      behavior_velocity_ns + "service/load_plugin");
+    raw_node_->create_client<LoadPlugin>(behavior_velocity_ns + "service/load_plugin");
   behavior_velocity_unload_client_ =
-    raw_node_->create_client<behavior_velocity_planner::srv::UnloadPlugin>(
-      behavior_velocity_ns + "service/unload_plugin");
+    raw_node_->create_client<UnloadPlugin>(behavior_velocity_ns + "service/unload_plugin");
 }
 
-void AutowareFeatureManagerPanel::save(rviz_common::Config config) const
+void FeatureManager::save(rviz_common::Config config) const
 {
   Panel::save(config);
 }
 
-void AutowareFeatureManagerPanel::load(const rviz_common::Config & config)
+void FeatureManager::load(const rviz_common::Config & config)
 {
   Panel::load(config);
 }
 
-void AutowareFeatureManagerPanel::loadOrUnloadBehaviorVelocityModule(
+void FeatureManager::loadOrUnloadBehaviorVelocityModule(
   const bool load, const std::string & load_name, const std::string & unload_name)
 {
   if (load) {
-    const auto callback =
-      [&](rclcpp::Client<behavior_velocity_planner::srv::LoadPlugin>::SharedFuture future) {
-        if (!future.get()->success) {
-          std::cerr << load_name << ": load failed" << std::endl;
-        }
-      };
-    const auto req = std::make_shared<behavior_velocity_planner::srv::LoadPlugin::Request>();
+    const auto callback = [&](rclcpp::Client<LoadPlugin>::SharedFuture future) {
+      if (!future.get()->success) {
+        std::cerr << load_name << ": load failed" << std::endl;
+      }
+    };
+    const auto req = std::make_shared<LoadPlugin::Request>();
     req->plugin_name = load_name;
     behavior_velocity_load_client_->async_send_request(req, callback);
   } else {
-    const auto callback =
-      [&](rclcpp::Client<behavior_velocity_planner::srv::UnloadPlugin>::SharedFuture future) {
-        if (!future.get()->success) {
-          std::cerr << unload_name << ": unload failed\n\n" << std::endl;
-        }
-      };
-    const auto req = std::make_shared<behavior_velocity_planner::srv::UnloadPlugin::Request>();
+    const auto callback = [&](rclcpp::Client<UnloadPlugin>::SharedFuture future) {
+      if (!future.get()->success) {
+        std::cerr << unload_name << ": unload failed\n\n" << std::endl;
+      }
+    };
+    const auto req = std::make_shared<UnloadPlugin::Request>();
     req->plugin_name = unload_name;
     behavior_velocity_unload_client_->async_send_request(req, callback);
   }
 }
 
-AutowareFeatureManagerPanel::~AutowareFeatureManagerPanel() = default;
+FeatureManager::~FeatureManager() = default;
 
 #include <pluginlib/class_list_macros.hpp>
-PLUGINLIB_EXPORT_CLASS(AutowareFeatureManagerPanel, rviz_common::Panel)
+PLUGINLIB_EXPORT_CLASS(FeatureManager, rviz_common::Panel)
