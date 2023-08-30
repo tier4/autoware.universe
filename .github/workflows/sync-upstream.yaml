@@ -38,4 +38,3 @@ jobs:
           sync-target-repository: https://github.com/autowarefoundation/autoware.universe.git
           sync-target-branch: main
           pr-title: "chore: sync upstream"
-          auto-merge-method: merge
