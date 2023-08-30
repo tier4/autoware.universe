@@ -26,6 +26,7 @@
   <depend>interpolation</depend>
   <depend>lanelet2_extension</depend>
   <depend>libopencv-dev</depend>
+  <depend>magic_enum</depend>
   <depend>motion_utils</depend>
   <depend>nav_msgs</depend>
   <depend>pluginlib</depend>
