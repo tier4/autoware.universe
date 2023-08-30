@@ -556,6 +556,9 @@ void GoalPlannerModule::generateGoalCandidates()
 
 BehaviorModuleOutput GoalPlannerModule::plan()
 {
+  resetPathCandidate();
+  resetPathReference();
+
   generateGoalCandidates();
 
   path_reference_ = getPreviousModuleOutput().reference_path;
