@@ -125,11 +125,8 @@ bool checkStuckVehicleInIntersection(
   const Polygon2d & stuck_vehicle_detect_area, const double stuck_vehicle_vel_thr,
   DebugData * debug_data);
 
-bool checkYieldStuckVehicleInIntersection(
-  const autoware_auto_perception_msgs::msg::PredictedObjects::ConstSharedPtr objects_ptr,
-  const lanelet::BasicPolygon2d & ego_poly, const lanelet::CompoundPolygon3d & first_attention_area,
-  const double stuck_vehicle_vel_thr, const double yield_stuck_distance_thr,
-  DebugData * debug_data);
+Polygon2d generateStuckVehicleDetectAreaPolygon(
+  const util::PathLanelets & path_lanelets, const double stuck_vehicle_detect_dist);
 
 Polygon2d generateStuckVehicleDetectAreaPolygon(
   const util::PathLanelets & path_lanelets, const double stuck_vehicle_detect_dist);
@@ -158,9 +155,7 @@ std::optional<PathLanelets> generatePathLanelets(
   const lanelet::ConstLanelets & lanelets_on_path,
   const util::InterpolatedPathInfo & interpolated_path_info, const std::set<int> & associative_ids,
   const lanelet::CompoundPolygon3d & first_conflicting_area,
-  const std::vector<lanelet::CompoundPolygon3d> & conflicting_areas,
-  const std::optional<lanelet::CompoundPolygon3d> & first_attention_area,
-  const std::vector<lanelet::CompoundPolygon3d> & attention_areas, const size_t closest_idx,
+  const std::vector<lanelet::CompoundPolygon3d> & conflicting_areas, const size_t closest_idx,
   const double width);
 
 }  // namespace util

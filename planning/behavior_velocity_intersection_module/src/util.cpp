@@ -450,10 +450,6 @@ std::optional<size_t> getFirstPointInsidePolygon(
   // NOTE: if first point is already inside the polygon, returns nullopt
   const auto polygon_2d = lanelet::utils::to2D(polygon);
   if (search_forward) {
-    const auto & p0 = path.points.at(lane_interval.first).point.pose.position;
-    if (bg::within(to_bg2d(p0), polygon_2d)) {
-      return std::nullopt;
-    }
     for (size_t i = lane_interval.first; i <= lane_interval.second; ++i) {
       const auto & p = path.points.at(i).point.pose.position;
       const auto is_in_lanelet = bg::within(to_bg2d(p), polygon_2d);
@@ -462,18 +458,11 @@ std::optional<size_t> getFirstPointInsidePolygon(
       }
     }
   } else {
-    const auto & p0 = path.points.at(lane_interval.second).point.pose.position;
-    if (bg::within(to_bg2d(p0), polygon_2d)) {
-      return std::nullopt;
-    }
     for (size_t i = lane_interval.second; i >= lane_interval.first; --i) {
       const auto & p = path.points.at(i).point.pose.position;
       const auto is_in_lanelet = bg::within(to_bg2d(p), polygon_2d);
       if (is_in_lanelet) {
         return std::make_optional<size_t>(i);
-      }
-      if (i == 0) {
-        break;
       }
     }
   }
@@ -515,9 +504,6 @@ getFirstPointInsidePolygons(
         }
       }
       if (is_in_lanelet) {
-        break;
-      }
-      if (i == 0) {
         break;
       }
     }
@@ -1416,9 +1402,7 @@ std::optional<PathLanelets> generatePathLanelets(
   const lanelet::ConstLanelets & lanelets_on_path,
   const util::InterpolatedPathInfo & interpolated_path_info, const std::set<int> & associative_ids,
   const lanelet::CompoundPolygon3d & first_conflicting_area,
-  const std::vector<lanelet::CompoundPolygon3d> & conflicting_areas,
-  const std::optional<lanelet::CompoundPolygon3d> & first_attention_area,
-  const std::vector<lanelet::CompoundPolygon3d> & attention_areas, const size_t closest_idx,
+  const std::vector<lanelet::CompoundPolygon3d> & conflicting_areas, const size_t closest_idx,
   const double width)
 {
   const auto & assigned_lane_interval_opt = interpolated_path_info.lane_id_interval;
@@ -1458,13 +1442,9 @@ std::optional<PathLanelets> generatePathLanelets(
   }
 
   const auto first_inside_conflicting_idx_opt =
-    first_attention_area.has_value()
-      ? getFirstPointInsidePolygon(path, assigned_lane_interval, first_attention_area.value())
-      : getFirstPointInsidePolygon(path, assigned_lane_interval, first_conflicting_area);
+    getFirstPointInsidePolygon(path, assigned_lane_interval, first_conflicting_area);
   const auto last_inside_conflicting_idx_opt =
-    first_attention_area.has_value()
-      ? getFirstPointInsidePolygons(path, assigned_lane_interval, attention_areas, false)
-      : getFirstPointInsidePolygons(path, assigned_lane_interval, conflicting_areas, false);
+    getFirstPointInsidePolygons(path, assigned_lane_interval, conflicting_areas, false);
   if (first_inside_conflicting_idx_opt && last_inside_conflicting_idx_opt) {
     const auto first_inside_conflicting_idx = first_inside_conflicting_idx_opt.value();
     const auto last_inside_conflicting_idx = last_inside_conflicting_idx_opt.value().first;

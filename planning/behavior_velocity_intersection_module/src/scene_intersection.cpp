@@ -988,35 +988,17 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
      first_attention_stop_line_idx_opt, occlusion_peeking_stop_line_idx_opt, pass_judge_line_idx] =
       intersection_stop_lines;
 
-  // see the doc for struct PathLanelets
-  const auto & conflicting_area = intersection_lanelets.conflicting_area();
+  const auto & conflicting_area = intersection_lanelets_.value().conflicting_area();
   const auto path_lanelets_opt = util::generatePathLanelets(
-    lanelets_on_path, interpolated_path_info, associative_ids_, first_conflicting_area,
-    conflicting_area, first_attention_area_opt, intersection_lanelets.attention_area(), closest_idx,
-    planner_data_->vehicle_info_.vehicle_width_m);
+    lanelets_on_path, interpolated_path_info, associative_ids_, first_conflicting_area.value(),
+    conflicting_area, closest_idx, planner_data_->vehicle_info_.vehicle_width_m);
   if (!path_lanelets_opt.has_value()) {
     return IntersectionModule::Indecisive{"failed to generate PathLanelets"};
   }
   const auto path_lanelets = path_lanelets_opt.value();
 
-  // utility functions
-  auto fromEgoDist = [&](const size_t index) {
-    return motion_utils::calcSignedArcLength(path->points, closest_idx, index);
-  };
-  auto stoppedForDuration =
-    [&](const size_t pos, const double duration, StateMachine & state_machine) {
-      const double dist_stopline = fromEgoDist(pos);
-      const bool approached_dist_stopline =
-        (std::fabs(dist_stopline) < planner_param_.common.stop_overshoot_margin);
-      const bool over_stopline = (dist_stopline < 0.0);
-      const bool is_stopped_duration = planner_data_->isVehicleStopped(duration);
-      if (over_stopline) {
-        state_machine.setState(StateMachine::State::GO);
-      } else if (is_stopped_duration && approached_dist_stopline) {
-        state_machine.setState(StateMachine::State::GO);
-      }
-      return state_machine.getState() == StateMachine::State::GO;
-    };
+  const bool stuck_detected = checkStuckVehicle(
+    planner_data_, path_lanelets, interpolated_path_info, intersection_stop_lines);
 
   // stuck vehicle detection is viable even if attention area is empty
   // so this needs to be checked before attention area validation
@@ -1274,7 +1256,9 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
 }
 
 bool IntersectionModule::checkStuckVehicle(
-  const std::shared_ptr<const PlannerData> & planner_data, const util::PathLanelets & path_lanelets)
+  const std::shared_ptr<const PlannerData> & planner_data, const util::PathLanelets & path_lanelets,
+  const util::InterpolatedPathInfo & interpolated_path_info,
+  const util::IntersectionStopLines & intersection_stop_lines)
 {
   const bool stuck_detection_direction = [&]() {
     return (turn_direction_ == "left" && planner_param_.stuck_vehicle.turn_direction.left) ||
@@ -1288,13 +1272,25 @@ bool IntersectionModule::checkStuckVehicle(
   const auto & objects_ptr = planner_data->predicted_objects;
 
   // considering lane change in the intersection, these lanelets are generated from the path
+  const auto & path = interpolated_path_info.path;
   const auto stuck_vehicle_detect_area = util::generateStuckVehicleDetectAreaPolygon(
     path_lanelets, planner_param_.stuck_vehicle.stuck_vehicle_detect_dist);
   debug_data_.stuck_vehicle_detect_area = toGeomPoly(stuck_vehicle_detect_area);
 
-  return util::checkStuckVehicleInIntersection(
-    objects_ptr, stuck_vehicle_detect_area, planner_param_.stuck_vehicle.stuck_vehicle_vel_thr,
-    &debug_data_);
+  const double dist_stuck_stopline = motion_utils::calcSignedArcLength(
+    path.points, path.points.at(stuck_line_idx).point.pose.position,
+    path.points.at(closest_idx).point.pose.position);
+  const bool is_over_stuck_stopline =
+    util::isOverTargetIndex(path, closest_idx, current_pose, stuck_line_idx) &&
+    (dist_stuck_stopline > planner_param_.common.stop_overshoot_margin);
+
+  bool is_stuck = false;
+  if (!is_over_stuck_stopline) {
+    is_stuck = util::checkStuckVehicleInIntersection(
+      objects_ptr, stuck_vehicle_detect_area, planner_param_.stuck_vehicle.stuck_vehicle_vel_thr,
+      &debug_data_);
+  }
+  return is_stuck;
 }
 
 bool IntersectionModule::checkYieldStuckVehicle(
@@ -1433,6 +1429,10 @@ bool IntersectionModule::checkCollision(
     concat_lanelets, tier4_autoware_utils::getPose(path.points.at(closest_idx).point));
   const auto & ego_lane = path_lanelets.ego_or_entry2exit;
   debug_data_.ego_lane = ego_lane.polygon3d();
+<<<<<<< HEAD
+=======
+
+>>>>>>> 14deed5b2d (feat(intersection): strict definition of stuck vehicle detection area (#4782))
   const auto ego_poly = ego_lane.polygon2d().basicPolygon();
 
   // change TTC margin based on ego traffic light color

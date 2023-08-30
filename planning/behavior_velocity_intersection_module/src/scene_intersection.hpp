@@ -303,7 +303,9 @@ private:
 
   bool checkStuckVehicle(
     const std::shared_ptr<const PlannerData> & planner_data,
-    const util::PathLanelets & path_lanelets);
+    const util::PathLanelets & path_lanelets,
+    const util::InterpolatedPathInfo & interpolated_path_info,
+    const util::IntersectionStopLines & intersection_stop_lines);
 
   bool checkYieldStuckVehicle(
     const std::shared_ptr<const PlannerData> & planner_data,
