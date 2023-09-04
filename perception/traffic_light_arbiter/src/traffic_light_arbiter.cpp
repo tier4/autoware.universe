@@ -49,7 +49,7 @@ TrafficLightArbiter::TrafficLightArbiter(const rclcpp::NodeOptions & options)
 {
   external_time_tolerance_ = this->declare_parameter<double>("external_time_tolerance", 5.0);
   perception_time_tolerance_ = this->declare_parameter<double>("perception_time_tolerance", 1.0);
-  external_priority_ = this->declare_parameter<bool>("external_priority", false);
+  external_priority_ = this->declare_parameter<bool>("external_priority", true);
 
   map_sub_ = create_subscription<LaneletMapBin>(
     "~/sub/vector_map", rclcpp::QoS(1).transient_local(),
