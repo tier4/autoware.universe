@@ -40,7 +40,7 @@
   <arg name="trust_distance" default="30.0"/>
 
   <!-- Jetson AGX -->
-  <!-- <include file="$(find-pkg-share tensorrt_yolo)/launch/yolo.launch.xml">
+  <include file="$(find-pkg-share tensorrt_yolo)/launch/yolo.launch.xml">
     <arg name="image_raw0" value="$(var image_raw0)"/>
     <arg name="image_raw1" value="$(var image_raw1)"/>
     <arg name="image_raw2" value="$(var image_raw2)"/>
@@ -50,7 +50,7 @@
     <arg name="image_raw6" value="$(var image_raw6)"/>
     <arg name="image_raw7" value="$(var image_raw7)"/>
     <arg name="image_number" value="$(var image_number)"/>
-  </include> -->
+  </include>
 
   <!-- Pointcloud map filter -->
   <group>
