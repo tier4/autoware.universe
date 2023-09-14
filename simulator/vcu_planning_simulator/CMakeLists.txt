@@ -19,7 +19,7 @@ target_compile_options(${PROJECT_NAME} PRIVATE -Wno-old-style-cast) # RCLCPP_ERR
 
 # Node executable
 rclcpp_components_register_node(${PROJECT_NAME}
-  PLUGIN "simulation::vcu_planning_simulator::SimplePlanningSimulator"
+  PLUGIN "simulation::vcu_planning_simulator::VcuPlanningSimulator"
   EXECUTABLE ${PROJECT_NAME}_exe
 )
 
@@ -34,4 +34,4 @@ if(BUILD_TESTING)
   )
 endif()
 
-ament_auto_package(INSTALL_TO_SHARE param launch)
+ament_auto_package(INSTALL_TO_SHARE param launch config)

@@ -57,6 +57,8 @@ def launch_setup(context, *args, **kwargs):
             ("input/manual_ackermann_control_command", "/vehicle/command/manual_control_cmd"),
             ("input/gear_report", "/vehicle/status/gear_status"),
             ("input/manual_gear_command", "/vehicle/command/manual_gear_command"),
+            ("input/steer_report", "/vehicle/status/steering_status"),
+            ("Input/velocity_report", "/vehicle/status/velocity_status"),
             ("input/trajectory", "/planning/scenario_planning/trajectory"),
             ("input/engage", "/vehicle/engage"),
             ("input/control_mode_request", "/control/control_mode_request"),
