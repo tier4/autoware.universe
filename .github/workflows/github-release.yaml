@@ -50,7 +50,7 @@ jobs:
 
       - name: Run generate-changelog
         id: generate-changelog
-        uses: autowarefoundation/autoware-github-actions/generate-changelog@v1
+        uses: autowarefoundation/autoware-github-actions/generate-changelog@v2
 
       - name: Select verb
         id: select-verb
