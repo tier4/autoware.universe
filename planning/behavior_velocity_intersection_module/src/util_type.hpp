@@ -71,25 +71,25 @@ struct IntersectionLanelets
 {
 public:
   void update(
-    const bool tl_arrow_solid_on, const InterpolatedPathInfo & interpolated_path_info,
+    const bool is_prioritized, const InterpolatedPathInfo & interpolated_path_info,
     const tier4_autoware_utils::LinearRing2d & footprint);
   const lanelet::ConstLanelets & attention() const
   {
-    return tl_arrow_solid_on_ ? attention_non_preceding_ : attention_;
+    return is_prioritized_ ? attention_non_preceding_ : attention_;
   }
   const std::vector<std::optional<lanelet::ConstLineString3d>> & attention_stop_lines() const
   {
-    return tl_arrow_solid_on_ ? attention_non_preceding_stop_lines_ : attention_stop_lines_;
+    return is_prioritized_ ? attention_non_preceding_stop_lines_ : attention_stop_lines_;
   }
   const lanelet::ConstLanelets & conflicting() const { return conflicting_; }
   const lanelet::ConstLanelets & adjacent() const { return adjacent_; }
   const lanelet::ConstLanelets & occlusion_attention() const
   {
-    return tl_arrow_solid_on_ ? attention_non_preceding_ : occlusion_attention_;
+    return is_prioritized_ ? attention_non_preceding_ : occlusion_attention_;
   }
   const std::vector<lanelet::CompoundPolygon3d> & attention_area() const
   {
-    return tl_arrow_solid_on_ ? attention_non_preceding_area_ : attention_area_;
+    return is_prioritized_ ? attention_non_preceding_area_ : attention_area_;
   }
   const std::vector<lanelet::CompoundPolygon3d> & conflicting_area() const
   {
@@ -141,7 +141,7 @@ public:
   std::optional<lanelet::CompoundPolygon3d> first_conflicting_area_{std::nullopt};
   std::optional<lanelet::ConstLanelet> first_attention_lane_{std::nullopt};
   std::optional<lanelet::CompoundPolygon3d> first_attention_area_{std::nullopt};
-  bool tl_arrow_solid_on_ = false;
+  bool is_prioritized_ = false;
 };
 
 struct IntersectionStopLines
@@ -191,6 +191,15 @@ struct TargetObjects
   std::vector<TargetObject> parked_attention_objects;
   std::vector<TargetObject> intersection_area_objects;
   std::vector<TargetObject> all_attention_objects;  // TODO(Mamoru Sobue): avoid copy
+};
+
+enum class TrafficPrioritizedLevel {
+  // The target lane's traffic signal is red or the ego's traffic signal has an arrow.
+  FULLY_PRIORITIZED = 0,
+  // The target lane's traffic signal is amber
+  PARTIALLY_PRIORITIZED,
+  // The target lane's traffic signal is green
+  NOT_PRIORITIZED
 };
 }  // namespace behavior_velocity_planner::util
 
