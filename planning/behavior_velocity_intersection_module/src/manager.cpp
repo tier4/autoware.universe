@@ -100,6 +100,10 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
     ns + ".collision_detection.not_prioritized.collision_end_margin_time");
   ip.collision_detection.keep_detection_vel_thr =
     node.declare_parameter<double>(ns + ".collision_detection.keep_detection_vel_thr");
+  ip.collision_detection.use_upstream_velocity =
+    node.declare_parameter<bool>(ns + ".collision_detection.use_upstream_velocity");
+  ip.collision_detection.minimum_upstream_velocity =
+    node.declare_parameter<double>(ns + ".collision_detection.minimum_upstream_velocity");
 
   ip.occlusion.enable = node.declare_parameter<bool>(ns + ".occlusion.enable");
   ip.occlusion.occlusion_attention_area_length =
