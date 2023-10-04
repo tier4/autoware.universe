@@ -70,14 +70,11 @@ private:
 
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr sub_joy_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_odom_;
 
   rclcpp::Time last_joy_received_time_;
   std::shared_ptr<const JoyConverterBase> joy_;
-  geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_;
 
   void onJoy(const sensor_msgs::msg::Joy::ConstSharedPtr msg);
-  void onOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
 
   // Publisher
   rclcpp::Publisher<autoware_auto_control_msgs::msg::AckermannControlCommand>::SharedPtr
@@ -90,7 +87,6 @@ private:
   rclcpp::Publisher<tier4_control_msgs::msg::GateMode>::SharedPtr pub_gate_mode_;
   rclcpp::Publisher<autoware_auto_vehicle_msgs::msg::Engage>::SharedPtr pub_vehicle_engage_;
 
-  void publishControlCommand();
   void publishExternalControlCommand();
   void publishShift();
   void publishTurnSignal();

@@ -187,15 +187,6 @@ void AutowareJoyControllerNode::onJoy(const sensor_msgs::msg::Joy::ConstSharedPt
   }
 }
 
-void AutowareJoyControllerNode::onOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
-{
-  auto twist = std::make_shared<geometry_msgs::msg::TwistStamped>();
-  twist->header = msg->header;
-  twist->twist = msg->twist.twist;
-
-  twist_ = twist;
-}
-
 bool AutowareJoyControllerNode::isDataReady()
 {
   // Joy
@@ -216,25 +207,6 @@ bool AutowareJoyControllerNode::isDataReady()
     }
   }
 
-  // Twist
-  {
-    if (!twist_) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), std::chrono::milliseconds(5000).count(),
-        "waiting for twist msg...");
-      return false;
-    }
-
-    constexpr auto timeout = 0.5;
-    const auto time_diff = this->now() - twist_->header.stamp;
-    if (time_diff.seconds() > timeout) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), std::chrono::milliseconds(5000).count(),
-        "twist msg is timeout");
-      return false;
-    }
-  }
-
   return true;
 }
 
@@ -244,44 +216,8 @@ void AutowareJoyControllerNode::onTimer()
     return;
   }
 
-  publishControlCommand();
   publishExternalControlCommand();
   publishHeartbeat();
-}
-
-void AutowareJoyControllerNode::publishControlCommand()
-{
-  autoware_auto_control_msgs::msg::AckermannControlCommand cmd;
-  cmd.stamp = this->now();
-  {
-    cmd.lateral.steering_tire_angle = steer_ratio_ * joy_->steer();
-    cmd.lateral.steering_tire_rotation_rate = steering_angle_velocity_;
-
-    if (joy_->accel()) {
-      cmd.longitudinal.acceleration = accel_ratio_ * joy_->accel();
-      cmd.longitudinal.speed =
-        twist_->twist.linear.x + velocity_gain_ * cmd.longitudinal.acceleration;
-      cmd.longitudinal.speed =
-        std::min(cmd.longitudinal.speed, static_cast<float>(max_forward_velocity_));
-    }
-
-    if (joy_->brake()) {
-      cmd.longitudinal.speed = 0.0;
-      cmd.longitudinal.acceleration = -brake_ratio_ * joy_->brake();
-    }
-
-    // Backward
-    if (joy_->accel() && joy_->brake()) {
-      cmd.longitudinal.acceleration = backward_accel_ratio_ * joy_->accel();
-      cmd.longitudinal.speed =
-        twist_->twist.linear.x - velocity_gain_ * cmd.longitudinal.acceleration;
-      cmd.longitudinal.speed =
-        std::max(cmd.longitudinal.speed, static_cast<float>(-max_backward_velocity_));
-    }
-  }
-
-  pub_control_command_->publish(cmd);
-  prev_control_command_ = cmd;
 }
 
 void AutowareJoyControllerNode::publishExternalControlCommand()
@@ -292,7 +228,8 @@ void AutowareJoyControllerNode::publishExternalControlCommand()
     auto & cmd = cmd_stamped.control;
 
     cmd.steering_angle = steer_ratio_ * joy_->steer();
-    cmd.steering_angle_velocity = steering_angle_velocity_;
+    cmd.steering_angle_velocity =
+      (cmd.steering_angle - prev_external_control_command_.steering_angle) / update_rate_;
     cmd.throttle =
       accel_ratio_ * calcMapping(static_cast<double>(joy_->accel()), accel_sensitivity_);
     cmd.brake = brake_ratio_ * calcMapping(static_cast<double>(joy_->brake()), brake_sensitivity_);
@@ -476,10 +413,6 @@ AutowareJoyControllerNode::AutowareJoyControllerNode(const rclcpp::NodeOptions &
   // Subscriber
   sub_joy_ = this->create_subscription<sensor_msgs::msg::Joy>(
     "input/joy", 1, std::bind(&AutowareJoyControllerNode::onJoy, this, std::placeholders::_1),
-    subscriber_option);
-  sub_odom_ = this->create_subscription<nav_msgs::msg::Odometry>(
-    "input/odometry", 1,
-    std::bind(&AutowareJoyControllerNode::onOdometry, this, std::placeholders::_1),
     subscriber_option);
 
   // Publisher
