@@ -168,7 +168,7 @@
           <arg name="container_name" value="$(var pointcloud_container_name)"/>
           <arg name="remove_unknown" value="$(var remove_unknown)"/>
           <arg name="trust_distance" value="$(var trust_distance)"/>
-          <arg name="use_roi_based_cluster" value="$(var use_roi_based_cluster)"/>
+	  <arg name="use_roi_based_cluster" value="$(var use_roi_based_cluster)"/>
         </include>
       </group>
 
