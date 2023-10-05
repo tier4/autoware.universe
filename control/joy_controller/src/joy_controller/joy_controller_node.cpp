@@ -360,19 +360,27 @@ void AutowareJoyControllerNode::publishAutowareEngage()
 
 void AutowareJoyControllerNode::publishVehicleEngage()
 {
-  autoware_auto_vehicle_msgs::msg::Engage engage;
+  const auto request =
+    std::make_shared<autoware_auto_vehicle_msgs::srv::ControlModeCommand::Request>();
+  const auto callback =
+    [this](
+      rclcpp::Client<autoware_auto_vehicle_msgs::srv::ControlModeCommand>::SharedFuture future) {
+      if (!future.get()->success) {
+        RCLCPP_WARN(get_logger(), "Autonomous mode change was rejected.");
+      }
+    };
 
   if (joy_->vehicle_engage()) {
-    engage.engage = true;
+    request->mode = autoware_auto_vehicle_msgs::srv::ControlModeCommand::Request::AUTONOMOUS;
     RCLCPP_INFO(get_logger(), "Vehicle Engage");
   }
 
   if (joy_->vehicle_disengage()) {
-    engage.engage = false;
+    request->mode = autoware_auto_vehicle_msgs::srv::ControlModeCommand::Request::MANUAL;
     RCLCPP_INFO(get_logger(), "Vehicle Disengage");
   }
 
-  pub_vehicle_engage_->publish(engage);
+  cli_vehicle_engage_->async_send_request(request, callback);
 }
 
 void AutowareJoyControllerNode::initTimer(double period_s)
@@ -429,8 +437,8 @@ AutowareJoyControllerNode::AutowareJoyControllerNode(const rclcpp::NodeOptions &
   pub_gate_mode_ = this->create_publisher<tier4_control_msgs::msg::GateMode>("output/gate_mode", 1);
   pub_heartbeat_ =
     this->create_publisher<tier4_external_api_msgs::msg::Heartbeat>("output/heartbeat", 1);
-  pub_vehicle_engage_ =
-    this->create_publisher<autoware_auto_vehicle_msgs::msg::Engage>("output/vehicle_engage", 1);
+  cli_vehicle_engage_ = this->create_client<autoware_auto_vehicle_msgs::srv::ControlModeCommand>(
+    "output/vehicle_engage");
 
   // Service Client
   client_emergency_stop_ = this->create_client<tier4_external_api_msgs::srv::SetEmergency>(

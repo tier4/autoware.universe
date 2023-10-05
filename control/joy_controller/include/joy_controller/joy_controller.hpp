@@ -21,6 +21,7 @@
 
 #include <autoware_auto_control_msgs/msg/ackermann_control_command.hpp>
 #include <autoware_auto_vehicle_msgs/msg/engage.hpp>
+#include <autoware_auto_vehicle_msgs/srv/control_mode_command.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -85,7 +86,8 @@ private:
   rclcpp::Publisher<tier4_external_api_msgs::msg::TurnSignalStamped>::SharedPtr pub_turn_signal_;
   rclcpp::Publisher<tier4_external_api_msgs::msg::Heartbeat>::SharedPtr pub_heartbeat_;
   rclcpp::Publisher<tier4_control_msgs::msg::GateMode>::SharedPtr pub_gate_mode_;
-  rclcpp::Publisher<autoware_auto_vehicle_msgs::msg::Engage>::SharedPtr pub_vehicle_engage_;
+  rclcpp::Client<autoware_auto_vehicle_msgs::srv::ControlModeCommand>::SharedPtr
+    cli_vehicle_engage_;
 
   void publishExternalControlCommand();
   void publishShift();

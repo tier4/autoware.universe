@@ -40,7 +40,7 @@ EmergencyHandler::EmergencyHandler() : Node("emergency_handler")
     create_subscription<autoware_auto_control_msgs::msg::AckermannControlCommand>(
       "~/input/prev_control_command", rclcpp::QoS{1},
       std::bind(&EmergencyHandler::onPrevControlCommand, this, _1));
-  sub_odom_ = create_subscription<nav_msgs::msg::Odometry>(
+  sub_odom_ = create_subscription<autoware_auto_vehicle_msgs::msg::VelocityReport>(
     "~/input/odometry", rclcpp::QoS{1}, std::bind(&EmergencyHandler::onOdometry, this, _1));
   // subscribe control mode
   sub_control_mode_ = create_subscription<autoware_auto_vehicle_msgs::msg::ControlModeReport>(
@@ -75,7 +75,7 @@ EmergencyHandler::EmergencyHandler() : Node("emergency_handler")
     client_mrm_emergency_stop_group_);
 
   // Initialize
-  odom_ = std::make_shared<const nav_msgs::msg::Odometry>();
+  odom_ = std::make_shared<const autoware_auto_vehicle_msgs::msg::VelocityReport>();
   control_mode_ = std::make_shared<const autoware_auto_vehicle_msgs::msg::ControlModeReport>();
   prev_control_command_ = autoware_auto_control_msgs::msg::AckermannControlCommand::ConstSharedPtr(
     new autoware_auto_control_msgs::msg::AckermannControlCommand);
@@ -108,7 +108,8 @@ void EmergencyHandler::onPrevControlCommand(
     autoware_auto_control_msgs::msg::AckermannControlCommand::ConstSharedPtr(control_command);
 }
 
-void EmergencyHandler::onOdometry(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
+void EmergencyHandler::onOdometry(
+  const autoware_auto_vehicle_msgs::msg::VelocityReport::ConstSharedPtr msg)
 {
   odom_ = msg;
 }
@@ -464,7 +465,7 @@ bool EmergencyHandler::isEmergency(
 bool EmergencyHandler::isStopped()
 {
   constexpr auto th_stopped_velocity = 0.001;
-  if (odom_->twist.twist.linear.x < th_stopped_velocity) {
+  if (odom_->longitudinal_velocity < th_stopped_velocity) {
     return true;
   }
 

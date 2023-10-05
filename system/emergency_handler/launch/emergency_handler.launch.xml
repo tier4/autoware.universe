@@ -2,7 +2,7 @@
   <arg name="input_hazard_status" default="/system/emergency/hazard_status"/>
   <!-- To be replaced by ControlCommand -->
   <arg name="input_prev_control_command" default="/control/command/control_cmd"/>
-  <arg name="input_odometry" default="/localization/kinematic_state"/>
+  <arg name="input_odometry" default="/vehicle/status/velocity_status"/>
   <arg name="input_control_mode" default="/vehicle/status/control_mode"/>
   <arg name="input_mrm_comfortable_stop_state" default="/system/mrm/comfortable_stop/status"/>
   <arg name="input_mrm_emergency_stop_state" default="/system/mrm/emergency_stop/status"/>

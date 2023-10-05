@@ -86,7 +86,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "in/odometry",
-            default_value="/localization/kinematic_state",
+            default_value="/vehicle/status/velocity_status",
         ),
         # output
         DeclareLaunchArgument(

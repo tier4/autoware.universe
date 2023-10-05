@@ -15,7 +15,7 @@
   <arg name="in/shift_cmd" default="/external/selected/gear_cmd"/>
   <arg name="in/emergency_stop" default="/external/selected/heartbeat"/>
   <arg name="in/current_gate_mode" default="/control/current_gate_mode"/>
-  <arg name="in/odometry" default="/localization/kinematic_state"/>
+  <arg name="in/odometry" default="/vehicle/status/velocity_status"/>
 
   <!-- output -->
   <arg name="out/control_cmd" default="/external/selected/control_cmd"/>

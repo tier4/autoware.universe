@@ -29,7 +29,7 @@ ExternalCmdConverterNode::ExternalCmdConverterNode(const rclcpp::NodeOptions & n
   pub_cmd_ = create_publisher<AckermannControlCommand>("out/control_cmd", rclcpp::QoS{1});
   pub_current_cmd_ =
     create_publisher<ExternalControlCommand>("out/latest_external_control_cmd", rclcpp::QoS{1});
-  sub_velocity_ = create_subscription<Odometry>(
+  sub_velocity_ = create_subscription<VelocityReport>(
     "in/odometry", 1, std::bind(&ExternalCmdConverterNode::onVelocity, this, _1));
   sub_control_cmd_ = create_subscription<ExternalControlCommand>(
     "in/external_control_cmd", 1, std::bind(&ExternalCmdConverterNode::onExternalCmd, this, _1));
@@ -84,9 +84,9 @@ void ExternalCmdConverterNode::onTimer()
   updater_.force_update();
 }
 
-void ExternalCmdConverterNode::onVelocity(const Odometry::ConstSharedPtr msg)
+void ExternalCmdConverterNode::onVelocity(const VelocityReport::ConstSharedPtr msg)
 {
-  current_velocity_ptr_ = std::make_shared<double>(msg->twist.twist.linear.x);
+  current_velocity_ptr_ = std::make_shared<double>(static_cast<double>(msg->longitudinal_velocity));
 }
 
 void ExternalCmdConverterNode::onGearCommand(const GearCommand::ConstSharedPtr msg)

@@ -78,7 +78,7 @@ RawVehicleCommandConverterNode::RawVehicleCommandConverterNode(
   pub_actuation_cmd_ = create_publisher<ActuationCommandStamped>("~/output/actuation_cmd", 1);
   sub_control_cmd_ = create_subscription<AckermannControlCommand>(
     "~/input/control_cmd", 1, std::bind(&RawVehicleCommandConverterNode::onControlCmd, this, _1));
-  sub_velocity_ = create_subscription<Odometry>(
+  sub_velocity_ = create_subscription<VelocityReport>(
     "~/input/odometry", 1, std::bind(&RawVehicleCommandConverterNode::onVelocity, this, _1));
   sub_steering_ = create_subscription<Steering>(
     "~/input/steering", 1, std::bind(&RawVehicleCommandConverterNode::onSteering, this, _1));
@@ -100,7 +100,7 @@ void RawVehicleCommandConverterNode::publishActuationCmd()
   double desired_steer_cmd = 0.0;
   ActuationCommandStamped actuation_cmd;
   const double acc = control_cmd_ptr_->longitudinal.acceleration;
-  const double vel = current_twist_ptr_->twist.linear.x;
+  const double vel = *current_twist_ptr_;
   const double steer = control_cmd_ptr_->lateral.steering_tire_angle;
   const double steer_rate = control_cmd_ptr_->lateral.steering_tire_rotation_rate;
   bool accel_cmd_is_zero = true;
@@ -207,11 +207,9 @@ void RawVehicleCommandConverterNode::onSteering(const Steering::ConstSharedPtr m
   current_steer_ptr_ = std::make_unique<double>(msg->steering_tire_angle);
 }
 
-void RawVehicleCommandConverterNode::onVelocity(const Odometry::ConstSharedPtr msg)
+void RawVehicleCommandConverterNode::onVelocity(const VelocityReport::ConstSharedPtr msg)
 {
-  current_twist_ptr_ = std::make_unique<TwistStamped>();
-  current_twist_ptr_->header = msg->header;
-  current_twist_ptr_->twist = msg->twist.twist;
+  current_twist_ptr_ = std::make_unique<double>(static_cast<double>(msg->longitudinal_velocity));
 }
 
 void RawVehicleCommandConverterNode::onControlCmd(const AckermannControlCommand::ConstSharedPtr msg)

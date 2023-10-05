@@ -22,7 +22,7 @@
 
 #include <autoware_auto_control_msgs/msg/ackermann_control_command.hpp>
 #include <autoware_auto_vehicle_msgs/msg/gear_command.hpp>
-#include <nav_msgs/msg/odometry.hpp>
+#include <autoware_auto_vehicle_msgs/msg/velocity_report.hpp>
 #include <tier4_control_msgs/msg/gate_mode.hpp>
 #include <tier4_external_api_msgs/msg/control_command_stamped.hpp>
 #include <tier4_external_api_msgs/msg/heartbeat.hpp>
@@ -35,11 +35,10 @@ namespace external_cmd_converter
 using GearCommand = autoware_auto_vehicle_msgs::msg::GearCommand;
 using AckermannControlCommand = autoware_auto_control_msgs::msg::AckermannControlCommand;
 using ExternalControlCommand = tier4_external_api_msgs::msg::ControlCommandStamped;
-using Odometry = nav_msgs::msg::Odometry;
+using autoware_auto_vehicle_msgs::msg::VelocityReport;
 using raw_vehicle_cmd_converter::AccelMap;
 using raw_vehicle_cmd_converter::BrakeMap;
 using ControlCommandStamped = autoware_auto_control_msgs::msg::AckermannControlCommand;
-using Odometry = nav_msgs::msg::Odometry;
 
 class ExternalCmdConverterNode : public rclcpp::Node
 {
@@ -53,7 +52,7 @@ private:
     pub_current_cmd_;
 
   // Subscriber
-  rclcpp::Subscription<Odometry>::SharedPtr sub_velocity_;
+  rclcpp::Subscription<VelocityReport>::SharedPtr sub_velocity_;
   rclcpp::Subscription<tier4_external_api_msgs::msg::ControlCommandStamped>::SharedPtr
     sub_control_cmd_;
   rclcpp::Subscription<GearCommand>::SharedPtr sub_shift_cmd_;
@@ -61,7 +60,7 @@ private:
   rclcpp::Subscription<tier4_external_api_msgs::msg::Heartbeat>::SharedPtr
     sub_emergency_stop_heartbeat_;
 
-  void onVelocity(const Odometry::ConstSharedPtr msg);
+  void onVelocity(const VelocityReport::ConstSharedPtr msg);
   void onExternalCmd(const ExternalControlCommand::ConstSharedPtr cmd_ptr);
   void onGearCommand(const GearCommand::ConstSharedPtr msg);
   void onGateMode(const tier4_control_msgs::msg::GateMode::ConstSharedPtr msg);

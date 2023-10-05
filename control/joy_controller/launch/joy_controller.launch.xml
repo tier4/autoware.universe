@@ -11,7 +11,7 @@
   <arg name="output_turn_signal" default="/api/external/set/command/$(var external_cmd_source)/turn_signal"/>
   <arg name="output_heartbeat" default="/api/external/set/command/$(var external_cmd_source)/heartbeat"/>
   <arg name="output_gate_mode" default="/control/gate_mode_cmd"/>
-  <arg name="output_vehicle_engage" default="/vehicle/engage"/>
+  <arg name="output_vehicle_engage" default="/control/control_mode_request"/>
 
   <arg name="config_file" default="$(find-pkg-share joy_controller)/config/joy_controller.param.yaml"/>
 

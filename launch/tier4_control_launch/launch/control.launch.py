@@ -33,8 +33,8 @@ def launch_setup(context, *args, **kwargs):
     with open(LaunchConfiguration("vehicle_param_file").perform(context), "r") as f:
         vehicle_info_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
-    with open(LaunchConfiguration("nearest_search_param_path").perform(context), "r") as f:
-        nearest_search_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+    # with open(LaunchConfiguration("nearest_search_param_path").perform(context), "r") as f:
+    #     nearest_search_param = yaml.safe_load(f)["/**"]["ros__parameters"]
 
     # with open(
     #     LaunchConfiguration("trajectory_follower_node_param_path").perform(context), "r"
@@ -48,10 +48,10 @@ def launch_setup(context, *args, **kwargs):
         vehicle_cmd_gate_param = yaml.safe_load(f)["/**"]["ros__parameters"]
     # with open(LaunchConfiguration("lane_departure_checker_param_path").perform(context), "r") as f:
     #     lane_departure_checker_param = yaml.safe_load(f)["/**"]["ros__parameters"]
-    with open(
-        LaunchConfiguration("operation_mode_transition_manager_param_path").perform(context), "r"
-    ) as f:
-        operation_mode_transition_manager_param = yaml.safe_load(f)["/**"]["ros__parameters"]
+    # with open(
+    #     LaunchConfiguration("operation_mode_transition_manager_param_path").perform(context), "r"
+    # ) as f:
+    #     operation_mode_transition_manager_param = yaml.safe_load(f)["/**"]["ros__parameters"]
     # with open(LaunchConfiguration("shift_decider_param_path").perform(context), "r") as f:
     #     shift_decider_param = yaml.safe_load(f)["/**"]["ros__parameters"]
     # with open(
@@ -209,28 +209,28 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # operation mode transition manager
-    operation_mode_transition_manager_component = ComposableNode(
-        package="operation_mode_transition_manager",
-        plugin="operation_mode_transition_manager::OperationModeTransitionManager",
-        name="operation_mode_transition_manager",
-        remappings=[
-            # input
-            ("kinematics", "/localization/kinematic_state"),
-            ("steering", "/vehicle/status/steering_status"),
-            ("trajectory", "/planning/scenario_planning/trajectory"),
-            ("control_cmd", "/control/command/control_cmd"),
-            ("control_mode_report", "/vehicle/status/control_mode"),
-            ("gate_operation_mode", "/control/vehicle_cmd_gate/operation_mode"),
-            # output
-            ("is_autonomous_available", "/control/is_autonomous_available"),
-            ("control_mode_request", "/control/control_mode_request"),
-        ],
-        parameters=[
-            nearest_search_param,
-            operation_mode_transition_manager_param,
-            vehicle_info_param,
-        ],
-    )
+    # operation_mode_transition_manager_component = ComposableNode(
+    #     package="operation_mode_transition_manager",
+    #     plugin="operation_mode_transition_manager::OperationModeTransitionManager",
+    #     name="operation_mode_transition_manager",
+    #     remappings=[
+    #         # input
+    #         ("kinematics", "/localization/kinematic_state"),
+    #         ("steering", "/vehicle/status/steering_status"),
+    #         ("trajectory", "/planning/scenario_planning/trajectory"),
+    #         ("control_cmd", "/control/command/control_cmd"),
+    #         ("control_mode_report", "/vehicle/status/control_mode"),
+    #         ("gate_operation_mode", "/control/vehicle_cmd_gate/operation_mode"),
+    #         # output
+    #         ("is_autonomous_available", "/control/is_autonomous_available"),
+    #         ("control_mode_request", "/control/control_mode_request"),
+    #     ],
+    #     parameters=[
+    #         nearest_search_param,
+    #         operation_mode_transition_manager_param,
+    #         vehicle_info_param,
+    #     ],
+    # )
 
     # external cmd selector
     external_cmd_selector_loader = IncludeLaunchDescription(
@@ -303,7 +303,7 @@ def launch_setup(context, *args, **kwargs):
             # lane_departure_component,
             # shift_decider_component,
             vehicle_cmd_gate_component,
-            operation_mode_transition_manager_component,
+            # operation_mode_transition_manager_component,
             glog_component,
         ],
     )
