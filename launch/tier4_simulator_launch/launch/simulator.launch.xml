@@ -41,7 +41,6 @@
       <arg name="visible_range" value="$(var sensing/visible_range)"/>
     </include>
   </group>
-  <group unless="$(var scenario_simulation)">
 
   <!-- Dummy localization -->
   <group if="$(var launch_dummy_localization)">
