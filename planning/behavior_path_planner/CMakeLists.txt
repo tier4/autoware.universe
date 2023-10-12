@@ -75,10 +75,11 @@ else()
   )
 
   message(WARNING "Build behavior_path_planner with NEW framework...")
-if(tf2_geometry_msgs_VERSION VERSION_LESS 0.25.4)
-  target_compile_definitions(behavior_path_planner_node PRIVATE
-    DEFINE_LEGACY_FUNCTION
-  )
+  if(tf2_geometry_msgs_VERSION VERSION_LESS 0.25.4)
+    target_compile_definitions(behavior_path_planner_node PRIVATE
+      DEFINE_LEGACY_FUNCTION
+    )
+  endif()
 endif()
 
 target_include_directories(behavior_path_planner_node SYSTEM PUBLIC
