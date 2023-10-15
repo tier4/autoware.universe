@@ -1012,15 +1012,16 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
   // get intersection area
   const auto intersection_area = util::getIntersectionArea(assigned_lanelet, lanelet_map_ptr);
 
-  // calculate dynamic collision around detection area
-  const double time_delay = (is_go_out_ || is_prioritized)
-                              ? 0.0
-                              : (planner_param_.collision_detection.state_transit_margin_time -
-                                 collision_state_machine_.getDuration());
   auto target_objects = generateTargetObjects(intersection_lanelets, intersection_area);
 
+  // calculate dynamic collision around attention area
+  const double time_to_restart = (is_go_out_ || is_prioritized)
+                                   ? 0.0
+                                   : (planner_param_.collision_detection.state_transit_margin_time -
+                                      collision_state_machine_.getDuration());
+
   const bool has_collision = checkCollision(
-    *path, &target_objects, path_lanelets, closest_idx, time_delay, traffic_prioritized_level);
+    *path, &target_objects, path_lanelets, closest_idx, time_to_restart, traffic_prioritized_level);
   collision_state_machine_.setStateWithMarginTime(
     has_collision ? StateMachine::State::STOP : StateMachine::State::GO,
     logger_.get_child("collision state_machine"), *clock_);
