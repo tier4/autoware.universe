@@ -128,7 +128,7 @@ void AutowareStateMonitorNode::onRoute(
   for(const auto & segment: msg->segments){
     autoware_planning_msgs::msg::LaneletSegment new_segment;
     new_segment.preferred_primitive.id = segment.preferred_primitive_id;
-    if(auto old_preffered_primitive = std::find(segment.primitives.begin(), segment.primitives.end(), [id = segment.preferred_primitive_id](const auto & primitive){
+    if(auto old_preffered_primitive = std::find_if(segment.primitives.begin(), segment.primitives.end(), [id = segment.preferred_primitive_id](const auto & primitive){
           return primitive.id == id;
         }); old_preffered_primitive != segment.primitives.end()){
         new_segment.preferred_primitive.primitive_type = old_preffered_primitive->primitive_type;
@@ -141,9 +141,9 @@ void AutowareStateMonitorNode::onRoute(
       new_primitive.primitive_type = primitive.primitive_type;
       new_segment.primitives.push_back(new_primitive);
     }
-    new_route_msg.segments.push_back(segment);
+    new_route_msg.segments.push_back(new_segment);
   }
-  new_route_msg.uuid = msg->uuid;
+//  new_route_msg.uuid = msg->uuid;
   // note: allw_modification is introduced in new msg
   // new_route_msg.allw_modification = msg->allw_modification;
 
