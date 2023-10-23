@@ -17,6 +17,8 @@
 #include "lanelet2_extension/utility/message_conversion.hpp"
 #include "lanelet2_extension/utility/route_checker.hpp"
 
+#include <autoware_planning_msgs/msg/lanelet_route.hpp>
+
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #else
@@ -118,7 +120,34 @@ void AutowareStateMonitorNode::onRoute(
     RCLCPP_WARN(this->get_logger(), "Map msg is not ready yet. Skip route msg.");
     return;
   }
-  bool is_route_valid = lanelet::utils::route::isRouteValid(*msg, lanelet_map_ptr_);
+
+  autoware_planning_msgs::msg::LaneletRoute new_route_msg;
+  new_route_msg.header = msg->header;
+  new_route_msg.start_pose = msg->start_pose;
+  new_route_msg.goal_pose = msg->goal_pose;
+  for(const auto & segment: msg->segments){
+    autoware_planning_msgs::msg::LaneletSegment new_segment;
+    new_segment.preferred_primitive.id = segment.preferred_primitive_id;
+    if(auto old_preffered_primitive = std::find(segment.primitives.begin(), segment.primitives.end(), [id = segment.preferred_primitive_id](const auto & primitive){
+          return primitive.id == id;
+        }); old_preffered_primitive != segment.primitives.end()){
+        new_segment.preferred_primitive.primitive_type = old_preffered_primitive->primitive_type;
+    }
+
+    // new_segment.preferred_primitive.primitive_type = segment.preferred_primitive_type;
+    for(const auto & primitive: segment.primitives){
+      autoware_planning_msgs::msg::LaneletPrimitive new_primitive;
+      new_primitive.id = primitive.id;
+      new_primitive.primitive_type = primitive.primitive_type;
+      new_segment.primitives.push_back(new_primitive);
+    }
+    new_route_msg.segments.push_back(segment);
+  }
+  new_route_msg.uuid = msg->uuid;
+  // note: allw_modification is introduced in new msg
+  // new_route_msg.allw_modification = msg->allw_modification;
+
+  bool is_route_valid = lanelet::utils::route::isRouteValid(new_route_msg, lanelet_map_ptr_);
   if (!is_route_valid) {
     return;
   }
