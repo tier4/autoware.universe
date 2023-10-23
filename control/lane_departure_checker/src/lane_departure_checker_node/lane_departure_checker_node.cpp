@@ -59,7 +59,38 @@ lanelet::ConstLanelets getRouteLanelets(
 {
   lanelet::ConstLanelets route_lanelets;
 
-  bool is_route_valid = lanelet::utils::route::isRouteValid(*route_ptr, lanelet_map);
+  autoware_planning_msgs::msg::LaneletRoute new_route_msg;
+  {
+    new_route_msg.header = route_ptr->header;
+    new_route_msg.start_pose = route_ptr->start_pose;
+    new_route_msg.goal_pose = route_ptr->goal_pose;
+    for (const auto & segment : route_ptr->segments) {
+      autoware_planning_msgs::msg::LaneletSegment new_segment;
+      new_segment.preferred_primitive.id = segment.preferred_primitive_id;
+      if (auto old_preffered_primitive = std::find_if(
+            segment.primitives.begin(), segment.primitives.end(),
+            [id = segment.preferred_primitive_id](const auto & primitive) {
+              return primitive.id == id;
+            });
+          old_preffered_primitive != segment.primitives.end()) {
+        new_segment.preferred_primitive.primitive_type = old_preffered_primitive->primitive_type;
+      }
+
+      // new_segment.preferred_primitive.primitive_type = segment.preferred_primitive_type;
+      for (const auto & primitive : segment.primitives) {
+        autoware_planning_msgs::msg::LaneletPrimitive new_primitive;
+        new_primitive.id = primitive.id;
+        new_primitive.primitive_type = primitive.primitive_type;
+        new_segment.primitives.push_back(new_primitive);
+      }
+      new_route_msg.segments.push_back(new_segment);
+    }
+    //  new_route_msg.uuid = msg->uuid;
+    // note: allw_modification is introduced in new msg
+    // new_route_msg.allw_modification = msg->allw_modification;
+  }
+
+  bool is_route_valid = lanelet::utils::route::isRouteValid(new_route_msg, lanelet_map);
   if (!is_route_valid) {
     return route_lanelets;
   }

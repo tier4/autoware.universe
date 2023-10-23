@@ -16,6 +16,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <lanelet2_core/geometry/Lanelet.h>
 
 #include <string>
