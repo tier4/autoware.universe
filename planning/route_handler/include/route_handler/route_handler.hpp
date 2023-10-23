@@ -32,6 +32,7 @@
 #include <lanelet2_routing/Route.h>
 #include <lanelet2_routing/RoutingCost.h>
 #include <lanelet2_routing/RoutingGraph.h>
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #include <lanelet2_routing/RoutingGraphContainer.h>
 #include <lanelet2_traffic_rules/TrafficRulesFactory.h>
 
