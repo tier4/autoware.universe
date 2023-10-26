@@ -118,10 +118,6 @@ public:
       {
         double object_expected_deceleration;
       } ignore_on_amber_traffic_light;
-      struct IgnoreOnRedTrafficLight
-      {
-        double object_margin_to_path;
-      } ignore_on_red_traffic_light;
     } collision_detection;
     struct Occlusion
     {
