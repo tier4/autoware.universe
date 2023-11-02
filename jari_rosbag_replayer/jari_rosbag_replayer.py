@@ -16,6 +16,8 @@ from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
 from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
 from visualization_msgs.msg import Marker
+import json
+from pathlib import Path
 
 # set line: when the ego is over the line, the rosbag start is triggered
 POS_X_L = 16690.2
@@ -23,11 +25,17 @@ POS_Y_L = 93171.8
 POS_X_R = 16695.0
 POS_Y_R = 93171.4
 
-# start rosbag time: start time of the replayed rosbag
-# Note: this time is available by checking the time when the ego in rosbag exceeds the line above.
-# T0 = 1668048507772541470 # 1668048507, 772541470
-# T0 = 1664876748366648640
-T0 = 1664876748066648640
+directory_path = Path(__file__).resolve().parent
+
+configs = json.load(open(directory_path / "config.json", "r"))
+
+config = configs["no16"]
+
+T0 = config["bag_start_time"] + config["start_offset"]
+
+# path of rosbag
+ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
+
 
 def get_rosbag_options(path, serialization_format="cdr"):
     storage_options = rosbag2_py.StorageOptions(uri=path, storage_id="sqlite3")
