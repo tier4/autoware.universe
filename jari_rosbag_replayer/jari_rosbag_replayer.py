@@ -47,11 +47,13 @@ def get_rosbag_options(path, serialization_format="cdr"):
 
     return storage_options, converter_options
 
+
 def open_reader(path: str):
     storage_options, converter_options = get_rosbag_options(path)
     reader = rosbag2_py.SequentialReader()
     reader.open(storage_options, converter_options)
     return reader
+
 
 class JariRosbagReplayer(Node):
     def __init__(self):
@@ -169,7 +171,7 @@ class JariRosbagReplayer(Node):
         while rclpy.ok() and self.next_pub_index_perception < len(self.rosbag_objects_data):
             object = self.rosbag_objects_data[self.next_pub_index_perception]
             t_spent_rosbag = object[0] - T0
-            if t_spent_rosbag < 0: # do not use data before T0
+            if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_perception += 1
                 continue
             if t_spent_rosbag < t_spent_real:
@@ -181,11 +183,11 @@ class JariRosbagReplayer(Node):
             else:
                 break
 
-        # publish_until_spent_time (todo: make function)
+        # publish_u ntil_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_odom < len(self.rosbag_ego_data):
             object = self.rosbag_ego_data[self.next_pub_index_ego_odom]
             t_spent_rosbag = object[0] - T0
-            if t_spent_rosbag < 0: # do not use data before T0
+            if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_odom += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
@@ -201,7 +203,7 @@ class JariRosbagReplayer(Node):
         while rclpy.ok() and self.next_pub_index_ego_control_cmd < len(self.rosbag_ego_control_cmd):
             object = self.rosbag_ego_control_cmd[self.next_pub_index_ego_control_cmd]
             t_spent_rosbag = object[0] - T0
-            if t_spent_rosbag < 0: # do not use data before T0
+            if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_cmd += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
@@ -217,7 +219,7 @@ class JariRosbagReplayer(Node):
         while rclpy.ok() and self.next_pub_index_ego_control_debug < len(self.rosbag_ego_control_debug):
             object = self.rosbag_ego_control_debug[self.next_pub_index_ego_control_debug]
             t_spent_rosbag = object[0] - T0
-            if t_spent_rosbag < 0: # do not use data before T0
+            if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_debug += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
@@ -230,22 +232,19 @@ class JariRosbagReplayer(Node):
             else:
                 break
 
-
-
     def onOdom(self, odom):
         pos = odom.pose.pose.position
         if self.isOverLine(pos) == True and self.triggered_time is None:
             (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
             self.triggered_time = int(sec * 1e9) + nanosec
 
-
-
     def load_rosbag(self, rosbag2_path: str):
         reader = open_reader(str(rosbag2_path))
 
         topic_types = reader.get_all_topics_and_types()
         # Create a map for quicker lookup
-        type_map = {topic_types[i].name: topic_types[i].type for i in range(len(topic_types))}
+        type_map = {
+            topic_types[i].name: topic_types[i].type for i in range(len(topic_types))}
 
         perception_topic = '/perception/object_recognition/objects'
         ego_odom_topic = '/localization/kinematic_state'
@@ -268,12 +267,12 @@ class JariRosbagReplayer(Node):
             if (topic == ego_control_debug_topic):
                 self.rosbag_ego_control_debug.append((stamp, msg))
 
+        # print()
         # print(self.rosbag_objects_data[0])
         # print(self.rosbag_ego_data[0])
         # print("rosbag_objects_data size: ", len(self.rosbag_objects_data))
         # print("rosbag_ego_data size: ", len(self.rosbag_ego_data))
         # print(self.rosbag_objects_data[0][1])
-
 
     def isOverLine(self, p):
         dx0 = POS_X_L - POS_X_R
