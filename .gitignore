@@ -13,3 +13,4 @@ log/
 
 # Python
 *.pyc
+jari_rosbag_replayer/config.json
