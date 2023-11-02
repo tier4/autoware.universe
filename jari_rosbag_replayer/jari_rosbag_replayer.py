@@ -9,7 +9,7 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.serialization import deserialize_message
 from rosidl_runtime_py.utilities import get_message
-from geometry_msgs.msg import Pose, Point
+from geometry_msgs.msg import Pose, Point, PoseStamped, PoseWithCovarianceStamped
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
 from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
@@ -81,16 +81,50 @@ class JariRosbagReplayer(Node):
         self.pub_marker = self.create_publisher(
             Marker, "/jari/debug_marker", 1
         )
+
+        self.pub_pose_estimation = self.create_publisher(
+            PoseWithCovarianceStamped, "/initialpose", 1
+        )
+
+        self.pub_set_goal_pose = self.create_publisher(
+            PoseStamped, "/planning/mission_planning/goal", 1
+        )
+
         self.rosbag_objects_data = []
         self.rosbag_ego_data = []
         self.rosbag_ego_control_cmd = []
         self.rosbag_ego_control_debug = []
-        self.load_rosbag("/mnt/data/rosbags/230118_jari_planning_sim/16_1")
+        self.load_rosbag(ROSBAG_PATH)
 
         self.publish_empty_object()
         self.publish_line_marker()
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
+
+        initial_pose = PoseWithCovarianceStamped()
+        initial_pose.header.stamp = self.get_clock().now().to_msg()
+        initial_pose.header.frame_id = "map"
+        initial_pose.pose.pose.position.x = 16673.787109375
+        initial_pose.pose.pose.position.y = 92971.7265625
+        initial_pose.pose.pose.position.z = 0.0
+        initial_pose.pose.pose.orientation.x = 0.0
+        initial_pose.pose.pose.orientation.y = 0.0
+        initial_pose.pose.pose.orientation.z = 0.6773713996525991
+        initial_pose.pose.pose.orientation.w = 0.7356412080169781
+        self.pub_pose_estimation.publish(initial_pose)
+
+
+        goal_pose = PoseStamped()
+        goal_pose.header.stamp = self.get_clock().now().to_msg()
+        goal_pose.header.frame_id = "map"
+        goal_pose.pose.position.x = 16713.16796875
+        goal_pose.pose.position.y = 93383.9296875
+        goal_pose.pose.position.z = 0.0
+        goal_pose.pose.orientation.x = 0.0
+        goal_pose.pose.orientation.y = 0.0
+        goal_pose.pose.orientation.z = 0.6811543441258587
+        goal_pose.pose.orientation.w = 0.7321398496725002
+        self.pub_set_goal_pose.publish(goal_pose)
 
         self.timer = self.create_timer(0.005, self.on_timer)
 
