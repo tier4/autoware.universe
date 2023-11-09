@@ -19,17 +19,17 @@ from visualization_msgs.msg import Marker
 import json
 from pathlib import Path
 
-# set line: when the ego is over the line, the rosbag start is triggered
-POS_X_L = 16690.2
-POS_Y_L = 93171.8
-POS_X_R = 16695.0
-POS_Y_R = 93171.4
 
 directory_path = Path(__file__).resolve().parent
 
 configs = json.load(open(directory_path / "config.json", "r"))
 
-config = configs["no16"]
+config = configs["no27"]
+
+POS_X_L = config["bag_start_line"]["left"][0]
+POS_Y_L = config["bag_start_line"]["left"][1]
+POS_X_R = config["bag_start_line"]["right"][0]
+POS_Y_R = config["bag_start_line"]["right"][1]
 
 T0 = config["bag_start_time"] + config["start_offset"]
 
