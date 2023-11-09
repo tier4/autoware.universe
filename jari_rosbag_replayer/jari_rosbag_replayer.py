@@ -18,6 +18,9 @@ from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
 from visualization_msgs.msg import Marker
 import json
 from pathlib import Path
+import subprocess
+import threading
+import signal
 
 
 directory_path = Path(__file__).resolve().parent
@@ -54,6 +57,36 @@ def open_reader(path: str):
     reader.open(storage_options, converter_options)
     return reader
 
+class BackgroundRosBagRecorder:
+    def __init__(self):
+        self.finish_flag = False
+        self.worker_thread = None
+
+    def __record_rosbag(self, path):
+        system('notify-send "start rosbag record!"')
+        command = ["ros2",  "bag", "record",  "-a", "-o", path, "-s", "mcap"]
+        log_path = path + "/log.txt"
+        log_file = open(log_path, 'w')
+        process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
+        while self.finish_flag == False:
+            process.wait(timeout=1.0)
+
+        system('notify-send "finish rosbag record!"')
+
+        process.send_signal(signal.SIGINT)
+        process.wait()
+        log_file.close()
+
+    def start(self, path):
+        if self.worker_thread is None:
+            self.worker_thread = threading.Thread(target=self.__record_rosbag, args=(path,))
+            self.worker_thread.start()
+
+    def stop(self):
+        self.finish_flag = True
+        if self.worker_thread is not None:
+            self.worker_thread.join()
+            self.worker_thread = None
 
 class JariRosbagReplayer(Node):
     def __init__(self):
@@ -64,6 +97,7 @@ class JariRosbagReplayer(Node):
         self.next_pub_index_perception = 0
         self.next_pub_index_ego_control_cmd = 0
         self.next_pub_index_ego_control_debug = 0
+        self.rosbag_recorder = BackgroundRosBagRecorder()
 
         self.sub_odom = self.create_subscription(
             Odometry, "/localization/kinematic_state", self.onOdom, 1
@@ -91,6 +125,9 @@ class JariRosbagReplayer(Node):
         self.pub_set_goal_pose = self.create_publisher(
             PoseStamped, "/planning/mission_planning/goal", 1
         )
+        # log path with timestamp
+        log_path = configs["rosbag_directory"] + "/rosbag/" + str(time.time())
+        self.rosbag_recorder.start(log_path)
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
 
@@ -303,6 +340,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        node.rosbag_recorder.stop()
+        print("finish recording")
         node.destroy_node()
         rclpy.shutdown()
 
