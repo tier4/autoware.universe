@@ -27,7 +27,6 @@ import subprocess
 import threading
 import signal
 
-
 directory_path = Path(__file__).resolve().parent
 
 configs = json.load(open(directory_path / "config.json", "r"))
@@ -48,6 +47,7 @@ BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
 TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
 ZOOM_IDENTITY = [1.0, 1.0, 1.0]
 
+
 def quaternion_to_yaw(quaternion):
     x = quaternion.x
     y = quaternion.y
@@ -58,12 +58,14 @@ def quaternion_to_yaw(quaternion):
     # print(f"yaw: {euler[2]}")
     return euler[2]
 
+
 def euclidean_dist_from_poses(pose0, pose1):
     x0 = pose0.position.x
     y0 = pose0.position.y
     x1 = pose1.position.x
     y1 = pose1.position.y
     return math.sqrt(math.pow(x1 - x0, 2) + math.pow(y1 - y0, 2))
+
 
 # path of rosbag
 ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
@@ -86,6 +88,7 @@ def open_reader(path: str):
     reader.open(storage_options, converter_options)
     return reader
 
+
 class BackgroundRosBagRecorder:
     def __init__(self):
         self.finish_flag = False
@@ -93,10 +96,11 @@ class BackgroundRosBagRecorder:
 
     def __record_rosbag(self, path):
         system('notify-send "start rosbag record!"')
-        command = ["ros2",  "bag", "record",  "-a", "-o", path, "-s", "mcap"]
+        command = ["ros2", "bag", "record", "-a", "-o", path, "-s", "mcap"]
         log_path = path + "/log.txt"
         log_file = open(log_path, 'w')
-        process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
+        process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT,
+                                   preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
         while self.finish_flag == False:
             process.wait(timeout=1.0)
 
@@ -116,6 +120,7 @@ class BackgroundRosBagRecorder:
         if self.worker_thread is not None:
             self.worker_thread.join()
             self.worker_thread = None
+
 
 class JariRosbagReplayer(Node):
     def __init__(self):
@@ -185,24 +190,21 @@ class JariRosbagReplayer(Node):
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
 
-        initial_pose = PoseWithCovarianceStamped()
-        initial_pose.header.stamp = self.get_clock().now().to_msg()
-        initial_pose.header.frame_id = "map"
-        initial_pose.pose.pose.position.x = 16673.787109375
-        initial_pose.pose.pose.position.y = 92971.7265625
-        initial_pose.pose.pose.position.z = 0.0
-        initial_pose.pose.pose.orientation.x = 0.0
-        initial_pose.pose.pose.orientation.y = 0.0
-        initial_pose.pose.pose.orientation.z = 0.6773713996525991
-        initial_pose.pose.pose.orientation.w = 0.7356412080169781
-        self.pub_pose_estimation.publish(initial_pose)
-        print("send pose estimation")
+        self.publish_pose_estimation()
 
         time.sleep(5.0)
 
         self.load_rosbag(ROSBAG_PATH)
         print("rosbag is loaded")
 
+        self.publish_goal_pose()
+
+        self.publish_empty_object()
+        self.publish_line_marker()
+
+        self.timer = self.create_timer(0.005, self.on_timer)
+
+    def publish_goal_pose(self):
         goal_pose = PoseStamped()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         goal_pose.header.frame_id = "map"
@@ -216,11 +218,19 @@ class JariRosbagReplayer(Node):
         self.pub_set_goal_pose.publish(goal_pose)
         print("send goal_pose")
 
-        self.publish_empty_object()
-        self.publish_line_marker()
-
-        self.timer = self.create_timer(0.005, self.on_timer)
-
+    def publish_pose_estimation(self):
+        initial_pose = PoseWithCovarianceStamped()
+        initial_pose.header.stamp = self.get_clock().now().to_msg()
+        initial_pose.header.frame_id = "map"
+        initial_pose.pose.pose.position.x = 16673.787109375
+        initial_pose.pose.pose.position.y = 92971.7265625
+        initial_pose.pose.pose.position.z = 0.0
+        initial_pose.pose.pose.orientation.x = 0.0
+        initial_pose.pose.pose.orientation.y = 0.0
+        initial_pose.pose.pose.orientation.z = 0.6773713996525991
+        initial_pose.pose.pose.orientation.w = 0.7356412080169781
+        self.pub_pose_estimation.publish(initial_pose)
+        print("send pose estimation")
 
     def analyze_on_odom_sim(self, msg):
         if self.forward_vehicle_object == None:
@@ -448,7 +458,8 @@ class JariRosbagReplayer(Node):
             debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
             debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
             debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE)
-            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE + length_forward_vehicle / 2.0 * math.cos(yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE + length_forward_vehicle / 2.0 * math.cos(
+                yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
             debug_array.append(debug_array[4] - debug_array[10])
             debug_array.append(ego_vehicle_pose.position.x)
             debug_array.append(ego_vehicle_pose.position.y)
@@ -475,6 +486,7 @@ class JariRosbagReplayer(Node):
         msg = PredictedObjects()
         msg.header.stamp = self.get_clock().now().to_msg()
         self.pub_perception.publish(msg)
+
 
 def main(args=None):
     try:
