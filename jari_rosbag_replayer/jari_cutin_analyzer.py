@@ -19,7 +19,14 @@ from visualization_msgs.msg import Marker
 import tf_transformations
 
 
-FORWARD_VEHICLE_UUID = [0x4e, 0xcb]
+directory_path = Path(__file__).resolve().parent
+
+configs = json.load(open(directory_path / "config.json", "r"))
+
+config = configs["no27"]
+
+FORWARD_VEHICLE_UUID = config["vehicle_uuid"]
+
 BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
 
 TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
