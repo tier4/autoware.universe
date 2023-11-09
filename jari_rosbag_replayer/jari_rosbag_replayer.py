@@ -92,15 +92,6 @@ class JariRosbagReplayer(Node):
             PoseStamped, "/planning/mission_planning/goal", 1
         )
 
-        self.rosbag_objects_data = []
-        self.rosbag_ego_data = []
-        self.rosbag_ego_control_cmd = []
-        self.rosbag_ego_control_debug = []
-        self.load_rosbag(ROSBAG_PATH)
-
-        self.publish_empty_object()
-        self.publish_line_marker()
-
         time.sleep(1.0)  # wait for ready to publish/subscribe
 
         initial_pose = PoseWithCovarianceStamped()
@@ -114,7 +105,9 @@ class JariRosbagReplayer(Node):
         initial_pose.pose.pose.orientation.z = 0.6773713996525991
         initial_pose.pose.pose.orientation.w = 0.7356412080169781
         self.pub_pose_estimation.publish(initial_pose)
+        print("send pose estimation")
 
+        time.sleep(10.0)
 
         goal_pose = PoseStamped()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
@@ -127,6 +120,17 @@ class JariRosbagReplayer(Node):
         goal_pose.pose.orientation.z = 0.6811543441258587
         goal_pose.pose.orientation.w = 0.7321398496725002
         self.pub_set_goal_pose.publish(goal_pose)
+        print("send goal_pose")
+
+        self.rosbag_objects_data = []
+        self.rosbag_ego_data = []
+        self.rosbag_ego_control_cmd = []
+        self.rosbag_ego_control_debug = []
+        self.load_rosbag(ROSBAG_PATH)
+        print("rosbag is loaded")
+
+        self.publish_empty_object()
+        self.publish_line_marker()
 
         self.timer = self.create_timer(0.005, self.on_timer)
 
