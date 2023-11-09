@@ -15,9 +15,14 @@ from nav_msgs.msg import Odometry
 from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
 from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
+from tier4_debug_msgs.msg import Float32Stamped, Float32MultiArrayStamped
+import tf_transformations
 from visualization_msgs.msg import Marker
 import json
+import math
 from pathlib import Path
+from os import system, path
+
 import subprocess
 import threading
 import signal
@@ -35,6 +40,30 @@ POS_X_R = config["bag_start_line"]["right"][0]
 POS_Y_R = config["bag_start_line"]["right"][1]
 
 T0 = config["bag_start_time"] + config["start_offset"]
+
+FORWARD_VEHICLE_UUID = config["vehicle_uuid"]
+
+BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
+
+TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
+ZOOM_IDENTITY = [1.0, 1.0, 1.0]
+
+def quaternion_to_yaw(quaternion):
+    x = quaternion.x
+    y = quaternion.y
+    z = quaternion.z
+    w = quaternion.w
+    qlist = [x, y, z, w]
+    euler = tf_transformations.euler_from_quaternion(qlist)
+    # print(f"yaw: {euler[2]}")
+    return euler[2]
+
+def euclidean_dist_from_poses(pose0, pose1):
+    x0 = pose0.position.x
+    y0 = pose0.position.y
+    x1 = pose1.position.x
+    y1 = pose1.position.y
+    return math.sqrt(math.pow(x1 - x0, 2) + math.pow(y1 - y0, 2))
 
 # path of rosbag
 ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
@@ -97,10 +126,16 @@ class JariRosbagReplayer(Node):
         self.next_pub_index_perception = 0
         self.next_pub_index_ego_control_cmd = 0
         self.next_pub_index_ego_control_debug = 0
+
+        self.rosbag_objects_data = []
+        self.rosbag_ego_data = []
+        self.rosbag_ego_control_cmd = []
+        self.rosbag_ego_control_debug = []
+
         self.rosbag_recorder = BackgroundRosBagRecorder()
 
         self.sub_odom = self.create_subscription(
-            Odometry, "/localization/kinematic_state", self.onOdom, 1
+            Odometry, "/localization/kinematic_state", self.on_odom, 1
         )
         self.pub_ego_odom = self.create_publisher(
             Odometry, "/localization/kinematic_state_rosbag", 1
@@ -125,6 +160,25 @@ class JariRosbagReplayer(Node):
         self.pub_set_goal_pose = self.create_publisher(
             PoseStamped, "/planning/mission_planning/goal", 1
         )
+
+        # analyzer
+        self.forward_vehicle_object = None
+        self.pub_distance_sim = self.create_publisher(
+            Float32Stamped, "/jari/distance_betwween_vehicles/sim", 1)
+        self.pub_distance_real = self.create_publisher(
+            Float32Stamped, "/jari/distance_betwween_vehicles/real", 1)
+        self.pub_ttc_sim = self.create_publisher(
+            Float32Stamped, "/jari/time_to_collision/sim", 1)
+        self.pub_ttc_real = self.create_publisher(
+            Float32Stamped, "/jari/time_to_collision/real", 1)
+        self.pub_debug_sim = self.create_publisher(
+            Float32MultiArrayStamped, "/jari/debug/sim", 1)
+        self.pub_debug_real = self.create_publisher(
+            Float32MultiArrayStamped, "/jari/debug/real", 1)
+
+        self.msg_debug_sim = Float32MultiArrayStamped()
+        self.msg_debug_real = Float32MultiArrayStamped()
+
         # log path with timestamp
         log_path = configs["rosbag_directory"] + "/rosbag/" + str(time.time())
         self.rosbag_recorder.start(log_path)
@@ -144,7 +198,10 @@ class JariRosbagReplayer(Node):
         self.pub_pose_estimation.publish(initial_pose)
         print("send pose estimation")
 
-        time.sleep(10.0)
+        time.sleep(5.0)
+
+        self.load_rosbag(ROSBAG_PATH)
+        print("rosbag is loaded")
 
         goal_pose = PoseStamped()
         goal_pose.header.stamp = self.get_clock().now().to_msg()
@@ -159,17 +216,70 @@ class JariRosbagReplayer(Node):
         self.pub_set_goal_pose.publish(goal_pose)
         print("send goal_pose")
 
-        self.rosbag_objects_data = []
-        self.rosbag_ego_data = []
-        self.rosbag_ego_control_cmd = []
-        self.rosbag_ego_control_debug = []
-        self.load_rosbag(ROSBAG_PATH)
-        print("rosbag is loaded")
-
         self.publish_empty_object()
         self.publish_line_marker()
 
         self.timer = self.create_timer(0.005, self.on_timer)
+
+
+    def analyze_on_odom_sim(self, msg):
+        if self.forward_vehicle_object == None:
+            return
+
+        dist_between_vehicles = self.calc_dist_between_vehicles(
+            msg.pose.pose,
+            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose,
+            True)
+
+        velocity_ego_vehicle = msg.twist.twist.linear.x
+        time_to_collision = dist_between_vehicles / velocity_ego_vehicle
+        # print(f"time_to_collision: {time_to_collision}")
+
+        msg_dist = Float32Stamped()
+        msg_dist.stamp = self.get_clock().now().to_msg()
+        msg_dist.data = dist_between_vehicles
+        self.pub_distance_sim.publish(msg_dist)
+
+        msg_ttc = Float32Stamped()
+        msg_ttc.stamp = self.get_clock().now().to_msg()
+        msg_ttc.data = time_to_collision
+        self.pub_ttc_sim.publish(msg_ttc)
+
+        self.msg_debug_sim.stamp = self.get_clock().now().to_msg()
+        self.pub_debug_sim.publish(self.msg_debug_sim)
+
+    def analyze_on_odom_real(self, msg):
+        if self.forward_vehicle_object == None:
+            return
+
+        dist_between_vehicles = self.calc_dist_between_vehicles(
+            msg.pose.pose,
+            self.forward_vehicle_object.kinematics.initial_pose_with_covariance.pose,
+            False)
+
+        velocity_ego_vehicle = msg.twist.twist.linear.x
+        time_to_collision = dist_between_vehicles / velocity_ego_vehicle
+        # print(f"time_to_collision: {time_to_collision}")
+
+        msg_dist = Float32Stamped()
+        msg_dist.stamp = self.get_clock().now().to_msg()
+        msg_dist.data = dist_between_vehicles
+        self.pub_distance_real.publish(msg_dist)
+
+        msg_ttc = Float32Stamped()
+        msg_ttc.stamp = self.get_clock().now().to_msg()
+        msg_ttc.data = time_to_collision
+        self.pub_ttc_real.publish(msg_ttc)
+
+        self.msg_debug_real.stamp = self.get_clock().now().to_msg()
+        self.pub_debug_real.publish(self.msg_debug_real)
+
+    def analyze_on_objects(self, msg):
+        for obj in msg.objects:
+            uuid0 = obj.object_id.uuid[0]
+            uuid1 = obj.object_id.uuid[1]
+            if uuid0 == FORWARD_VEHICLE_UUID[0] and uuid1 == FORWARD_VEHICLE_UUID[1]:
+                self.forward_vehicle_object = obj
 
     def publish_line_marker(self):
         marker = Marker()
@@ -201,6 +311,7 @@ class JariRosbagReplayer(Node):
             msg = PredictedObjects()
             msg.header.stamp = self.get_clock().now().to_msg()
             self.pub_perception.publish(msg)
+            self.analyze_on_objects(msg)
             return
 
         (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
@@ -219,6 +330,7 @@ class JariRosbagReplayer(Node):
                 msg = object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self.pub_perception.publish(msg)
+                self.analyze_on_objects(msg)
                 self.next_pub_index_perception += 1
                 # print("perception published: ", self.next_pub_index_perception, "t_spent_rosbag: ", t_spent_rosbag)
             else:
@@ -235,6 +347,7 @@ class JariRosbagReplayer(Node):
                 msg = object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self.pub_ego_odom.publish(msg)
+                self.analyze_on_odom_real(msg)
                 self.next_pub_index_ego_odom += + 1
                 # print("odom published: ", self.next_pub_index_ego_odom, "t_spent_rosbag: ", t_spent_rosbag)
             else:
@@ -273,11 +386,12 @@ class JariRosbagReplayer(Node):
             else:
                 break
 
-    def onOdom(self, odom):
+    def on_odom(self, odom):
         pos = odom.pose.pose.position
-        if self.isOverLine(pos) == True and self.triggered_time is None:
+        if self.is_over_line(pos) == True and self.triggered_time is None:
             (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
             self.triggered_time = int(sec * 1e9) + nanosec
+        self.analyze_on_odom_sim(odom)
 
     def load_rosbag(self, rosbag2_path: str):
         reader = open_reader(str(rosbag2_path))
@@ -308,14 +422,45 @@ class JariRosbagReplayer(Node):
             if (topic == ego_control_debug_topic):
                 self.rosbag_ego_control_debug.append((stamp, msg))
 
-        # print()
-        # print(self.rosbag_objects_data[0])
-        # print(self.rosbag_ego_data[0])
-        # print("rosbag_objects_data size: ", len(self.rosbag_objects_data))
-        # print("rosbag_ego_data size: ", len(self.rosbag_ego_data))
-        # print(self.rosbag_objects_data[0][1])
+        def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose, is_sim):
+            yaw_ego_vehicle = quaternion_to_yaw(ego_vehicle_pose.orientation)
+            yaw_forward_vehicle = quaternion_to_yaw(forward_vehicle_pose.orientation)
+            yaw_diff = math.fabs(yaw_ego_vehicle - yaw_forward_vehicle)
+            # print(f"yaw ego: {yaw_ego_vehicle}, yaw forward: {yaw_forward_vehicle}, diff: {yaw_diff}")
 
-    def isOverLine(self, p):
+            euclidean_dist = euclidean_dist_from_poses(ego_vehicle_pose, forward_vehicle_pose)
+
+            length_forward_vehicle = self.forward_vehicle_object.shape.dimensions.x
+            width_forward_vehicle = self.forward_vehicle_object.shape.dimensions.y
+            dist_between_vehicles = \
+                euclidean_dist * math.cos(yaw_diff) - BASELINK_TO_FRONT_EGO_VEHICLE - \
+                (length_forward_vehicle / 2.0 * math.cos(yaw_diff) + \
+                 width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+
+            debug_array = []
+            debug_array.append(yaw_ego_vehicle)
+            debug_array.append(yaw_forward_vehicle)
+            debug_array.append(yaw_diff)
+            debug_array.append(euclidean_dist)
+            debug_array.append(euclidean_dist * math.cos(yaw_diff))
+            debug_array.append(length_forward_vehicle / 2.0)
+            debug_array.append(width_forward_vehicle / 2.0)
+            debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
+            debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
+            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE)
+            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE + length_forward_vehicle / 2.0 * math.cos(yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+            debug_array.append(debug_array[4] - debug_array[10])
+            debug_array.append(ego_vehicle_pose.position.x)
+            debug_array.append(ego_vehicle_pose.position.y)
+
+            if is_sim:
+                self.msg_debug_sim.data = debug_array
+            else:
+                self.msg_debug_real.data = debug_array
+
+            return dist_between_vehicles
+
+    def is_over_line(self, p):
         dx0 = POS_X_L - POS_X_R
         dy0 = POS_Y_L - POS_Y_R
         dx1 = POS_X_L - p.x
@@ -330,7 +475,6 @@ class JariRosbagReplayer(Node):
         msg = PredictedObjects()
         msg.header.stamp = self.get_clock().now().to_msg()
         self.pub_perception.publish(msg)
-
 
 def main(args=None):
     try:
