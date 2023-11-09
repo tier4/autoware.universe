@@ -1,48 +1,31 @@
 #!/usr/bin/env python3
 
-
 import time
+import json
+import math
+from pathlib import Path
+
 import rclpy
 import rosbag2_py
 from rosbag2_py import StorageFilter
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.serialization import deserialize_message
 from rosidl_runtime_py.utilities import get_message
-from geometry_msgs.msg import Pose, Point, PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
-from autoware_auto_perception_msgs.msg import DetectedObjects, PredictedObjects
+from autoware_auto_perception_msgs.msg import PredictedObjects
 from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
 from tier4_debug_msgs.msg import Float32Stamped, Float32MultiArrayStamped
 import tf_transformations
 from visualization_msgs.msg import Marker
-import json
-import math
-from pathlib import Path
-from os import system, path
 
-import subprocess
-import threading
-import signal
+# T0 = config["bag_start_time"] + config["start_offset"]
 
-directory_path = Path(__file__).resolve().parent
+# FORWARD_VEHICLE_UUID = config["vehicle_uuid"]
 
-configs = json.load(open(directory_path / "config.json", "r"))
-
-config = configs["no27"]
-
-POS_X_L = config["bag_start_line"]["left"][0]
-POS_Y_L = config["bag_start_line"]["left"][1]
-POS_X_R = config["bag_start_line"]["right"][0]
-POS_Y_R = config["bag_start_line"]["right"][1]
-
-T0 = config["bag_start_time"] + config["start_offset"]
-
-FORWARD_VEHICLE_UUID = config["vehicle_uuid"]
-
-BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
+# BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
 
 TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
 ZOOM_IDENTITY = [1.0, 1.0, 1.0]
@@ -68,7 +51,29 @@ def euclidean_dist_from_poses(pose0, pose1):
 
 
 # path of rosbag
-ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
+# ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
+
+class Config:
+    def __init__(self, name="no27"):
+        directory_path = Path(__file__).resolve().parent
+        configs = json.load(open(directory_path / "config.json", "r"))
+
+        config = configs[name]
+
+        self.start_line_left_x = config["bag_start_line"]["left"][0]
+        self.start_line_left_y = config["bag_start_line"]["left"][1]
+        self.start_line_right_x = config["bag_start_line"]["right"][0]
+        self.start_line_right_y = config["bag_start_line"]["right"][1]
+
+        self.forward_vehicle_uuid = config["vehicle_uuid"]
+
+        self.rosbag_start_time = config["bag_start_time"] + config["start_offset"]
+
+        # wheel base: 2.75m, front overhang: 0.8m
+        self.baselink_to_front = 3.55
+
+        self.rosbag_path = configs["rosbag_directory"] + "/" + config["bag_name"]
+        self.rosbag_directory = configs["rosbag_directory"]
 
 
 def get_rosbag_options(path, serialization_format="cdr"):
@@ -95,9 +100,12 @@ class BackgroundRosBagRecorder:
         self.worker_thread = None
 
     def __record_rosbag(self, path):
+        from os import system
+        import subprocess
+        import signal
         system('notify-send "start rosbag record!"')
         command = ["ros2", "bag", "record", "-a", "-o", path, "-s", "mcap"]
-        log_path = path + "/log.txt"
+        log_path = path + "-log.txt"
         log_file = open(log_path, 'w')
         process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT,
                                    preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
@@ -111,6 +119,7 @@ class BackgroundRosBagRecorder:
         log_file.close()
 
     def start(self, path):
+        import threading
         if self.worker_thread is None:
             self.worker_thread = threading.Thread(target=self.__record_rosbag, args=(path,))
             self.worker_thread.start()
@@ -126,6 +135,8 @@ class JariRosbagReplayer(Node):
     def __init__(self):
         super().__init__("jari_rosbag_replayer")
 
+        self.config = Config()
+
         self.triggered_time = None
         self.next_pub_index_ego_odom = 0
         self.next_pub_index_perception = 0
@@ -139,32 +150,22 @@ class JariRosbagReplayer(Node):
 
         self.rosbag_recorder = BackgroundRosBagRecorder()
 
-        self.sub_odom = self.create_subscription(
-            Odometry, "/localization/kinematic_state", self.on_odom, 1
-        )
-        self.pub_ego_odom = self.create_publisher(
-            Odometry, "/localization/kinematic_state_rosbag", 1
-        )
-        self.pub_ego_control_cmd = self.create_publisher(
-            AckermannControlCommand, "/control/command/control_cmd_rosbag", 1
-        )
+        self.sub_odom_sim = self.create_subscription(
+            Odometry, "/localization/kinematic_state", self.on_odom_sim, 1)
+        self.pub_odom_real = self.create_publisher(
+            Odometry, "/localization/kinematic_state_rosbag", 1)
+        self.pub_control_cmd_real = self.create_publisher(
+            AckermannControlCommand, "/control/command/control_cmd_rosbag", 1)
         self.pub_ego_control_debug = self.create_publisher(
-            Float32MultiArrayDiagnostic, "/control/trajectory_follower/longitudinal/diagnostic_rosbag", 1
-        )
-        self.pub_perception = self.create_publisher(
-            PredictedObjects, "/perception/object_recognition/objects", 1
-        )
+            Float32MultiArrayDiagnostic, "/control/trajectory_follower/longitudinal/diagnostic_rosbag", 1)
+        self.pub_perception_real = self.create_publisher(
+            PredictedObjects, "/perception/object_recognition/objects", 1)
         self.pub_marker = self.create_publisher(
-            Marker, "/jari/debug_marker", 1
-        )
-
+            Marker, "/jari/debug_marker", 1)
         self.pub_pose_estimation = self.create_publisher(
-            PoseWithCovarianceStamped, "/initialpose", 1
-        )
-
-        self.pub_set_goal_pose = self.create_publisher(
-            PoseStamped, "/planning/mission_planning/goal", 1
-        )
+            PoseWithCovarianceStamped, "/initialpose", 1)
+        self.pub_goal_pose = self.create_publisher(
+            PoseStamped, "/planning/mission_planning/goal", 1)
 
         # analyzer
         self.forward_vehicle_object = None
@@ -185,7 +186,7 @@ class JariRosbagReplayer(Node):
         self.msg_debug_real = Float32MultiArrayStamped()
 
         # log path with timestamp
-        log_path = configs["rosbag_directory"] + "/rosbag/" + str(time.time())
+        log_path = self.config.rosbag_directory + "/rosbag/" + str(time.time())
         self.rosbag_recorder.start(log_path)
 
         time.sleep(1.0)  # wait for ready to publish/subscribe
@@ -194,7 +195,7 @@ class JariRosbagReplayer(Node):
 
         time.sleep(5.0)
 
-        self.load_rosbag(ROSBAG_PATH)
+        self.load_rosbag(self.config.rosbag_path)
         print("rosbag is loaded")
 
         self.publish_goal_pose()
@@ -215,7 +216,7 @@ class JariRosbagReplayer(Node):
         goal_pose.pose.orientation.y = 0.0
         goal_pose.pose.orientation.z = 0.6811543441258587
         goal_pose.pose.orientation.w = 0.7321398496725002
-        self.pub_set_goal_pose.publish(goal_pose)
+        self.pub_goal_pose.publish(goal_pose)
         print("send goal_pose")
 
     def publish_pose_estimation(self):
@@ -243,7 +244,6 @@ class JariRosbagReplayer(Node):
 
         velocity_ego_vehicle = msg.twist.twist.linear.x
         time_to_collision = dist_between_vehicles / velocity_ego_vehicle
-        # print(f"time_to_collision: {time_to_collision}")
 
         msg_dist = Float32Stamped()
         msg_dist.stamp = self.get_clock().now().to_msg()
@@ -288,7 +288,7 @@ class JariRosbagReplayer(Node):
         for obj in msg.objects:
             uuid0 = obj.object_id.uuid[0]
             uuid1 = obj.object_id.uuid[1]
-            if uuid0 == FORWARD_VEHICLE_UUID[0] and uuid1 == FORWARD_VEHICLE_UUID[1]:
+            if uuid0 == self.config.forward_vehicle_uuid[0] and uuid1 == self.config.forward_vehicle_uuid[1]:
                 self.forward_vehicle_object = obj
 
     def publish_line_marker(self):
@@ -300,12 +300,12 @@ class JariRosbagReplayer(Node):
         marker.id = 1
         marker.ns = "trigger_line"
         p1 = Point()
-        p1.x = POS_X_L
-        p1.y = POS_Y_L
+        p1.x = self.config.start_line_left_x
+        p1.y = self.config.start_line_left_y
         marker.points.append(p1)
         p2 = Point()
-        p2.x = POS_X_R
-        p2.y = POS_Y_R
+        p2.x = self.config.start_line_right_x
+        p2.y = self.config.start_line_right_y
         marker.points.append(p2)
         marker.color.a = 0.99
         marker.color.r = 1.0
@@ -320,69 +320,65 @@ class JariRosbagReplayer(Node):
         if self.triggered_time is None:  # not triggered yet
             msg = PredictedObjects()
             msg.header.stamp = self.get_clock().now().to_msg()
-            self.pub_perception.publish(msg)
+            self.pub_perception_real.publish(msg)
             self.analyze_on_objects(msg)
             return
 
         (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
         t_now = int(sec * 1e9) + nanosec
         t_spent_real = t_now - self.triggered_time
-        # print("t_now = ", t_now, ", triggered_time = ", self.triggered_time, "t_spent_from_triggered = ", t_spent_real*1.0e-9)
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_perception < len(self.rosbag_objects_data):
             object = self.rosbag_objects_data[self.next_pub_index_perception]
-            t_spent_rosbag = object[0] - T0
+            t_spent_rosbag = object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_perception += 1
                 continue
             if t_spent_rosbag < t_spent_real:
                 msg = object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
-                self.pub_perception.publish(msg)
+                self.pub_perception_real.publish(msg)
                 self.analyze_on_objects(msg)
                 self.next_pub_index_perception += 1
-                # print("perception published: ", self.next_pub_index_perception, "t_spent_rosbag: ", t_spent_rosbag)
             else:
                 break
 
         # publish_u ntil_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_odom < len(self.rosbag_ego_data):
             object = self.rosbag_ego_data[self.next_pub_index_ego_odom]
-            t_spent_rosbag = object[0] - T0
+            t_spent_rosbag = object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_odom += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
                 msg = object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
-                self.pub_ego_odom.publish(msg)
+                self.pub_odom_real.publish(msg)
                 self.analyze_on_odom_real(msg)
                 self.next_pub_index_ego_odom += + 1
-                # print("odom published: ", self.next_pub_index_ego_odom, "t_spent_rosbag: ", t_spent_rosbag)
             else:
                 break
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_control_cmd < len(self.rosbag_ego_control_cmd):
             object = self.rosbag_ego_control_cmd[self.next_pub_index_ego_control_cmd]
-            t_spent_rosbag = object[0] - T0
+            t_spent_rosbag = object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_cmd += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
                 msg = object[1]
                 msg.stamp = self.get_clock().now().to_msg()
-                self.pub_ego_control_cmd.publish(msg)
+                self.pub_control_cmd_real.publish(msg)
                 self.next_pub_index_ego_control_cmd += + 1
-                # print("odom published: ", self.next_pub_index_ego_control_cmd, "t_spent_rosbag: ", t_spent_rosbag)
             else:
                 break
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_control_debug < len(self.rosbag_ego_control_debug):
             object = self.rosbag_ego_control_debug[self.next_pub_index_ego_control_debug]
-            t_spent_rosbag = object[0] - T0
+            t_spent_rosbag = object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_debug += + 1
                 continue
@@ -392,11 +388,10 @@ class JariRosbagReplayer(Node):
                 msg.diag_header.computation_start = self.get_clock().now().to_msg()
                 self.pub_ego_control_debug.publish(msg)
                 self.next_pub_index_ego_control_debug += + 1
-                # print("odom published: ", self.next_pub_index_ego_control_debug, "t_spent_rosbag: ", t_spent_rosbag)
             else:
                 break
 
-    def on_odom(self, odom):
+    def on_odom_sim(self, odom):
         pos = odom.pose.pose.position
         if self.is_over_line(pos) == True and self.triggered_time is None:
             (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
@@ -423,7 +418,7 @@ class JariRosbagReplayer(Node):
             (topic, data, stamp) = reader.read_next()
             msg_type = get_message(type_map[topic])
             msg = deserialize_message(data, msg_type)
-            if (topic == perception_topic):
+            if (topic == self.pub_perception_real.topic_name):
                 self.rosbag_objects_data.append((stamp, msg))
             if (topic == ego_odom_topic):
                 self.rosbag_ego_data.append((stamp, msg))
@@ -443,7 +438,7 @@ class JariRosbagReplayer(Node):
             length_forward_vehicle = self.forward_vehicle_object.shape.dimensions.x
             width_forward_vehicle = self.forward_vehicle_object.shape.dimensions.y
             dist_between_vehicles = \
-                euclidean_dist * math.cos(yaw_diff) - BASELINK_TO_FRONT_EGO_VEHICLE - \
+                euclidean_dist * math.cos(yaw_diff) - self.config.baselink_to_front - \
                 (length_forward_vehicle / 2.0 * math.cos(yaw_diff) + \
                  width_forward_vehicle / 2.0 * math.sin(yaw_diff))
 
@@ -457,8 +452,8 @@ class JariRosbagReplayer(Node):
             debug_array.append(width_forward_vehicle / 2.0)
             debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
             debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
-            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE)
-            debug_array.append(BASELINK_TO_FRONT_EGO_VEHICLE + length_forward_vehicle / 2.0 * math.cos(
+            debug_array.append(self.config.baselink_to_front)
+            debug_array.append(self.config.baselink_to_front + length_forward_vehicle / 2.0 * math.cos(
                 yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
             debug_array.append(debug_array[4] - debug_array[10])
             debug_array.append(ego_vehicle_pose.position.x)
@@ -472,20 +467,19 @@ class JariRosbagReplayer(Node):
             return dist_between_vehicles
 
     def is_over_line(self, p):
-        dx0 = POS_X_L - POS_X_R
-        dy0 = POS_Y_L - POS_Y_R
-        dx1 = POS_X_L - p.x
-        dy1 = POS_Y_L - p.y
+        dx0 = self.config.start_line_left_x - self.config.start_line_right_x
+        dy0 = self.config.start_line_left_y - self.config.start_line_right_y
+        dx1 = self.config.start_line_left_x - p.x
+        dy1 = self.config.start_line_left_y - p.y
         outer = dx0 * dy1 - dy0 * dx1
         result = 'before line' if outer < 0 else 'OVER LINE!!!'
         print(self.get_clock().now().seconds_nanoseconds(), result)
-        # self.get_logger().info(result)
         return bool(outer > 0)
 
     def publish_empty_object(self):
         msg = PredictedObjects()
         msg.header.stamp = self.get_clock().now().to_msg()
-        self.pub_perception.publish(msg)
+        self.pub_perception_real.publish(msg)
 
 
 def main(args=None):
