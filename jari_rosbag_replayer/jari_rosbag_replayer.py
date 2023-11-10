@@ -21,12 +21,6 @@ from tier4_debug_msgs.msg import Float32Stamped, Float32MultiArrayStamped
 import tf_transformations
 from visualization_msgs.msg import Marker
 
-# T0 = config["bag_start_time"] + config["start_offset"]
-
-# FORWARD_VEHICLE_UUID = config["vehicle_uuid"]
-
-# BASELINK_TO_FRONT_EGO_VEHICLE = 3.55  # wheel base: 2.75m, front overhang: 0.8m
-
 TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
 ZOOM_IDENTITY = [1.0, 1.0, 1.0]
 
@@ -50,9 +44,6 @@ def euclidean_dist_from_poses(pose0, pose1):
     return math.sqrt(math.pow(x1 - x0, 2) + math.pow(y1 - y0, 2))
 
 
-# path of rosbag
-# ROSBAG_PATH = configs["rosbag_directory"] + "/" + config["bag_name"]
-
 class Config:
     def __init__(self, name="no27"):
         directory_path = Path(__file__).resolve().parent
@@ -69,7 +60,7 @@ class Config:
 
         self.rosbag_start_time = config["bag_start_time"] + config["start_offset"]
 
-        # wheel base: 2.75m, front overhang: 0.8m
+        # wheelbase: 2.75m, front overhang: 0.8m
         self.baselink_to_front = 3.55
 
         self.rosbag_path = configs["rosbag_directory"] + "/" + config["bag_name"]
@@ -109,7 +100,7 @@ class BackgroundRosBagRecorder:
         log_file = open(log_path, 'w')
         process = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT,
                                    preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
-        while self.finish_flag == False:
+        while not self.finish_flag:
             process.wait(timeout=1.0)
 
         system('notify-send "finish rosbag record!"')
@@ -234,7 +225,7 @@ class JariRosbagReplayer(Node):
         print("send pose estimation")
 
     def analyze_on_odom_sim(self, msg):
-        if self.forward_vehicle_object == None:
+        if self.forward_vehicle_object is None:
             return
 
         dist_between_vehicles = self.calc_dist_between_vehicles(
@@ -259,7 +250,7 @@ class JariRosbagReplayer(Node):
         self.pub_debug_sim.publish(self.msg_debug_sim)
 
     def analyze_on_odom_real(self, msg):
-        if self.forward_vehicle_object == None:
+        if self.forward_vehicle_object is None:
             return
 
         dist_between_vehicles = self.calc_dist_between_vehicles(
@@ -324,19 +315,19 @@ class JariRosbagReplayer(Node):
             self.analyze_on_objects(msg)
             return
 
-        (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
-        t_now = int(sec * 1e9) + nanosec
+        (sec, nano_sec) = self.get_clock().now().seconds_nanoseconds()
+        t_now = int(sec * 1e9) + nano_sec
         t_spent_real = t_now - self.triggered_time
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_perception < len(self.rosbag_objects_data):
-            object = self.rosbag_objects_data[self.next_pub_index_perception]
-            t_spent_rosbag = object[0] - self.config.rosbag_start_time
+            current_object = self.rosbag_objects_data[self.next_pub_index_perception]
+            t_spent_rosbag = current_object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_perception += 1
                 continue
             if t_spent_rosbag < t_spent_real:
-                msg = object[1]
+                msg = current_object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self.pub_perception_real.publish(msg)
                 self.analyze_on_objects(msg)
@@ -344,15 +335,15 @@ class JariRosbagReplayer(Node):
             else:
                 break
 
-        # publish_u ntil_spent_time (todo: make function)
+        # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_odom < len(self.rosbag_ego_data):
-            object = self.rosbag_ego_data[self.next_pub_index_ego_odom]
-            t_spent_rosbag = object[0] - self.config.rosbag_start_time
+            current_object = self.rosbag_ego_data[self.next_pub_index_ego_odom]
+            t_spent_rosbag = current_object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_odom += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
-                msg = object[1]
+                msg = current_object[1]
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self.pub_odom_real.publish(msg)
                 self.analyze_on_odom_real(msg)
@@ -362,13 +353,13 @@ class JariRosbagReplayer(Node):
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_control_cmd < len(self.rosbag_ego_control_cmd):
-            object = self.rosbag_ego_control_cmd[self.next_pub_index_ego_control_cmd]
-            t_spent_rosbag = object[0] - self.config.rosbag_start_time
+            current_object = self.rosbag_ego_control_cmd[self.next_pub_index_ego_control_cmd]
+            t_spent_rosbag = current_object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_cmd += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
-                msg = object[1]
+                msg = current_object[1]
                 msg.stamp = self.get_clock().now().to_msg()
                 self.pub_control_cmd_real.publish(msg)
                 self.next_pub_index_ego_control_cmd += + 1
@@ -377,13 +368,13 @@ class JariRosbagReplayer(Node):
 
         # publish_until_spent_time (todo: make function)
         while rclpy.ok() and self.next_pub_index_ego_control_debug < len(self.rosbag_ego_control_debug):
-            object = self.rosbag_ego_control_debug[self.next_pub_index_ego_control_debug]
-            t_spent_rosbag = object[0] - self.config.rosbag_start_time
+            current_object = self.rosbag_ego_control_debug[self.next_pub_index_ego_control_debug]
+            t_spent_rosbag = current_object[0] - self.config.rosbag_start_time
             if t_spent_rosbag < 0:  # do not use data before T0
                 self.next_pub_index_ego_control_debug += + 1
                 continue
             if t_spent_rosbag < t_spent_real:
-                msg = object[1]
+                msg = current_object[1]
                 msg.diag_header.data_stamp = self.get_clock().now().to_msg()
                 msg.diag_header.computation_start = self.get_clock().now().to_msg()
                 self.pub_ego_control_debug.publish(msg)
@@ -393,9 +384,9 @@ class JariRosbagReplayer(Node):
 
     def on_odom_sim(self, odom):
         pos = odom.pose.pose.position
-        if self.is_over_line(pos) == True and self.triggered_time is None:
-            (sec, nanosec) = self.get_clock().now().seconds_nanoseconds()
-            self.triggered_time = int(sec * 1e9) + nanosec
+        if self.is_over_line(pos) and self.triggered_time is None:
+            (sec, nano_sec) = self.get_clock().now().seconds_nanoseconds()
+            self.triggered_time = int(sec * 1e9) + nano_sec
         self.analyze_on_odom_sim(odom)
 
     def load_rosbag(self, rosbag2_path: str):
@@ -418,53 +409,52 @@ class JariRosbagReplayer(Node):
             (topic, data, stamp) = reader.read_next()
             msg_type = get_message(type_map[topic])
             msg = deserialize_message(data, msg_type)
-            if (topic == self.pub_perception_real.topic_name):
+            if topic == self.pub_perception_real.topic_name:
                 self.rosbag_objects_data.append((stamp, msg))
-            if (topic == ego_odom_topic):
+            if topic == ego_odom_topic:
                 self.rosbag_ego_data.append((stamp, msg))
-            if (topic == ego_control_cmd_topic):
+            if topic == ego_control_cmd_topic:
                 self.rosbag_ego_control_cmd.append((stamp, msg))
-            if (topic == ego_control_debug_topic):
+            if topic == ego_control_debug_topic:
                 self.rosbag_ego_control_debug.append((stamp, msg))
 
-        def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose, is_sim):
-            yaw_ego_vehicle = quaternion_to_yaw(ego_vehicle_pose.orientation)
-            yaw_forward_vehicle = quaternion_to_yaw(forward_vehicle_pose.orientation)
-            yaw_diff = math.fabs(yaw_ego_vehicle - yaw_forward_vehicle)
-            # print(f"yaw ego: {yaw_ego_vehicle}, yaw forward: {yaw_forward_vehicle}, diff: {yaw_diff}")
+    def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose, is_sim):
+        yaw_ego_vehicle = quaternion_to_yaw(ego_vehicle_pose.orientation)
+        yaw_forward_vehicle = quaternion_to_yaw(forward_vehicle_pose.orientation)
+        yaw_diff = math.fabs(yaw_ego_vehicle - yaw_forward_vehicle)
+        # print(f"yaw ego: {yaw_ego_vehicle}, yaw forward: {yaw_forward_vehicle}, diff: {yaw_diff}")
 
-            euclidean_dist = euclidean_dist_from_poses(ego_vehicle_pose, forward_vehicle_pose)
+        euclidean_dist = euclidean_dist_from_poses(ego_vehicle_pose, forward_vehicle_pose)
 
-            length_forward_vehicle = self.forward_vehicle_object.shape.dimensions.x
-            width_forward_vehicle = self.forward_vehicle_object.shape.dimensions.y
-            dist_between_vehicles = \
-                euclidean_dist * math.cos(yaw_diff) - self.config.baselink_to_front - \
-                (length_forward_vehicle / 2.0 * math.cos(yaw_diff) + \
-                 width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+        length_forward_vehicle = self.forward_vehicle_object.shape.dimensions.x
+        width_forward_vehicle = self.forward_vehicle_object.shape.dimensions.y
+        dist_between_vehicles = \
+            euclidean_dist * math.cos(yaw_diff) - self.config.baselink_to_front - \
+            (length_forward_vehicle / 2.0 * math.cos(yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
 
-            debug_array = []
-            debug_array.append(yaw_ego_vehicle)
-            debug_array.append(yaw_forward_vehicle)
-            debug_array.append(yaw_diff)
-            debug_array.append(euclidean_dist)
-            debug_array.append(euclidean_dist * math.cos(yaw_diff))
-            debug_array.append(length_forward_vehicle / 2.0)
-            debug_array.append(width_forward_vehicle / 2.0)
-            debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
-            debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
-            debug_array.append(self.config.baselink_to_front)
-            debug_array.append(self.config.baselink_to_front + length_forward_vehicle / 2.0 * math.cos(
-                yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
-            debug_array.append(debug_array[4] - debug_array[10])
-            debug_array.append(ego_vehicle_pose.position.x)
-            debug_array.append(ego_vehicle_pose.position.y)
+        debug_array = []
+        debug_array.append(yaw_ego_vehicle)
+        debug_array.append(yaw_forward_vehicle)
+        debug_array.append(yaw_diff)
+        debug_array.append(euclidean_dist)
+        debug_array.append(euclidean_dist * math.cos(yaw_diff))
+        debug_array.append(length_forward_vehicle / 2.0)
+        debug_array.append(width_forward_vehicle / 2.0)
+        debug_array.append((length_forward_vehicle / 2.0) * math.cos(yaw_diff))
+        debug_array.append((width_forward_vehicle / 2.0) * math.sin(yaw_diff))
+        debug_array.append(self.config.baselink_to_front)
+        debug_array.append(self.config.baselink_to_front + length_forward_vehicle / 2.0 * math.cos(
+            yaw_diff) + width_forward_vehicle / 2.0 * math.sin(yaw_diff))
+        debug_array.append(debug_array[4] - debug_array[10])
+        debug_array.append(ego_vehicle_pose.position.x)
+        debug_array.append(ego_vehicle_pose.position.y)
 
-            if is_sim:
-                self.msg_debug_sim.data = debug_array
-            else:
-                self.msg_debug_real.data = debug_array
+        if is_sim:
+            self.msg_debug_sim.data = debug_array
+        else:
+            self.msg_debug_real.data = debug_array
 
-            return dist_between_vehicles
+        return dist_between_vehicles
 
     def is_over_line(self, p):
         dx0 = self.config.start_line_left_x - self.config.start_line_right_x
@@ -483,6 +473,7 @@ class JariRosbagReplayer(Node):
 
 
 def main(args=None):
+    node = None
     try:
         rclpy.init(args=args)
         node = JariRosbagReplayer()
@@ -490,9 +481,10 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.rosbag_recorder.stop()
-        print("finish recording")
-        node.destroy_node()
+        if node is not None:
+            node.rosbag_recorder.stop()
+            print("finish recording")
+            node.destroy_node()
         rclpy.shutdown()
 
 
