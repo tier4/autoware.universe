@@ -285,8 +285,10 @@ class JariRosbagReplayer(Node):
         def publish_msg(msg):
             if target == 'perception':
                 self.pub_perception_real.publish(msg)
+                self.analyze_on_objects(msg)
             elif target == 'ego_odom':
                 self.pub_odom_real.publish(msg)
+                self.analyze_on_odom_real(msg)
             elif target == 'ego_control_cmd':
                 self.pub_control_cmd_real.publish(msg)
             elif target == 'ego_control_debug':
@@ -320,10 +322,6 @@ class JariRosbagReplayer(Node):
                 else:
                     msg.header.stamp = self.get_clock().now().to_msg()
                 publish_msg(msg)
-                if target == 'perception':
-                    self.analyze_on_objects(msg)
-                elif target == 'ego_odom':
-                    self.analyze_on_odom_real(msg)
                 increment_index()
             else:
                 break
