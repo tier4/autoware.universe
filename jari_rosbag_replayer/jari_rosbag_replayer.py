@@ -363,9 +363,13 @@ class JariRosbagReplayer(Node):
         type_map = {
             topic_types[i].name: topic_types[i].type for i in range(len(topic_types))}
 
+        odom_real_topic = '/localization/kinematic_state'
+        conrol_cmd_real_topic = '/control/command/control_cmd'
+        ego_control_debug_topic = '/control/trajectory_follower/longitudinal/diagnostic'
+
         topic_filter = StorageFilter(
-            topics=[self.pub_perception_real.topic_name, self.pub_odom_real.topic_name,
-                    self.pub_control_cmd_real.topic_name, self.pub_ego_control_debug.topic_name])
+            topics=[self.pub_perception_real.topic_name, odom_real_topic,
+                    conrol_cmd_real_topic, ego_control_debug_topic])
         reader.set_filter(topic_filter)
 
         while reader.has_next():
@@ -374,11 +378,11 @@ class JariRosbagReplayer(Node):
             msg = deserialize_message(data, msg_type)
             if topic == self.pub_perception_real.topic_name:
                 self.rosbag_objects_data.append((stamp, msg))
-            if topic == self.pub_odom_real.topic_name:
+            if topic == odom_real_topic:
                 self.rosbag_ego_data.append((stamp, msg))
-            if topic == self.pub_control_cmd_real.topic_name:
+            if topic == conrol_cmd_real_topic:
                 self.rosbag_ego_control_cmd.append((stamp, msg))
-            if topic == self.pub_ego_control_debug.topic_name:
+            if topic == ego_control_debug_topic:
                 self.rosbag_ego_control_debug.append((stamp, msg))
 
     def calc_dist_between_vehicles(self, ego_vehicle_pose, forward_vehicle_pose, is_sim):
