@@ -319,6 +319,8 @@ class JariRosbagReplayer(Node):
                 if target == 'ego_control_debug':
                     msg.diag_header.data_stamp = self.get_clock().now().to_msg()
                     msg.diag_header.computation_start = self.get_clock().now().to_msg()
+                elif target == 'ego_control_cmd':
+                    msg.stamp = self.get_clock().now().to_msg()
                 else:
                     msg.header.stamp = self.get_clock().now().to_msg()
                 publish_msg(msg)
