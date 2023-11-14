@@ -520,7 +520,49 @@ void BehaviorPathPlannerNode::run()
   // for remote operation
   publishModuleStatus(bt_manager_->getModulesStatus());
 
-  publishDebugMarker(bt_manager_->getDebugMarkers());
+  visualization_msgs::msg::MarkerArray path_msg;
+  for (size_t i = 0; i < path->points.size(); ++i) {
+    visualization_msgs::msg::Marker marker;
+    marker.header = path->header;
+    marker.id = i;
+    marker.ns = "resample_path";
+    marker.type = visualization_msgs::msg::Marker::ARROW;
+    marker.pose = path->points.at(i).point.pose;
+    marker.scale.y = marker.scale.z = 0.05;
+    marker.scale.x = 0.25;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+    marker.color.a = 0.999;  // Don't forget to set the alpha!
+    marker.color.r = 1.0;
+    marker.color.g = 0.5;
+    marker.color.b = 1.0;
+    path_msg.markers.push_back(marker);
+  }
+
+  visualization_msgs::msg::MarkerArray original_path_msg;
+  for (size_t i = 0; i < output.path->points.size(); ++i) {
+    visualization_msgs::msg::Marker marker;
+    marker.header = output.path->header;
+    marker.id = i;
+    marker.ns = "original_path";
+    marker.type = visualization_msgs::msg::Marker::ARROW;
+    marker.pose = output.path->points.at(i).point.pose;
+    marker.scale.y = marker.scale.z = 0.05;
+    marker.scale.x = 0.25;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.lifetime = rclcpp::Duration::from_seconds(0.5);
+    marker.color.a = 0.999;  // Don't forget to set the alpha!
+    marker.color.r = 1.0;
+    marker.color.g = 1.0;
+    marker.color.b = 1.0;
+    original_path_msg.markers.push_back(marker);
+  }
+
+  auto vec_array = bt_manager_->getDebugMarkers();
+  vec_array.push_back(path_msg);
+  vec_array.push_back(original_path_msg);
+  publishDebugMarker(vec_array);
+  // publishDebugMarker(bt_manager_->getDebugMarkers());
 
   if (planner_data_->parameters.visualize_drivable_area_for_shared_linestrings_lanelet) {
     const auto drivable_area_lines = marker_utils::createFurthestLineStringMarkerArray(
