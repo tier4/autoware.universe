@@ -26,10 +26,10 @@ POS_Y_R = 93120.3
 
 # start rosbag time: start time of the replayed rosbag
 # Note: this time is available by checking the time when the ego in rosbag exceeds the line above.
-# T0 = 1668048507772541470 # 1668048507, 772541470
-# T0 = 1664876748366648640
-# T0 = 1664876748066648640
-T0 = 1664876396000000000+3170024326441828+ 48550000000
+T0 = 1668046468876441828
+
+# set rosbag path
+ROSBAG_PATH = "/home/takumiito/jari_info/rosbag/noRe16_ego40k_tag10k_40m_vy1.0ms_b64370f4-8b54-4cdd-863d-11d942f6bc7f_2022-11-10-11-13-39"
 
 def get_rosbag_options(path, serialization_format="cdr"):
     storage_options = rosbag2_py.StorageOptions(uri=path, storage_id="sqlite3")
@@ -79,7 +79,7 @@ class JariRosbagReplayer(Node):
         self.rosbag_ego_data = []
         self.rosbag_ego_control_cmd = []
         self.rosbag_ego_control_debug = []
-        self.load_rosbag("/home/takumiito/jari_info/rosbag/noRe16_ego40k_tag10k_40m_vy1.0ms_b64370f4-8b54-4cdd-863d-11d942f6bc7f_2022-11-10-11-13-39")
+        self.load_rosbag(ROSBAG_PATH)
 
         self.publish_empty_object()
         self.publish_line_marker()
