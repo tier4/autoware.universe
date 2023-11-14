@@ -66,9 +66,6 @@ class JariRosbagReplayer(Node):
         self.pub_ego_control_cmd = self.create_publisher(
             AckermannControlCommand, "/control/command/control_cmd_rosbag", 1
         )
-        # self.pub_ego_control_debug = self.create_publisher(
-        #     Float32MultiArrayStamped, "/control/trajectory_follower/longitudinal/diagnostic_rosbag", 1
-        # )
         self.pub_perception = self.create_publisher(
             PredictedObjects, "/perception/object_recognition/objects", 1
         )
@@ -210,9 +207,7 @@ class JariRosbagReplayer(Node):
         perception_topic = '/perception/object_recognition/objects'
         ego_odom_topic = '/localization/kinematic_state'
         ego_control_cmd_topic = '/control/command/control_cmd'
-        # ego_control_debug_topic = '/control/trajectory_follower/longitudinal/diagnostic'
         topic_filter = StorageFilter(
-            # topics=[perception_topic, ego_odom_topic, ego_control_cmd_topic, ego_control_debug_topic])
             topics=[perception_topic, ego_odom_topic, ego_control_cmd_topic])
         reader.set_filter(topic_filter)
 
@@ -226,14 +221,6 @@ class JariRosbagReplayer(Node):
                 self.rosbag_ego_data.append((stamp, msg))
             if (topic == ego_control_cmd_topic):
                 self.rosbag_ego_control_cmd.append((stamp, msg))
-            # if (topic == ego_control_debug_topic):
-            #     self.rosbag_ego_control_debug.append((stamp, msg))
-
-        # print(self.rosbag_objects_data[0])
-        # print(self.rosbag_ego_data[0])
-        # print("rosbag_objects_data size: ", len(self.rosbag_objects_data))
-        # print("rosbag_ego_data size: ", len(self.rosbag_ego_data))
-        # print(self.rosbag_objects_data[0][1])
 
 
     def isOverLine(self, p):
