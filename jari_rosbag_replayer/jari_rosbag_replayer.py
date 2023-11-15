@@ -28,6 +28,8 @@ from autoware_auto_system_msgs.msg import AutowareState
 from tier4_external_api_msgs.srv import Engage
 import tf_transformations
 from visualization_msgs.msg import Marker
+import matplotlib.pyplot as plt
+import numpy as np
 
 TRANSLATION_IDENTITY = [0.0, 0.0, 0.0]
 ZOOM_IDENTITY = [1.0, 1.0, 1.0]
@@ -271,6 +273,8 @@ class JariRosbagReplayer(Node):
 
         self.config = Config()
 
+        self.log_analyzer = LogAnalyzer()
+
         self.triggered_time = None
         self.next_pub_index_ego_odom = 0
         self.next_pub_index_perception = 0
@@ -364,13 +368,21 @@ class JariRosbagReplayer(Node):
             True)
 
         velocity_ego_vehicle = msg.twist.twist.linear.x
-        time_to_collision = dist_between_vehicles / velocity_ego_vehicle
+        self.log_analyzer.speed_sim.append(velocity_ego_vehicle)
 
-        self.pub_distance_sim.publish(Float32Stamped(stamp=self.get_clock().now().to_msg(), data=dist_between_vehicles))
+        time_to_collision = 0.0
+        if velocity_ego_vehicle != 0.0:
+            time_to_collision = dist_between_vehicles / velocity_ego_vehicle
 
-        self.pub_ttc_sim.publish(Float32Stamped(stamp=self.get_clock().now().to_msg(), data=time_to_collision))
+        stamp = self._clock.now().to_msg()
 
-        self.msg_debug_sim.stamp = self.get_clock().now().to_msg()
+        self.pub_distance_sim.publish(Float32Stamped(stamp=stamp, data=dist_between_vehicles))
+        self.pub_ttc_sim.publish(Float32Stamped(stamp=stamp, data=time_to_collision))
+
+        self.log_analyzer.ttc_sim.append(time_to_collision)
+        self.log_analyzer.distance_sim.append(dist_between_vehicles)
+
+        self.msg_debug_sim.stamp = stamp
         self.pub_debug_sim.publish(self.msg_debug_sim)
 
     def analyze_on_odom_real(self, msg):
@@ -383,13 +395,22 @@ class JariRosbagReplayer(Node):
             False)
 
         velocity_ego_vehicle = msg.twist.twist.linear.x
-        time_to_collision = dist_between_vehicles / velocity_ego_vehicle
+        self.log_analyzer.speed_real.append(velocity_ego_vehicle)
+
+        time_to_collision = 0.0
+        if velocity_ego_vehicle != 0.0:
+            time_to_collision = dist_between_vehicles / velocity_ego_vehicle
+
+        stamp = self._clock.now().to_msg()
 
         self.pub_distance_real.publish(
-            Float32Stamped(stamp=self.get_clock().now().to_msg(), data=dist_between_vehicles))
-        self.pub_ttc_real.publish(Float32Stamped(stamp=self.get_clock().now().to_msg(), data=time_to_collision))
+            Float32Stamped(stamp=stamp, data=dist_between_vehicles))
+        self.pub_ttc_real.publish(Float32Stamped(stamp=stamp, data=time_to_collision))
 
-        self.msg_debug_real.stamp = self.get_clock().now().to_msg()
+        self.log_analyzer.ttc_real.append(time_to_collision)
+        self.log_analyzer.distance_real.append(dist_between_vehicles)
+
+        self.msg_debug_real.stamp = stamp
         self.pub_debug_real.publish(self.msg_debug_real)
 
     def analyze_on_objects(self, msg):
@@ -506,6 +527,7 @@ class JariRosbagReplayer(Node):
         if self.is_over_line(pos) and self.triggered_time is None:
             (sec, nano_sec) = self.get_clock().now().seconds_nanoseconds()
             self.triggered_time = int(sec * 1e9) + nano_sec
+            self.log_analyzer.start()
         self.analyze_on_odom_sim(odom)
 
     def load_rosbag(self, rosbag2_path: str):
