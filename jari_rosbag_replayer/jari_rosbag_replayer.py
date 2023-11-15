@@ -111,6 +111,45 @@ class BackgroundRosBagRecorder:
             self.worker_thread = None
 
 
+class AutowareOperator:
+    def __init__(self, node):
+        self.node = node
+        self.client_engage = node.create_client(
+            Engage, "/api/external/set/engage")
+
+        self.state = None
+        self.sub_autoware_state = node.create_subscription(
+            AutowareState, "/autoware/state", self.on_autoware_state, 1)
+
+        self.pub_pose_estimation = node.create_publisher(
+            PoseWithCovarianceStamped, "/initialpose", 1)
+        self.pub_goal_pose = node.create_publisher(
+            PoseStamped, "/planning/mission_planning/goal", 1)
+
+        self.pub_velocity_limit = node.create_publisher(
+            VelocityLimit, '/planning/scenario_planning/max_velocity_default',
+            rclpy.qos.QoSProfile(depth=1, durability=rclpy.qos.DurabilityPolicy.TRANSIENT_LOCAL))
+
+        # check client is ready
+        while not self.client_engage.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('engage service not available, waiting again...')
+
+    def on_autoware_state(self, msg):
+        self.state = msg.state
+
+    def engage(self, engage=True):
+        req = Engage.Request()
+        req.engage = engage
+        self.client_engage.call_async(req)
+        print("engage")
+
+    def set_velocity_limit(self, velocity_limit):
+        velocity_limit_msg = VelocityLimit()
+        velocity_limit_msg.max_velocity = velocity_limit
+        self.pub_velocity_limit.publish(velocity_limit_msg)
+        print("set velocity limit")
+
+
 class JariRosbagReplayer(Node):
     def __init__(self):
         super().__init__("jari_rosbag_replayer")
@@ -130,6 +169,8 @@ class JariRosbagReplayer(Node):
 
         self.rosbag_recorder = BackgroundRosBagRecorder()
 
+        self.autoware = AutowareOperator(self)
+
         self.sub_odom_sim = self.create_subscription(
             Odometry, "/localization/kinematic_state", self.on_odom_sim, 1)
         self.pub_odom_real = self.create_publisher(
@@ -142,10 +183,6 @@ class JariRosbagReplayer(Node):
             PredictedObjects, "/perception/object_recognition/objects", 1)
         self.pub_marker = self.create_publisher(
             Marker, "/jari/debug_marker", 1)
-        self.pub_pose_estimation = self.create_publisher(
-            PoseWithCovarianceStamped, "/initialpose", 1)
-        self.pub_goal_pose = self.create_publisher(
-            PoseStamped, "/planning/mission_planning/goal", 1)
 
         # analyzer
         self.forward_vehicle_object = None
@@ -190,7 +227,7 @@ class JariRosbagReplayer(Node):
         initial_pose.header.frame_id = "map"
         initial_pose.pose.pose.position = Point(x=16673.787109375, y=92971.7265625, z=0.0)
         initial_pose.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.6773713996525991, w=0.7356412080169781)
-        self.pub_pose_estimation.publish(initial_pose)
+        self.autoware.pub_pose_estimation.publish(initial_pose)
         print("send pose estimation")
 
     def publish_goal_pose(self):
@@ -199,7 +236,7 @@ class JariRosbagReplayer(Node):
         goal_pose.header.frame_id = "map"
         goal_pose.pose.position = Point(x=16713.16796875, y=93383.9296875, z=0.0)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.6811543441258587, w=0.7321398496725002)
-        self.pub_goal_pose.publish(goal_pose)
+        self.autoware.pub_goal_pose.publish(goal_pose)
         print("send goal_pose")
 
     def analyze_on_odom_sim(self, msg):
