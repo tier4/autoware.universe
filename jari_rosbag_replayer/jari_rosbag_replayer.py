@@ -106,7 +106,6 @@ class BackgroundRosBagRecorder:
         log_file.close()
 
     def start(self, path):
-        import threading
         if self.worker_thread is None:
             self.worker_thread = threading.Thread(target=self.__record_rosbag, args=(path,))
             self.worker_thread.start()
@@ -321,23 +320,29 @@ class JariRosbagReplayer(Node):
         self.msg_debug_sim = Float32MultiArrayStamped()
         self.msg_debug_real = Float32MultiArrayStamped()
 
-        # log path with timestamp
-        log_path = self.config.rosbag_directory + "/rosbag/" + str(time.time())
-        self.rosbag_recorder.start(log_path)
-
         time.sleep(1.0)  # wait for ready to publish/subscribe
 
-        self.publish_pose_estimation()
+        if self.autoware.state == AutowareState.DRIVING:
+            self.autoware.engage(False)
+            time.sleep(1.0)
 
-        time.sleep(5.0)
+        self.publish_pose_estimation()
 
         self.load_rosbag(self.config.rosbag_path)
         print("rosbag is loaded")
 
+        # log path with timestamp
+        log_path = self.config.rosbag_directory + "/rosbag/" + str(time.time())
+        self.rosbag_recorder.start(log_path)
+
         self.publish_goal_pose()
         self.publish_empty_object()
         self.publish_line_marker()
+        self.autoware.set_velocity_limit(self.config.velocity_limit_mps)
 
+        time.sleep(1.0)
+
+        self.engaged = False
         self.timer = self.create_timer(0.005, self.on_timer)
 
     def publish_pose_estimation(self):
@@ -503,6 +508,21 @@ class JariRosbagReplayer(Node):
                 break
 
     def on_timer(self):
+
+        if self.autoware.state is None:
+            return
+        if self.engaged is False:
+            if self.autoware.state == AutowareState.WAITING_FOR_ENGAGE:
+                self.autoware.engage(True)
+                self.engaged = True
+
+        if self.log_analyzer.should_finish():
+            self.autoware.engage(False)
+            self.rosbag_recorder.stop()
+            print("finish recording")
+            self.destroy_node()
+            os.kill(os.getpid(), signal.SIGINT)
+
         if self.triggered_time is None:  # not triggered yet
             msg = PredictedObjects()
             msg.header.stamp = self.get_clock().now().to_msg()
@@ -615,18 +635,26 @@ class JariRosbagReplayer(Node):
 def main(args=None):
     node = None
     try:
-        rclpy.init(args=args)
+        rclpy.init()
         node = JariRosbagReplayer()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        if node is not None:
-            node.rosbag_recorder.stop()
-            print("finish recording")
-            node.destroy_node()
         rclpy.shutdown()
+        time.sleep(15.0)
+        os.system('notify-send "finish!"')
 
 
 if __name__ == "__main__":
-    main()
+    number_of_experiment = 5
+    for i in range(number_of_experiment):
+        print(f"start experiment {i}")
+        worker = threading.Thread(target=main, daemon=True)
+        worker.start()
+        try:
+            worker.join()
+        except KeyboardInterrupt:
+            pass
+
+    # rclpy.shutdown()
