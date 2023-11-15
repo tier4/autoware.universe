@@ -23,6 +23,9 @@ from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_system_msgs.msg import Float32MultiArrayDiagnostic
 from std_msgs.msg import ColorRGBA
 from tier4_debug_msgs.msg import Float32Stamped, Float32MultiArrayStamped
+from tier4_planning_msgs.msg import VelocityLimit
+from autoware_auto_system_msgs.msg import AutowareState
+from tier4_external_api_msgs.srv import Engage
 import tf_transformations
 from visualization_msgs.msg import Marker
 
@@ -44,6 +47,8 @@ class Config:
         configs = json.load(open(directory_path / "config.json", "r"))
 
         config = configs[name]
+
+        self.velocity_limit_mps = config["velocity_limit"] / 3.6
 
         self.start_line_left_x = config["bag_start_line"]["left"][0]
         self.start_line_left_y = config["bag_start_line"]["left"][1]
@@ -109,6 +114,116 @@ class BackgroundRosBagRecorder:
         if self.worker_thread is not None:
             self.worker_thread.join()
             self.worker_thread = None
+
+
+class SeriesData:
+    def __init__(self, name, stamp_offset=time.time()):
+        self.name = name
+        self.stamp_offset = None
+        self.stamp = []
+        self.data = []
+
+    def set_start_offset(self, offset):
+        self.stamp_offset = offset
+
+    def clear(self):
+        self.stamp = []
+        self.data = []
+
+    def append(self, data):
+        self.stamp.append(time.time() - self.stamp_offset)
+        self.data.append(data)
+
+    def save(self, dir):
+        self.dir = dir + self.name + '/'
+        os.makedirs(self.dir, exist_ok=True)
+        np.save(self.dir + 'stamp.npy', np.array(self.stamp))
+        np.save(self.dir + 'data.npy', np.array(self.data))
+        #         save plot of series
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111)
+        ax.plot(self.stamp, self.data)
+        ax.set_title(self.name)
+        ax.set_ylabel(self.name)
+        ax.set_xlabel('time (s)')
+        fig.savefig(self.dir + 'plot.svg')
+
+
+class LogAnalyzer:
+    def __init__(self):
+        self.distance_real = SeriesData('distance_real')
+        self.distance_sim = SeriesData('distance_sim')
+        self.ttc_real = SeriesData('ttc_real')
+        self.ttc_sim = SeriesData('ttc_sim')
+        self.speed_real = SeriesData('speed_real')
+        self.speed_sim = SeriesData('speed_sim')
+        self.start_time = None
+        self.log_duration_sec = 20
+
+    def start(self):
+        self.start_time = time.time()
+        self.distance_real.set_start_offset(self.start_time)
+        self.distance_sim.set_start_offset(self.start_time)
+        self.ttc_real.set_start_offset(self.start_time)
+        self.ttc_sim.set_start_offset(self.start_time)
+        self.speed_real.set_start_offset(self.start_time)
+        self.speed_sim.set_start_offset(self.start_time)
+
+    def on_finish(self):
+        dir = "analysis/" + str(time.time()) + "/"
+
+        # save log
+        os.makedirs(dir, exist_ok=True)
+        # save data and stamp to npy file
+        self.distance_sim.save(dir)
+        self.distance_real.save(dir)
+        self.ttc_sim.save(dir)
+        self.ttc_real.save(dir)
+        self.speed_sim.save(dir)
+        self.speed_real.save(dir)
+
+        # plot distance of real and sim
+        plt.figure()
+        plt.title("distance")
+        plt.xlabel("time [s]")
+        plt.ylabel("distance [m]")
+        plt.plot(self.distance_real.stamp, self.distance_real.data, label="real")
+        plt.plot(self.distance_sim.stamp, self.distance_sim.data, label="sim")
+        plt.legend()
+        # savefig as svg
+        plt.savefig(dir + "distance.svg")
+        plt.close()
+
+        # plot ttc of real and sim
+        plt.figure()
+        plt.title("ttc")
+        plt.xlabel("time [s]")
+        plt.ylabel("ttc [s]")
+        plt.plot(self.ttc_real.stamp, self.ttc_real.data, label="real")
+        plt.plot(self.ttc_sim.stamp, self.ttc_sim.data, label="sim")
+        plt.legend()
+        plt.savefig(dir + "ttc.svg")
+        plt.close()
+
+        # plot speed of real and sim
+        plt.figure()
+        plt.title("speed")
+        plt.xlabel("time [s]")
+        plt.ylabel("speed [m/s]")
+        plt.plot(self.speed_real.stamp, self.speed_real.data, label="real")
+        plt.plot(self.speed_sim.stamp, self.speed_sim.data, label="sim")
+        plt.legend()
+        plt.savefig(dir + "speed.svg")
+        plt.close()
+
+    def should_finish(self):
+        if self.start_time is None:
+            return False
+        flag = (time.time() - self.start_time) > self.log_duration_sec
+        if flag:
+            self.on_finish()
+            return True
+        return False
 
 
 class AutowareOperator:
