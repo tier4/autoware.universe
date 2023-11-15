@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
+import os
+import signal
+import subprocess
 import time
 import json
 import math
+import threading
 from pathlib import Path
 
 import rclpy
@@ -79,10 +83,7 @@ class BackgroundRosBagRecorder:
         self.worker_thread = None
 
     def __record_rosbag(self, path):
-        from os import system
-        import subprocess
-        import signal
-        system('notify-send "start rosbag record!"')
+        os.system('notify-send "start rosbag record!"')
         command = ["ros2", "bag", "record", "-a", "-o", path, "-s", "mcap"]
         log_path = path + "-log.txt"
         log_file = open(log_path, 'w')
@@ -91,7 +92,7 @@ class BackgroundRosBagRecorder:
         while not self.finish_flag:
             time.sleep(1.0)
 
-        system('notify-send "finish rosbag record!"')
+        os.system('notify-send "finish rosbag record!"')
 
         process.send_signal(signal.SIGINT)
         process.wait()
@@ -429,8 +430,6 @@ class JariRosbagReplayer(Node):
         dx1 = self.config.start_line_left_x - p.x
         dy1 = self.config.start_line_left_y - p.y
         outer = dx0 * dy1 - dy0 * dx1
-        result = 'before line' if outer < 0 else 'OVER LINE!!!'
-        print(self.get_clock().now().seconds_nanoseconds(), result)
         return bool(outer > 0)
 
     def publish_empty_object(self):
