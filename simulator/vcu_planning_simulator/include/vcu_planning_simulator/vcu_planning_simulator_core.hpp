@@ -71,6 +71,7 @@ using geometry_msgs::msg::TransformStamped;
 using geometry_msgs::msg::Twist;
 using nav_msgs::msg::Odometry;
 using tier4_external_api_msgs::srv::InitializePose;
+using autoware_auto_mapping_msgs::msg::HADMapBin;
 
 class DeltaTime
 {
