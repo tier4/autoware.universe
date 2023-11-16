@@ -86,9 +86,6 @@ VcuPlanningSimulator::VcuPlanningSimulator(const rclcpp::NodeOptions & options)
   using std::placeholders::_1;
   using std::placeholders::_2;
 
-  sub_map_ = create_subscription<HADMapBin>(
-    "input/vector_map", rclcpp::QoS(10).transient_local(),
-    std::bind(&SimplePlanningSimulator::on_map, this, _1));
   sub_init_pose_ = create_subscription<PoseWithCovarianceStamped>(
     "input/initialpose", QoS{1}, std::bind(&VcuPlanningSimulator::on_initialpose, this, _1));
   sub_manual_ackermann_cmd_ = create_subscription<AckermannControlCommand>(
@@ -266,19 +263,6 @@ void VcuPlanningSimulator::on_timer()
   // publish vehicle state
   publish_odometry(current_odometry_);
   publish_tf(current_odometry_);
-}
-
-void SimplePlanningSimulator::on_map(const HADMapBin::ConstSharedPtr msg)
-{
-  auto lanelet_map_ptr = std::make_shared<lanelet::LaneletMap>();
-
-  lanelet::routing::RoutingGraphPtr routing_graph_ptr;
-  lanelet::traffic_rules::TrafficRulesPtr traffic_rules_ptr;
-  lanelet::utils::conversion::fromBinMsg(
-    *msg, lanelet_map_ptr, &traffic_rules_ptr, &routing_graph_ptr);
-
-  lanelet::ConstLanelets all_lanelets = lanelet::utils::query::laneletLayer(lanelet_map_ptr);
-  road_lanelets_ = lanelet::utils::query::roadLanelets(all_lanelets);
 }
 
 void VcuPlanningSimulator::on_initialpose(const PoseWithCovarianceStamped::ConstSharedPtr msg)

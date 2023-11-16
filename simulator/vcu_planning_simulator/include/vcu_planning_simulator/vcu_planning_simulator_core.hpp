@@ -38,7 +38,6 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "tier4_external_api_msgs/srv/initialize_pose.hpp"
-#include "autoware_auto_mapping_msgs/msg/had_map_bin.hpp"
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -71,7 +70,6 @@ using geometry_msgs::msg::TransformStamped;
 using geometry_msgs::msg::Twist;
 using nav_msgs::msg::Odometry;
 using tier4_external_api_msgs::srv::InitializePose;
-using autoware_auto_mapping_msgs::msg::HADMapBin;
 
 class DeltaTime
 {
@@ -120,7 +118,6 @@ private:
   rclcpp::Subscription<VelocityReport>::SharedPtr sub_velocity_report_;
   rclcpp::Subscription<VehicleControlCommand>::SharedPtr sub_vehicle_cmd_;
   rclcpp::Subscription<AckermannControlCommand>::SharedPtr sub_manual_ackermann_cmd_;
-  rclcpp::Subscription<HADMapBin>::SharedPtr sub_map_;
   rclcpp::Subscription<PoseWithCovarianceStamped>::SharedPtr sub_init_pose_;
   rclcpp::Subscription<Trajectory>::SharedPtr sub_trajectory_;
   rclcpp::Subscription<Engage>::SharedPtr sub_engage_;
@@ -190,11 +187,6 @@ private:
    * @brief set input steering, velocity from the vehicle interface reports
    */
   void set_input_from_vehicle_report(const SteeringReport & steer, const VelocityReport & vel);
-
- /**
-   * @brief subscribe lanelet map
-   */
-  void on_map(const HADMapBin::ConstSharedPtr msg);
 
   /**
    * @brief set initial pose for simulation with received message
