@@ -38,6 +38,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "tier4_external_api_msgs/srv/initialize_pose.hpp"
+#include "autoware_auto_mapping_msgs/msg/had_map_bin.hpp"
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
