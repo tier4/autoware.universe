@@ -127,7 +127,7 @@
 
   <!-- Simulator model -->
   <group if="$(var launch_dummy_vehicle)">
-    <arg name="simulator_model" default="$(var vcu_planning_simulator)/config/simulator_model.param.yaml" description="path to the file of simulator model"/>
+    <arg name="simulator_model" default="$(find-pkg-share vcu_planning_simulator)/config/simulator_model.param.yaml" description="path to the file of simulator model"/>
     <include file="$(find-pkg-share vcu_planning_simulator)/launch/vcu_planning_simulator.launch.py">
       <arg name="vehicle_info_param_file" value="$(var vehicle_info_param_file)"/>
       <arg name="simulator_model_param_file" value="$(var simulator_model)"/>
