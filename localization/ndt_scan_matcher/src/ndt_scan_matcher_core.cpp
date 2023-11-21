@@ -372,6 +372,38 @@ void NDTScanMatcher::callback_sensor_points(
     transformation_msg_array.push_back(pose_ros);
   }
 
+  if (true) {
+    std::array<double, 36> ndt_covariance_car = output_pose_covariance_;
+    std::array<double, 36> ndt_covariance_map = output_pose_covariance_;
+
+    // 車両進行方向に分散を十分大きくする(信頼度を落とす)
+    ndt_covariance_car[0] = 10000.0;
+
+    // 共分散行列のxyz成分を抽出する
+    std::vector<double> covariance_car_xyz = {
+      ndt_covariance_car[0],  ndt_covariance_car[1],  ndt_covariance_car[2],
+      ndt_covariance_car[6],  ndt_covariance_car[7],  ndt_covariance_car[8],
+      ndt_covariance_car[12], ndt_covariance_car[13], ndt_covariance_car[14]};
+
+    // 行列にする
+    Eigen::Map<Eigen::MatrixXd> cov_map(covariance_car_xyz.data(), 3, 3);
+    Eigen::Map<Eigen::MatrixXd> cov_car(covariance_car_xyz.data(), 3, 3);
+
+    // rotate base_link(car) -> map
+    Eigen::Quaterniond quat = Eigen::Quaterniond(
+      result_pose_msg.orientation.w, result_pose_msg.orientation.x, result_pose_msg.orientation.y,
+      result_pose_msg.orientation.z);
+    Eigen::Matrix3d R = quat.normalized().toRotationMatrix();
+    cov_map = R * cov_car * R.transpose();
+
+    // 共分散行列のxyz成分を置換する
+    for (Eigen::Index i = 0; i < cov_map.rows(); ++i) {
+      ndt_covariance_map[i] = cov_map(i);
+      ndt_covariance_map[i + 6] = cov_map(i + 3);
+      ndt_covariance_map[i + 12] = cov_map(i + 6);
+    }
+  }
+
   // perform several validations
   /*****************************************************************************
   The reason the add 2 to the ndt_ptr_->getMaximumIterations() is that there are bugs in
