@@ -94,9 +94,8 @@ struct DynamicAvoidanceParameters
 class DynamicAvoidanceModule : public SceneModuleInterface
 {
 public:
-  enum class PolygonGenerationMethod
-  {
-    EGO_PATH_BASE=0,
+  enum class PolygonGenerationMethod {
+    EGO_PATH_BASE = 0,
     OBJECT_PATH_BASE,
   };
   struct DynamicAvoidanceObject
@@ -137,7 +136,8 @@ public:
 
     void update(
       const MinMaxValue & arg_lon_offset_to_avoid, const MinMaxValue & arg_lat_offset_to_avoid,
-      const bool arg_is_collision_left, const bool arg_should_be_avoided, const PolygonGenerationMethod & arg_polygon_generation_method)
+      const bool arg_is_collision_left, const bool arg_should_be_avoided,
+      const PolygonGenerationMethod & arg_polygon_generation_method)
     {
       lon_offset_to_avoid = arg_lon_offset_to_avoid;
       lat_offset_to_avoid = arg_lat_offset_to_avoid;
@@ -241,7 +241,8 @@ public:
     {
       if (object_map_.count(uuid) != 0) {
         object_map_.at(uuid).update(
-          lon_offset_to_avoid, lat_offset_to_avoid, is_collision_left, should_be_avoided, polygon_generation_method);
+          lon_offset_to_avoid, lat_offset_to_avoid, is_collision_left, should_be_avoided,
+          polygon_generation_method);
       }
     }
 
@@ -294,7 +295,8 @@ private:
   void updateTargetObjects();
   bool willObjectCutIn(
     const std::vector<PathPointWithLaneId> & ego_path, const PredictedPath & predicted_path,
-    const double obj_tangent_vel, const LatLonOffset & lat_lon_offset, PolygonGenerationMethod & polygon_generation_method) const;
+    const double obj_tangent_vel, const LatLonOffset & lat_lon_offset,
+    PolygonGenerationMethod & polygon_generation_method) const;
   DecisionWithReason willObjectCutOut(
     const double obj_tangent_vel, const double obj_normal_vel, const bool is_object_left,
     const std::optional<DynamicAvoidanceObject> & prev_object) const;
