@@ -335,7 +335,7 @@ std::vector<PolygonPoint> concatenateTwoPolygons(
     double min_dist_to_intersection = std::numeric_limits<double>::max();
     PolygonPoint closest_intersect_point;
     for (size_t i = 0; i < get_in_poly().size() - 1; ++i) {
-      const auto intersection = intersect(
+      const auto intersection = tier4_autoware_utils::intersect(
         get_out_poly().at(curr_idx).point, get_out_poly().at(next_idx).point,
         get_in_poly().at(i).point, get_in_poly().at(i + 1).point);
       if (!intersection) {
