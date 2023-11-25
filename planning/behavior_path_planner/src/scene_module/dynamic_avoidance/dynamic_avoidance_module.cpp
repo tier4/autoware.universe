@@ -535,7 +535,7 @@ void DynamicAvoidanceModule::updateTargetObjects()
 
     // 2.f. calculate which side object will be against ego's path
     const auto future_obj_pose =
-      perception_utils::calcInterpolatedPose(obj_path, time_to_collision);
+      object_recognition_utils::calcInterpolatedPose(obj_path, time_to_collision);
     const bool is_collision_left = future_obj_pose
                                      ? isLeft(prev_module_path->points, future_obj_pose->position)
                                      : is_object_left;
@@ -592,7 +592,7 @@ DynamicAvoidanceModule::calcCollisionSection(
 
     const auto future_ego_pose = ego_path.at(i);
     const auto future_obj_pose =
-      perception_utils::calcInterpolatedPose(obj_path, elapsed_time);
+      object_recognition_utils::calcInterpolatedPose(obj_path, elapsed_time);
 
     if (future_obj_pose) {
       const double dist_ego_to_obj =
