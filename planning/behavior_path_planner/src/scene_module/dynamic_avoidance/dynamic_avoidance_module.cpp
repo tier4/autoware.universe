@@ -224,7 +224,7 @@ DynamicAvoidanceModule::DynamicAvoidanceModule(
   std::shared_ptr<DynamicAvoidanceParameters> parameters,
   const std::unordered_map<std::string, std::shared_ptr<RTCInterface>> & rtc_interface_ptr_map)
 : SceneModuleInterface{name, node, rtc_interface_ptr_map},
-  parameters_{std::move(parameters)},
+  parameters_{parameters},
   target_objects_manager_{TargetObjectsManager(
     parameters_->successive_num_to_entry_dynamic_avoidance_condition,
     parameters_->successive_num_to_exit_dynamic_avoidance_condition)}
