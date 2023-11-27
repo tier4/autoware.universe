@@ -318,6 +318,8 @@ BehaviorModuleOutput DynamicAvoidanceModule::plan()
   std::vector<DrivableAreaInfo::Obstacle> obstacles_for_drivable_area;
   for (const auto & object : target_objects_) {
     const auto obstacle_poly = [&]() {
+      return calcEgoPathBasedDynamicObstaclePolygon(object);
+      /*
       if (object.polygon_generation_method == PolygonGenerationMethod::EGO_PATH_BASE) {
         return calcEgoPathBasedDynamicObstaclePolygon(object);
       }
@@ -325,6 +327,7 @@ BehaviorModuleOutput DynamicAvoidanceModule::plan()
         return calcObjectPathBasedDynamicObstaclePolygon(object);
       }
       throw std::logic_error("The polygon_generation_method's string is invalid.");
+      */
     }();
     if (obstacle_poly) {
       obstacles_for_drivable_area.push_back(
