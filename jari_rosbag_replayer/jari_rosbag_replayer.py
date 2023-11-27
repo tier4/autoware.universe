@@ -44,7 +44,7 @@ def euclidean_dist_from_poses(pose0, pose1):
 
 
 class Config:
-    def __init__(self, name="no27"):
+    def __init__(self, name="no27_acc"):
         directory_path = Path(__file__).resolve().parent
         configs = json.load(open(directory_path / "config.json", "r"))
 
@@ -641,13 +641,12 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        rclpy.shutdown()
         time.sleep(15.0)
         os.system('notify-send "finish!"')
 
 
 if __name__ == "__main__":
-    number_of_experiment = 5
+    number_of_experiment = 1
     for i in range(number_of_experiment):
         print(f"start experiment {i}")
         worker = threading.Thread(target=main, daemon=True)
@@ -656,5 +655,3 @@ if __name__ == "__main__":
             worker.join()
         except KeyboardInterrupt:
             pass
-
-    # rclpy.shutdown()
