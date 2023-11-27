@@ -63,6 +63,7 @@ def launch_setup(context, *args, **kwargs):
             ("input/engage", "/vehicle/engage"),
             ("input/control_mode_request", "/control/control_mode_request"),
             ("output/odometry", "/localization/kinematic_state"),
+            ("output/acceleration", "/localization/acceleration"),
         ],
     )
 
