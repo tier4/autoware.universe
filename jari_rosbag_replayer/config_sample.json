@@ -1,0 +1,23 @@
+{
+    "rosbag_directory": "/media/autoware/SSD/rosbag_dir",
+    "project_code_xx": {
+        "bag_name": "name_of_bag_directory",
+        "bag_start_time": 1668144490000000000,
+        "start_offset": 8900000000,
+        "velocity_limit": 30.0,
+        "bag_start_line": {
+            "right": [
+                16676.7,
+                92973.7
+            ],
+            "left": [
+                16670.7,
+                92973.7
+            ]
+        },
+        "vehicle_uuid": [
+            64,
+            35
+        ]
+    }
+}
