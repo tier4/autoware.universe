@@ -115,6 +115,7 @@ VcuPlanningSimulator::VcuPlanningSimulator(const rclcpp::NodeOptions & options)
     "input/engage", rclcpp::QoS{1}, std::bind(&VcuPlanningSimulator::on_engage, this, _1));
 
   pub_odom_ = create_publisher<Odometry>("output/odometry", QoS{1});
+  pub_acc_ = create_publisher<AccelWithCovarianceStamped>("output/acceleration", QoS{1});
   pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>("/tf", QoS{1});
 
   /* set param callback */
@@ -263,6 +264,7 @@ void VcuPlanningSimulator::on_timer()
   // publish vehicle state
   publish_odometry(current_odometry_);
   publish_tf(current_odometry_);
+  publish_acceleration();
 }
 
 void VcuPlanningSimulator::on_initialpose(const PoseWithCovarianceStamped::ConstSharedPtr msg)
@@ -443,6 +445,24 @@ void VcuPlanningSimulator::publish_odometry(const Odometry & odometry)
   msg.header.stamp = get_clock()->now();
   msg.child_frame_id = simulated_frame_id_;
   pub_odom_->publish(msg);
+}
+
+void VcuPlanningSimulator::publish_acceleration()
+{
+  AccelWithCovarianceStamped msg;
+  msg.header.frame_id = "/base_link";
+  msg.header.stamp = get_clock()->now();
+  msg.accel.accel.linear.x = vehicle_model_ptr_->getAx();
+
+  using COV_IDX = tier4_autoware_utils::xyzrpy_covariance_index::XYZRPY_COV_IDX;
+  constexpr auto COV = 0.001;
+  msg.accel.covariance.at(COV_IDX::X_X) = COV;          // linear x
+  msg.accel.covariance.at(COV_IDX::Y_Y) = COV;          // linear y
+  msg.accel.covariance.at(COV_IDX::Z_Z) = COV;          // linear z
+  msg.accel.covariance.at(COV_IDX::ROLL_ROLL) = COV;    // angular x
+  msg.accel.covariance.at(COV_IDX::PITCH_PITCH) = COV;  // angular y
+  msg.accel.covariance.at(COV_IDX::YAW_YAW) = COV;      // angular z
+  pub_acc_->publish(msg);
 }
 
 void VcuPlanningSimulator::publish_tf(const Odometry & odometry)

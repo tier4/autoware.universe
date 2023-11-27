@@ -31,6 +31,7 @@
 #include "autoware_auto_vehicle_msgs/msg/vehicle_control_command.hpp"
 #include "autoware_auto_vehicle_msgs/msg/velocity_report.hpp"
 #include "autoware_auto_vehicle_msgs/srv/control_mode_command.hpp"
+#include "geometry_msgs/msg/accel_with_covariance_stamped.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
@@ -63,6 +64,7 @@ using autoware_auto_vehicle_msgs::msg::SteeringReport;
 using autoware_auto_vehicle_msgs::msg::VehicleControlCommand;
 using autoware_auto_vehicle_msgs::msg::VelocityReport;
 using autoware_auto_vehicle_msgs::srv::ControlModeCommand;
+using geometry_msgs::msg::AccelWithCovarianceStamped;
 using geometry_msgs::msg::Pose;
 using geometry_msgs::msg::PoseStamped;
 using geometry_msgs::msg::PoseWithCovarianceStamped;
@@ -110,6 +112,7 @@ public:
 private:
   /* ros system */
   rclcpp::Publisher<Odometry>::SharedPtr pub_odom_;
+  rclcpp::Publisher<AccelWithCovarianceStamped>::SharedPtr pub_acc_;
   rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr pub_tf_;
 
   rclcpp::Subscription<GearReport>::SharedPtr sub_gear_report_;
@@ -270,6 +273,11 @@ private:
    * @param [in] odometry The odometry to publish
    */
   void publish_odometry(const Odometry & odometry);
+
+  /**
+   * @brief publish acceleration
+   */
+  void publish_acceleration();
 
   /**
    * @brief publish tf
