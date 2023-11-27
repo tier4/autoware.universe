@@ -641,17 +641,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        time.sleep(15.0)
         os.system('notify-send "finish!"')
 
 
 if __name__ == "__main__":
-    number_of_experiment = 1
-    for i in range(number_of_experiment):
-        print(f"start experiment {i}")
-        worker = threading.Thread(target=main, daemon=True)
-        worker.start()
-        try:
-            worker.join()
-        except KeyboardInterrupt:
-            pass
+    main()
