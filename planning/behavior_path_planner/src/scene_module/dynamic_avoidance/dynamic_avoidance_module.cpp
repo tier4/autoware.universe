@@ -408,7 +408,9 @@ void DynamicAvoidanceModule::updateTargetObjects()
   for (const auto & predicted_object : predicted_objects) {
     const auto obj_uuid = tier4_autoware_utils::toHexString(predicted_object.object_id);
     const auto & obj_pose = predicted_object.kinematics.initial_pose_with_covariance.pose;
-    const double obj_vel = predicted_object.kinematics.initial_twist_with_covariance.twist.linear.x;
+    const double obj_vel_norm = std::hypot(
+      predicted_object.kinematics.initial_twist_with_covariance.twist.linear.x,
+      predicted_object.kinematics.initial_twist_with_covariance.twist.linear.y);
     const auto prev_object = getObstacleFromUuid(prev_objects, obj_uuid);
     const auto obj_path = *std::max_element(
       predicted_object.kinematics.predicted_paths.begin(),
@@ -442,7 +444,7 @@ void DynamicAvoidanceModule::updateTargetObjects()
                                              ? parameters_->min_overtaking_crossing_object_vel
                                              : parameters_->min_oncoming_crossing_object_vel;
     const bool is_crossing_object_to_ignore =
-      min_crossing_object_vel < std::abs(obj_vel) && is_obstacle_crossing_path;
+      min_crossing_object_vel < obj_vel_norm && is_obstacle_crossing_path;
     if (is_crossing_object_to_ignore) {
       RCLCPP_INFO_EXPRESSION(
         getLogger(), parameters_->enable_debug_info,
