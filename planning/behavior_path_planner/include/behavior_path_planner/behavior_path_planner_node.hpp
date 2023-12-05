@@ -178,7 +178,7 @@ private:
   /**
    * @brief publish reroute availability
    */
-  void publish_reroute_availability();
+  void publish_reroute_availability() const;
 
   /**
    * @brief publish steering factor from intersection
