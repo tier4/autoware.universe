@@ -91,6 +91,8 @@ if(TRT_AVAIL AND CUDA_AVAIL AND CUDNN_AVAIL)
     lib/preprocess/voxel_generator.cpp
   )
 
+  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -lineinfo")
+
   cuda_add_library(centerpoint_cuda_lib SHARED
     lib/postprocess/circle_nms_kernel.cu
     lib/postprocess/postprocess_kernel.cu
