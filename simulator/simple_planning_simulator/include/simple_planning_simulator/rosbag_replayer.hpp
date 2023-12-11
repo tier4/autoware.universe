@@ -45,6 +45,71 @@
 #include <vector>
 
 
+using Engage = tier4_external_api_msgs::srv::Engage;
+class AutowareOperator
+{
+public:
+  AutowareOperator(rclcpp::Node::SharedPtr node) : node(node)
+  {
+    client_engage = node->create_client<Engage>("/api/external/set/engage");
+    pub_pose_estimation =
+      node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 1);
+    pub_goal_pose =
+      node->create_publisher<geometry_msgs::msg::PoseStamped>("/planning/mission_planning/goal", 1);
+    pub_velocity_limit = node->create_publisher<tier4_planning_msgs::msg::VelocityLimit>(
+      "/planning/scenario_planning/max_velocity_default",
+      rclcpp::QoS(rclcpp::KeepLast(1)).transient_local());
+
+    sub_autoware_state = node->create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
+      "/autoware/state", 1,
+      [this](const autoware_auto_system_msgs::msg::AutowareState::SharedPtr msg) { state = msg; });
+
+    checkServiceConnection();
+  }
+
+  void checkServiceConnection(void)
+  {
+    while (!client_engage->wait_for_service(std::chrono::seconds(1))) {
+      RCLCPP_INFO(node->get_logger(), "engage service not available, waiting again...");
+    }
+  }
+
+  void engage(bool engage)
+  {
+    auto req = std::make_shared<Engage::Request>();
+    req->engage = engage;
+    auto future = client_engage->async_send_request(req);
+    auto status = future.wait_for(std::chrono::seconds(1));
+    if (status == std::future_status::ready) {
+      auto response = future.get();
+      if (response->status.code == response->status.SUCCESS) {
+        RCLCPP_INFO(node->get_logger(), "engage success");
+      } else {
+        RCLCPP_ERROR(node->get_logger(), "engage failed");
+      }
+    } else {
+      RCLCPP_ERROR(node->get_logger(), "engage timeout");
+    }
+  }
+
+  void setVelocityLimit(float velocity_limit)
+  {
+    auto msg = std::make_shared<tier4_planning_msgs::msg::VelocityLimit>();
+    msg->max_velocity = velocity_limit;
+    pub_velocity_limit->publish(*msg);
+  }
+
+private:
+  rclcpp::Node::SharedPtr node;
+  rclcpp::Client<Engage>::SharedPtr client_engage;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_pose_estimation;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_goal_pose;
+  rclcpp::Publisher<tier4_planning_msgs::msg::VelocityLimit>::SharedPtr pub_velocity_limit;
+  rclcpp::Subscription<autoware_auto_system_msgs::msg::AutowareState>::SharedPtr sub_autoware_state;
+  autoware_auto_system_msgs::msg::AutowareState::SharedPtr state = nullptr;
+};
+
+
 class Config
 {
 public:
