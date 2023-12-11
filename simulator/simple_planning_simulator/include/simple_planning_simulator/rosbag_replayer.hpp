@@ -180,6 +180,23 @@ private:
   // publisher for analyzer
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr distance_publisher;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr ttc_publisher;
+
+  Config config;
+
+  template<typename MessageT>
+  struct TopicStore
+  {
+    std::vector<MessageT> store;
+    typename  std::vector<MessageT>::iterator iterator;
+  };
+
+  struct RosbagData
+  {
+    TopicStore<nav_msgs::msg::Odometry> ego_odom;
+    TopicStore<autoware_auto_perception_msgs::msg::PredictedObjects> perception;
+    TopicStore<autoware_auto_control_msgs::msg::AckermannControlCommand> ego_control_cmd;
+    TopicStore<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic> ego_control_debug;
+  } rosbag_data;
 };
 
 
