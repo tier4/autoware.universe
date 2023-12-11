@@ -87,6 +87,7 @@
 namespace pointcloud_preprocessor
 {
 using autoware_point_types::PointXYZI;
+using autoware_point_types::PointXYZIE;
 using point_cloud_msg_wrapper::PointCloud2Modifier;
 /** \brief @b PointCloudConcatenateDataSynchronizerComponent is a special form of data
  * synchronizer: it listens for a set of input PointCloud messages on the same topic,
@@ -142,6 +143,8 @@ private:
   // XmlRpc::XmlRpcValue input_topics_;
   std::vector<std::string> input_topics_;
 
+  bool for_eval_;
+
   /** \brief TF listener object. */
   std::shared_ptr<tf2_ros::Buffer> tf2_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf2_listener_;
@@ -163,6 +166,9 @@ private:
   void publish();
 
   void convertToXYZICloud(
+    const sensor_msgs::msg::PointCloud2::SharedPtr & input_ptr,
+    sensor_msgs::msg::PointCloud2::SharedPtr & output_ptr);
+  void convertToXYZIECloud(
     const sensor_msgs::msg::PointCloud2::SharedPtr & input_ptr,
     sensor_msgs::msg::PointCloud2::SharedPtr & output_ptr);
   void setPeriod(const int64_t new_period);
