@@ -54,6 +54,8 @@
 #include <string>
 #include <vector>
 
+#include "rosbag_replayer.hpp"
+
 namespace simulation
 {
 namespace simple_planning_simulator
@@ -204,6 +206,7 @@ private:
   } vehicle_model_type_;  //!< @brief vehicle model type to decide the model dynamics
   std::shared_ptr<SimModelInterface> vehicle_model_ptr_;  //!< @brief vehicle model pointer
 
+  std::unique_ptr<RealRosbagReplayer> real_rosbag_replayer_ = nullptr;  //!< @brief real rosbag replayer
   /**
    * @brief set current_vehicle_cmd_ptr_ with received message
    */

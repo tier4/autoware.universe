@@ -115,7 +115,7 @@ public:
   {
     std::string directory_path =
       ament_index_cpp::get_package_share_directory("simple_planning_simulator");
-    std::ifstream ifs(directory_path + "/config.json");
+    std::ifstream ifs(directory_path + "/param/config.json");
     if (!ifs.is_open()) {
       std::cerr << "cannot open config file" << std::endl;
       exit(1);
@@ -161,7 +161,7 @@ public:
 class RealRosbagReplayer
 {
 public:
-  RealRosbagReplayer(rclcpp::Node & node) : rosbag_data(node)
+  RealRosbagReplayer(rclcpp::Node & node, std::string config_name) : config(config_name), rosbag_data(node)
   {
     marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
       "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
@@ -171,13 +171,10 @@ public:
       "/planning/mission_planning/mission_planning/debug/ttc", 1);
   }
 
-  void loadRosbag(std::filesystem::path rosbag_path)
+  void loadRosbag()
   {
-    rosbag2_storage::StorageOptions storage_options;
-    storage_options.uri = rosbag_path.string();
-    storage_options.storage_id = "sqlite3";
     rosbag2_cpp::Reader reader;
-    reader.open(rosbag_path.string());
+    reader.open(config.rosbag_path.string());
 
     while (reader.has_next()) {
       auto serialized_message = reader.read_next();
@@ -225,7 +222,6 @@ public:
 
   void publishRosbagData(int64_t current_time_ns)
   {
-    // convert current_time to
     auto publish = [this, current_time_ns](auto & store, auto & publisher) {
       while (store.iterator != store.store.end() && store.iterator->first <= current_time_ns) {
         publisher->publish(store.iterator->second);

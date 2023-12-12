@@ -85,6 +85,9 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
   using std::placeholders::_1;
   using std::placeholders::_2;
 
+  real_rosbag_replayer_ = std::make_unique<RealRosbagReplayer>(*this, "no27");
+  real_rosbag_replayer_->loadRosbag();
+
   sub_init_pose_ = create_subscription<PoseWithCovarianceStamped>(
     "/initialpose", QoS{1}, std::bind(&SimplePlanningSimulator::on_initialpose, this, _1));
   sub_ackermann_cmd_ = create_subscription<AckermannControlCommand>(
