@@ -259,6 +259,13 @@ private:
 
     void createPublishThead(std::chrono::system_clock::time_point start_time)
     {
+      // check start_time is nearly now
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - start_time);
+        if (std::abs(diff.count()) > 100) {
+          std::cerr << "start time is too old / " << std::endl;
+          exit(1);
+        }
       publish_thread = std::make_unique<std::thread>([this, start_time]() {
         while (1) {
           // sleep until next message time stamp is reached
