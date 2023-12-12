@@ -163,17 +163,6 @@ class RealRosbagReplayer
 public:
   RealRosbagReplayer(rclcpp::Node & node) : rosbag_data(node)
   {
-    perception_publisher =
-      node.create_publisher<autoware_auto_perception_msgs::msg::PredictedObjects>(
-        "/perception/object_recognition/objects", 1);
-    odom_publisher =
-      node.create_publisher<nav_msgs::msg::Odometry>("/localization/odometry/filtered", 1);
-    control_cmd_publisher =
-      node.create_publisher<autoware_auto_control_msgs::msg::AckermannControlCommand>(
-        "/control/trajectory_follower/longitudinal/control_cmd", 1);
-    control_debug_publisher =
-      node.create_publisher<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>(
-        "/control/trajectory_follower/longitudinal/debug", 1);
     marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
       "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
     distance_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
@@ -250,18 +239,7 @@ public:
   }
 
 private:
-  rclcpp::Publisher<autoware_auto_perception_msgs::msg::PredictedObjects>::SharedPtr
-    perception_publisher;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher;
-  rclcpp::Publisher<autoware_auto_control_msgs::msg::AckermannControlCommand>::SharedPtr
-    control_cmd_publisher;
-
-  // publisher for debug
-  rclcpp::Publisher<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>::SharedPtr
-    control_debug_publisher;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_publisher;
-
-  // publisher for analyzer
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr distance_publisher;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr ttc_publisher;
 
