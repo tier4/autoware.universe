@@ -234,6 +234,21 @@ public:
     }
   }
 
+  void publishRosbagData(int64_t current_time_ns)
+  {
+    // convert current_time to
+    auto publish = [this, current_time_ns](auto & store, auto & publisher) {
+      while (store.iterator != store.store.end() && store.iterator->first <= current_time_ns) {
+        publisher->publish(store.iterator->second);
+        store.iterator++;
+      }
+    };
+    publish(rosbag_data.ego_odom, rosbag_data.ego_odom.publisher);
+    publish(rosbag_data.ego_control_cmd, rosbag_data.ego_control_cmd.publisher);
+    publish(rosbag_data.ego_control_debug, rosbag_data.ego_control_debug.publisher);
+    publish(rosbag_data.perception, rosbag_data.perception.publisher);
+  }
+
 private:
   rclcpp::Publisher<autoware_auto_perception_msgs::msg::PredictedObjects>::SharedPtr
     perception_publisher;
@@ -261,10 +276,27 @@ private:
     std::vector<MessageWithStamp> store;
     typename std::vector<MessageWithStamp>::iterator iterator;
     typename rclcpp::Publisher<MessageT>::SharedPtr publisher = nullptr;
+    std::unique_ptr<std::thread> publish_thread = nullptr;
 
     void createPublisher(rclcpp::Node & node)
     {
       publisher = node.create_publisher<MessageT>(topic_name, 1);
+    }
+
+    void createPublishThead(std::chrono::system_clock::time_point start_time)
+    {
+      publish_thread = std::make_unique<std::thread>([this, start_time]() {
+        while (1) {
+          // sleep until next message time stamp is reached
+          if (iterator != store.end()) {
+            std::this_thread::sleep_until(start_time + std::chrono::nanoseconds(iterator->first));
+            publisher->publish(iterator->second);
+            iterator++;
+          } else {
+            break;
+          }
+        }
+      });
     }
   };
 
@@ -284,6 +316,13 @@ private:
       perception.createPublisher(node);
       ego_control_cmd.createPublisher(node);
       ego_control_debug.createPublisher(node);
+    }
+
+    void startPublishThreads(std::chrono::system_clock::time_point start_time){
+        ego_odom.createPublishThead(start_time);
+        perception.createPublishThead(start_time);
+        ego_control_cmd.createPublishThead(start_time);
+        ego_control_debug.createPublishThead(start_time);
     }
   } rosbag_data;
 };
