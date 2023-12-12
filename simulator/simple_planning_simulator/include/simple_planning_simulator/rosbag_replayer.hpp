@@ -281,10 +281,10 @@ private:
     TopicStore<autoware_auto_control_msgs::msg::AckermannControlCommand> ego_control_cmd;
     TopicStore<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic> ego_control_debug;
     RosbagData(rclcpp::Node & node)
-    : ego_odom("/localization/odometry/filtered"),
+    : ego_odom("/localization/kinematic_state_rosbag"),
       perception("/perception/object_recognition/objects"),
-      ego_control_cmd("/control/trajectory_follower/longitudinal/control_cmd"),
-      ego_control_debug("/control/trajectory_follower/longitudinal/debug")
+      ego_control_cmd("/control/command/control_cmd_rosbag"),
+      ego_control_debug("/control/trajectory_follower/longitudinal/diagnostic_rosbag")
     {
       ego_odom.createPublisher(node);
       perception.createPublisher(node);
