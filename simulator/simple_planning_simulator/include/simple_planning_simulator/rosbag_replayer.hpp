@@ -17,9 +17,9 @@
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <nlohmann/json.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <rosbag2_cpp/storage_options.hpp>
-#include <rclcpp/rclcpp.hpp>
 
 #include <autoware_auto_control_msgs/msg/ackermann_control_command.hpp>
 #include <autoware_auto_perception_msgs/msg/predicted_objects.hpp>
@@ -163,21 +163,23 @@ class RealRosbagReplayer
 public:
   RealRosbagReplayer(rclcpp::Node & node) : rosbag_data(node)
   {
-        perception_publisher = node.create_publisher<autoware_auto_perception_msgs::msg::PredictedObjects>(
-          "/perception/object_recognition/objects", 1);
-        odom_publisher = node.create_publisher<nav_msgs::msg::Odometry>("/localization/odometry/filtered", 1);
-        control_cmd_publisher =
-          node.create_publisher<autoware_auto_control_msgs::msg::AckermannControlCommand>(
-                "/control/trajectory_follower/longitudinal/control_cmd", 1);
-        control_debug_publisher =
-          node.create_publisher<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>(
-                "/control/trajectory_follower/longitudinal/debug", 1);
-        marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
-          "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
-        distance_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
-          "/planning/mission_planning/mission_planning/debug/distance", 1);
-        ttc_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
-          "/planning/mission_planning/mission_planning/debug/ttc", 1);
+    perception_publisher =
+      node.create_publisher<autoware_auto_perception_msgs::msg::PredictedObjects>(
+        "/perception/object_recognition/objects", 1);
+    odom_publisher =
+      node.create_publisher<nav_msgs::msg::Odometry>("/localization/odometry/filtered", 1);
+    control_cmd_publisher =
+      node.create_publisher<autoware_auto_control_msgs::msg::AckermannControlCommand>(
+        "/control/trajectory_follower/longitudinal/control_cmd", 1);
+    control_debug_publisher =
+      node.create_publisher<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>(
+        "/control/trajectory_follower/longitudinal/debug", 1);
+    marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
+      "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
+    distance_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
+      "/planning/mission_planning/mission_planning/debug/distance", 1);
+    ttc_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
+      "/planning/mission_planning/mission_planning/debug/ttc", 1);
   }
 
   void loadRosbag(std::filesystem::path rosbag_path)
@@ -200,7 +202,9 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp, msg);
         }());
-      } else if (rosbag_data.ego_control_cmd.topic_name == "/control/trajectory_follower/longitudinal/control_cmd") {
+      } else if (
+        rosbag_data.ego_control_cmd.topic_name ==
+        "/control/trajectory_follower/longitudinal/control_cmd") {
         rosbag_data.ego_control_cmd.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<autoware_auto_control_msgs::msg::AckermannControlCommand>
             serialization;
@@ -208,7 +212,9 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp, msg);
         }());
-      } else if (rosbag_data.ego_control_debug.topic_name == "/control/trajectory_follower/longitudinal/debug") {
+      } else if (
+        rosbag_data.ego_control_debug.topic_name ==
+        "/control/trajectory_follower/longitudinal/debug") {
         rosbag_data.ego_control_debug.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>
             serialization;
@@ -249,17 +255,15 @@ private:
   template <typename MessageT>
   struct TopicStore
   {
-    TopicStore(std::string topic_name) : topic_name(topic_name) {
-      iterator = store.begin();
-    }
+    TopicStore(std::string topic_name) : topic_name(topic_name) { iterator = store.begin(); }
     std::string topic_name;
-    using MessageWithStamp= std::pair<rcutils_time_point_value_t, MessageT>;
+    using MessageWithStamp = std::pair<rcutils_time_point_value_t, MessageT>;
     std::vector<MessageWithStamp> store;
     typename std::vector<MessageWithStamp>::iterator iterator;
     typename rclcpp::Publisher<MessageT>::SharedPtr publisher = nullptr;
 
-
-    void createPublisher(rclcpp::Node & node) {
+    void createPublisher(rclcpp::Node & node)
+    {
       publisher = node.create_publisher<MessageT>(topic_name, 1);
     }
   };
@@ -270,15 +274,16 @@ private:
     TopicStore<autoware_auto_perception_msgs::msg::PredictedObjects> perception;
     TopicStore<autoware_auto_control_msgs::msg::AckermannControlCommand> ego_control_cmd;
     TopicStore<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic> ego_control_debug;
-    RosbagData(rclcpp::Node & node) : ego_odom("/localization/odometry/filtered"),
-                   perception("/perception/object_recognition/objects"),
-                   ego_control_cmd("/control/trajectory_follower/longitudinal/control_cmd"),
-                   ego_control_debug("/control/trajectory_follower/longitudinal/debug")
+    RosbagData(rclcpp::Node & node)
+    : ego_odom("/localization/odometry/filtered"),
+      perception("/perception/object_recognition/objects"),
+      ego_control_cmd("/control/trajectory_follower/longitudinal/control_cmd"),
+      ego_control_debug("/control/trajectory_follower/longitudinal/debug")
     {
-        ego_odom.createPublisher(node);
-        perception.createPublisher(node);
-        ego_control_cmd.createPublisher(node);
-        ego_control_debug.createPublisher(node);
+      ego_odom.createPublisher(node);
+      perception.createPublisher(node);
+      ego_control_cmd.createPublisher(node);
+      ego_control_debug.createPublisher(node);
     }
   } rosbag_data;
 };
