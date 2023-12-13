@@ -258,6 +258,33 @@ public:
       }
     }
   }
+
+  void initializeAutoware()
+  {
+    autoware.checkServiceConnection();
+    autoware.setPoseEstimation();
+    publishEmptyObjects();
+  }
+
+  void prepareAutoware()
+  {
+    autoware.setVelocityLimit(config.velocity_limit_mps);
+    autoware.setGoalPose();
+    publishEmptyObjects();
+    //    // wait for autoware to be ready
+    //    while (1) {
+    //      auto state = autoware.getAutowareState();
+    //      if (
+    //        state &&
+    //        state->state == autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
+    //        break;
+    //      }
+    //      std::cout << "waiting for autoware to be ready" << std::endl;
+    //      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    //    }
+    //    autoware.engage(true);
+  }
+
   void publishEmptyObjects()
   {
     auto msg = std::make_shared<autoware_auto_perception_msgs::msg::PredictedObjects>();
@@ -268,8 +295,9 @@ public:
 
   void engageAutoware()
   {
-    if(autoware.getAutowareState()->state == autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE)
-    {
+    if (
+      autoware.getAutowareState()->state ==
+      autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
       autoware.engage(true);
     }
   }
@@ -297,9 +325,7 @@ public:
     auto dy_ego = config.start_line_left_y - msg.pose.pose.position.y;
     bool is_over_line = (dx_line * dy_ego - dx_ego * dy_line > 0);
     if (is_over_line) {
-      std::cout << "ego vehicle is over start line" << std::endl;
       if (not rosbag_data.perception.publish_thread) {
-        std::cout << "start publish rosbag data" << std::endl;
         rosbag_data.startPublishThreads(std::chrono::system_clock::now());
       }
     }
@@ -375,11 +401,12 @@ private:
       ego_control_debug.createPublisher(node);
     }
 
-    void startPublishThreads(std::chrono::system_clock::time_point start_time){
-        ego_odom.createPublishThead(start_time);
-        perception.createPublishThead(start_time);
-        ego_control_cmd.createPublishThead(start_time);
-        ego_control_debug.createPublishThead(start_time);
+    void startPublishThreads(std::chrono::system_clock::time_point start_time)
+    {
+      ego_odom.createPublishThead(start_time);
+      perception.createPublishThead(start_time);
+      ego_control_cmd.createPublishThead(start_time);
+      ego_control_debug.createPublishThead(start_time);
     }
   } rosbag_data;
 
