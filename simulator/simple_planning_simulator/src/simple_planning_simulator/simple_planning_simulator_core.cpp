@@ -305,6 +305,8 @@ void SimplePlanningSimulator::on_timer()
     current_odometry_.pose.covariance[1 * 6 + 1] = y_stddev_;
   }
 
+  real_rosbag_replayer_->checkStartLineOnOdom(current_odometry_);
+
   // publish vehicle state
   publish_odometry(current_odometry_);
   publish_velocity(current_velocity_);

@@ -234,6 +234,28 @@ public:
     publish(rosbag_data.perception, rosbag_data.perception.publisher);
   }
 
+  void checkStartLineOnOdom(const nav_msgs::msg::Odometry & msg)
+  {
+    // check if ego vehicle is over start line
+    auto dx_line = config.start_line_left_x - config.start_line_right_x;
+    auto dy_line = config.start_line_left_y - config.start_line_right_y;
+    auto dx_ego = config.start_line_left_x - msg.pose.pose.position.x;
+    auto dy_ego = config.start_line_left_y - msg.pose.pose.position.y;
+    bool is_over_line = (dx_line * dy_ego - dx_ego * dy_line > 0);
+    if (is_over_line) {
+      std::cout << "ego vehicle is over start line" << std::endl;
+      if (not rosbag_data.perception.publish_thread) {
+        std::cout << "start publish rosbag data" << std::endl;
+        rosbag_data.startPublishThreads(std::chrono::system_clock::now());
+      }
+    }
+
+    if(not rosbag_data.perception.publish_thread){
+      auto msga = std::make_shared<autoware_auto_perception_msgs::msg::PredictedObjects>();
+      rosbag_data.perception.publisher->publish(*msga);
+    }
+  }
+
 private:
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_publisher;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr distance_publisher;
