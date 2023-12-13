@@ -110,24 +110,23 @@ public:
     pub_goal_pose->publish(*msg);
   }
 
-  void setPoseEstimation()
+  void setPoseEstimation() { pub_pose_estimation->publish(getInitialPose()); }
+
+  auto getInitialPose() -> geometry_msgs::msg::PoseWithCovarianceStamped
   {
-    auto msg = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
-    msg->header.frame_id = "map";
-    msg->header.stamp = rclcpp::Clock().now();
-    msg->pose.pose.position.x = 16673.787109375;
-    msg->pose.pose.position.y = 92971.7265625;
-    msg->pose.pose.orientation.set__x(0)
+    auto msg = geometry_msgs::msg::PoseWithCovarianceStamped();
+    msg.header.frame_id = "map";
+    msg.header.stamp = rclcpp::Clock().now();
+    msg.pose.pose.position.x = 16673.787109375;
+    msg.pose.pose.position.y = 92971.7265625;
+    msg.pose.pose.orientation.set__x(0)
       .set__y(0)
       .set__z(0.6773713996525991)
       .set__w(0.7356412080169781);
-    pub_pose_estimation->publish(*msg);
+    return msg;
   }
 
-  auto getAutowareState()
-  {
-    return state;
-  }
+  auto getAutowareState() { return state; }
 
 private:
   rclcpp::Client<Engage>::SharedPtr client_engage;
