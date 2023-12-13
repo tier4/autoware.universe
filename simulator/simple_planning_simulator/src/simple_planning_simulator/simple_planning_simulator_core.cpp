@@ -234,8 +234,7 @@ void SimplePlanningSimulator::initialize_vehicle_model()
     // TODO consider way to give acceleration map path better way
     const std::string acceleration_map_path = declare_parameter(
       "acceleration_map_path",
-      std::string("$HOME/projects/pilot-auto.xx1/src/autoware/universe/simulator/"
-                  "simple_planning_simulator/param/acceleration_map.csv"));
+      std::string(ament_index_cpp::get_package_share_directory("simple_planning_simulator") + "/param/acceleration_map.csv"));
     vehicle_model_ptr_ = std::make_shared<SimModelWithConverter>(
       vel_lim, steer_lim, vel_rate_lim, steer_rate_lim, wheelbase, timer_sampling_time_ms_ / 1000.0,
       acc_time_delay, acc_time_constant, steer_time_delay, steer_time_constant,
