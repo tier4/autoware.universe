@@ -183,6 +183,9 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
   // control mode
   current_control_mode_.data = ControlMode::AUTO;
   current_manual_gear_cmd_.command = GearCommand::DRIVE;
+
+  PoseWithCovarianceStamped::ConstSharedPtr initial_pose = std::make_shared<PoseWithCovarianceStamped>(real_rosbag_replayer_->getInitialPose());
+  on_initialpose(initial_pose);
 }
 
 void SimplePlanningSimulator::initialize_vehicle_model()
