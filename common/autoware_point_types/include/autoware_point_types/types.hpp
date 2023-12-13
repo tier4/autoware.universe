@@ -48,8 +48,8 @@ struct PointXYZIE
   float x{0.0F};
   float y{0.0F};
   float z{0.0F};
-  float intensity{0};
   int32_t entity_id{0};
+  float intensity{0};
   friend bool operator==(const PointXYZIE & p1, const PointXYZIE & p2) noexcept
   {
     return float_eq<float>(p1.x, p2.x) && float_eq<float>(p1.y, p2.y) &&
@@ -106,8 +106,8 @@ using PointXYZIRADRTGenerator = std::tuple<
 
 using PointXYZIEGenerator = std::tuple<
   point_cloud_msg_wrapper::field_x_generator, point_cloud_msg_wrapper::field_y_generator,
-  point_cloud_msg_wrapper::field_z_generator, point_cloud_msg_wrapper::field_intensity_generator,
-  field_entity_id_generator>;
+  point_cloud_msg_wrapper::field_z_generator, field_entity_id_generator,
+  point_cloud_msg_wrapper::field_intensity_generator>;
 }  // namespace autoware_point_types
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(
