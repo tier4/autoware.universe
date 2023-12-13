@@ -258,6 +258,21 @@ public:
       }
     }
   }
+  void publishEmptyObjects()
+  {
+    auto msg = std::make_shared<autoware_auto_perception_msgs::msg::PredictedObjects>();
+    msg->header.frame_id = "map";
+    msg->header.stamp = rclcpp::Clock().now();
+    rosbag_data.perception.publisher->publish(*msg);
+  }
+
+  void engageAutoware()
+  {
+    if(autoware.getAutowareState()->state == autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE)
+    {
+      autoware.engage(true);
+    }
+  }
 
   void publishRosbagData(int64_t current_time_ns)
   {
