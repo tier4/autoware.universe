@@ -48,18 +48,18 @@ using Engage = tier4_external_api_msgs::srv::Engage;
 class AutowareOperator
 {
 public:
-  AutowareOperator(rclcpp::Node::SharedPtr node) : node(node)
+  AutowareOperator(rclcpp::Node & node)
   {
-    client_engage = node->create_client<Engage>("/api/external/set/engage");
+    client_engage = node.create_client<Engage>("/api/external/set/engage");
     pub_pose_estimation =
-      node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 1);
+      node.create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 1);
     pub_goal_pose =
-      node->create_publisher<geometry_msgs::msg::PoseStamped>("/planning/mission_planning/goal", 1);
-    pub_velocity_limit = node->create_publisher<tier4_planning_msgs::msg::VelocityLimit>(
+      node.create_publisher<geometry_msgs::msg::PoseStamped>("/planning/mission_planning/goal", 1);
+    pub_velocity_limit = node.create_publisher<tier4_planning_msgs::msg::VelocityLimit>(
       "/planning/scenario_planning/max_velocity_default",
       rclcpp::QoS(rclcpp::KeepLast(1)).transient_local());
 
-    sub_autoware_state = node->create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
+    sub_autoware_state = node.create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
       "/autoware/state", 1,
       [this](const autoware_auto_system_msgs::msg::AutowareState::SharedPtr msg) { state = msg; });
 
@@ -69,7 +69,8 @@ public:
   void checkServiceConnection(void)
   {
     while (!client_engage->wait_for_service(std::chrono::seconds(1))) {
-      RCLCPP_INFO(node->get_logger(), "engage service not available, waiting again...");
+      RCLCPP_INFO(
+        rclcpp::get_logger("AutowareOperator"), "engage service not available, waiting again...");
     }
   }
 
@@ -82,12 +83,12 @@ public:
     if (status == std::future_status::ready) {
       auto response = future.get();
       if (response->status.code == response->status.SUCCESS) {
-        RCLCPP_INFO(node->get_logger(), "engage success");
+        RCLCPP_INFO(rclcpp::get_logger("AutowareOperator"), "engage success");
       } else {
-        RCLCPP_ERROR(node->get_logger(), "engage failed");
+        RCLCPP_ERROR(rclcpp::get_logger("AutowareOperator"), "engage failed");
       }
     } else {
-      RCLCPP_ERROR(node->get_logger(), "engage timeout");
+      RCLCPP_ERROR(rclcpp::get_logger("AutowareOperator"), "engage timeout");
     }
   }
 
@@ -99,7 +100,6 @@ public:
   }
 
 private:
-  rclcpp::Node::SharedPtr node;
   rclcpp::Client<Engage>::SharedPtr client_engage;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_pose_estimation;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_goal_pose;
@@ -175,6 +175,9 @@ public:
   {
     rosbag2_cpp::Reader reader;
     reader.open(config.rosbag_path.string());
+
+    std::cout << "loading rosbag: " << config.rosbag_path.string() << std::endl;
+
     auto rosbag_start_time =
       std::chrono::nanoseconds(static_cast<int64_t>(config.rosbag_start_time * 1e9));
 
