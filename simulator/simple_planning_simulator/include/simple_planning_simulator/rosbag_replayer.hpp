@@ -175,13 +175,16 @@ public:
   {
     rosbag2_cpp::Reader reader;
     reader.open(config.rosbag_path.string());
+    auto rosbag_start_time =
+      std::chrono::nanoseconds(static_cast<int64_t>(config.rosbag_start_time * 1e9));
 
     while (reader.has_next()) {
       auto serialized_message = reader.read_next();
       rclcpp::SerializedMessage extracted_serialized_msg(*serialized_message->serialized_data);
       auto topic = serialized_message->topic_name;
-      auto stamp = serialized_message->time_stamp;
-      if (rosbag_data.ego_odom.topic_name == "/localization/odometry/filtered") {
+      auto stamp = serialized_message->time_stamp - rosbag_start_time.count();
+      if (topic == "/localization/odometry/filtered") {
+        std::cout << "extracting to ego_odom message..." << std::endl;
         rosbag_data.ego_odom.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<nav_msgs::msg::Odometry> serialization;
           nav_msgs::msg::Odometry msg;
