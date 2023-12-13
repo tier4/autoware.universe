@@ -15,6 +15,7 @@
 #ifndef GROUND_SEGMENTATION__SCAN_GROUND_FILTER_NODELET_HPP_
 #define GROUND_SEGMENTATION__SCAN_GROUND_FILTER_NODELET_HPP_
 
+#include "autoware_point_types/types.hpp"
 #include "pointcloud_preprocessor/filter.hpp"
 
 #include <vehicle_info_util/vehicle_info.hpp>
@@ -42,6 +43,7 @@ class ScanGroundFilterTest;
 
 namespace ground_segmentation
 {
+using autoware_point_types::PointXYZIE;
 using vehicle_info_util::VehicleInfo;
 
 class ScanGroundFilterComponent : public pointcloud_preprocessor::Filter
@@ -69,7 +71,7 @@ private:
     PointLabel point_state{PointLabel::INIT};
 
     size_t orig_index;  // index of this point in the source pointcloud
-    pcl::PointXYZ * orig_point;
+    PointXYZIE * orig_point;
   };
   using PointCloudRefVector = std::vector<PointRef>;
 
@@ -192,10 +194,10 @@ private:
    *     each element will contain the points ordered
    */
   void convertPointcloud(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
+    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
     std::vector<PointCloudRefVector> & out_radial_ordered_points_manager);
   void convertPointcloudGridScan(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
+    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
     std::vector<PointCloudRefVector> & out_radial_ordered_points_manager);
   /*!
    * Output ground center of front wheels as the virtual ground point
@@ -240,8 +242,8 @@ private:
    * @param out_object_cloud_ptr Resulting PointCloud with the indices kept
    */
   void extractObjectPoints(
-    const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
-    pcl::PointCloud<pcl::PointXYZ>::Ptr out_object_cloud_ptr);
+    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
+    pcl::PointCloud<PointXYZIE>::Ptr out_object_cloud_ptr);
 
   /** \brief Parameter service callback result : needed to be hold */
   OnSetParametersCallbackHandle::SharedPtr set_param_res_;

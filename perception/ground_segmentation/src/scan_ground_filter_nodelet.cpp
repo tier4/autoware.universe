@@ -80,7 +80,7 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
 }
 
 void ScanGroundFilterComponent::convertPointcloudGridScan(
-  const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
+  const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
   std::vector<PointCloudRefVector> & out_radial_ordered_points)
 {
   out_radial_ordered_points.resize(radial_dividers_num_);
@@ -137,7 +137,7 @@ void ScanGroundFilterComponent::convertPointcloudGridScan(
   }
 }
 void ScanGroundFilterComponent::convertPointcloud(
-  const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
+  const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
   std::vector<PointCloudRefVector> & out_radial_ordered_points)
 {
   out_radial_ordered_points.resize(radial_dividers_num_);
@@ -529,8 +529,8 @@ void ScanGroundFilterComponent::classifyPointCloud(
 }
 
 void ScanGroundFilterComponent::extractObjectPoints(
-  const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
-  pcl::PointCloud<pcl::PointXYZ>::Ptr out_object_cloud_ptr)
+  const pcl::PointCloud<PointXYZIE>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
+  pcl::PointCloud<PointXYZIE>::Ptr out_object_cloud_ptr)
 {
   for (const auto & i : in_indices.indices) {
     out_object_cloud_ptr->points.emplace_back(in_cloud_ptr->points[i]);
@@ -543,13 +543,13 @@ void ScanGroundFilterComponent::filter(
 {
   std::scoped_lock lock(mutex_);
   stop_watch_ptr_->toc("processing_time", true);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr current_sensor_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<PointXYZIE>::Ptr current_sensor_cloud_ptr(new pcl::PointCloud<PointXYZIE>);
   pcl::fromROSMsg(*input, *current_sensor_cloud_ptr);
 
   std::vector<PointCloudRefVector> radial_ordered_points;
 
   pcl::PointIndices no_ground_indices;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr no_ground_cloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<PointXYZIE>::Ptr no_ground_cloud_ptr(new pcl::PointCloud<PointXYZIE>);
   no_ground_cloud_ptr->points.reserve(current_sensor_cloud_ptr->points.size());
 
   if (elevation_grid_mode_) {
