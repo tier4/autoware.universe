@@ -99,6 +99,36 @@ public:
     pub_velocity_limit->publish(*msg);
   }
 
+  void setGoalPose()
+  {
+    auto msg = std::make_shared<geometry_msgs::msg::PoseStamped>();
+    msg->header.frame_id = "map";
+    msg->header.stamp = rclcpp::Clock().now();
+    msg->pose.position.x = 16713.16796875;
+    msg->pose.position.y = 93383.9296875;
+    msg->pose.orientation.set__x(0).set__y(0).set__z(0.6811543441258587).set__w(0.7321398496725002);
+    pub_goal_pose->publish(*msg);
+  }
+
+  void setPoseEstimation()
+  {
+    auto msg = std::make_shared<geometry_msgs::msg::PoseWithCovarianceStamped>();
+    msg->header.frame_id = "map";
+    msg->header.stamp = rclcpp::Clock().now();
+    msg->pose.pose.position.x = 16673.787109375;
+    msg->pose.pose.position.y = 92971.7265625;
+    msg->pose.pose.orientation.set__x(0)
+      .set__y(0)
+      .set__z(0.6773713996525991)
+      .set__w(0.7356412080169781);
+    pub_pose_estimation->publish(*msg);
+  }
+
+  auto getAutowareState()
+  {
+    return state;
+  }
+
 private:
   rclcpp::Client<Engage>::SharedPtr client_engage;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_pose_estimation;
