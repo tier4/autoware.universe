@@ -190,7 +190,8 @@ public:
 class RealRosbagReplayer
 {
 public:
-  RealRosbagReplayer(rclcpp::Node & node, std::string config_name) : config(config_name), rosbag_data(node)
+  RealRosbagReplayer(rclcpp::Node & node, std::string config_name)
+  : config(config_name), rosbag_data(node), autoware(node)
   {
     marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
       "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
@@ -199,6 +200,13 @@ public:
     ttc_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
       "/planning/mission_planning/mission_planning/debug/ttc", 1);
   }
+
+  auto getInitialPose() -> geometry_msgs::msg::PoseWithCovarianceStamped
+  {
+    return autoware.getInitialPose();
+  }
+
+  auto getAutowareState() { return autoware.getAutowareState(); }
 
   void loadRosbag()
   {
@@ -359,6 +367,8 @@ private:
         ego_control_debug.createPublishThead(start_time);
     }
   } rosbag_data;
+
+  AutowareOperator autoware;
 };
 
 #endif  // SIMPLE_PLANNING_SIMULATOR__ROSBAG_REPLAYER_HPP_
