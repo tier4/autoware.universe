@@ -224,9 +224,7 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp, msg);
         }());
-      } else if (
-        rosbag_data.ego_control_cmd.topic_name ==
-        "/control/trajectory_follower/longitudinal/control_cmd") {
+      } else if (topic == "/control/trajectory_follower/longitudinal/control_cmd") {
         rosbag_data.ego_control_cmd.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<autoware_auto_control_msgs::msg::AckermannControlCommand>
             serialization;
@@ -234,9 +232,7 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp, msg);
         }());
-      } else if (
-        rosbag_data.ego_control_debug.topic_name ==
-        "/control/trajectory_follower/longitudinal/debug") {
+      } else if (topic == "/control/trajectory_follower/longitudinal/debug") {
         rosbag_data.ego_control_debug.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>
             serialization;
@@ -244,7 +240,7 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp, msg);
         }());
-      } else if (rosbag_data.perception.topic_name == "/perception/object_recognition/objects") {
+      } else if (topic == "/perception/object_recognition/objects") {
         rosbag_data.perception.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<autoware_auto_perception_msgs::msg::PredictedObjects>
             serialization;
