@@ -166,7 +166,7 @@ public:
     forward_vehicle_uuid.push_back(config["vehicle_uuid"][1].get<uint8_t>());
 
     rosbag_start_time =
-      config["bag_start_time"].get<double>() + config["start_offset"].get<double>();
+      config["bag_start_time"].get<int64_t>() + config["start_offset"].get<int64_t>();
 
     // wheelbase: 2.75m, front overhang: 0.8m
     baselink_to_front = 3.55;
@@ -181,7 +181,7 @@ public:
   float start_line_right_x;
   float start_line_right_y;
   std::vector<uint8_t> forward_vehicle_uuid;
-  float rosbag_start_time;
+  int64_t rosbag_start_time;
   float baselink_to_front;
   std::filesystem::path rosbag_path;
   std::string rosbag_directory;
@@ -217,44 +217,44 @@ public:
 
     std::cout << "loading rosbag: " << config.rosbag_path.string() << std::endl;
 
-    auto rosbag_start_time =
-      std::chrono::nanoseconds(static_cast<int64_t>(config.rosbag_start_time * 1e9));
-
     while (reader.has_next()) {
       auto serialized_message = reader.read_next();
       rclcpp::SerializedMessage extracted_serialized_msg(*serialized_message->serialized_data);
       auto topic = serialized_message->topic_name;
-      auto stamp = serialized_message->time_stamp - rosbag_start_time.count();
+      auto stamp_ns = serialized_message->time_stamp - config.rosbag_start_time;
+      if(stamp_ns < 0){
+        continue;
+      }
       if (topic == "/localization/odometry/filtered") {
-        rosbag_data.ego_odom.store.push_back([&extracted_serialized_msg, stamp]() {
+        rosbag_data.ego_odom.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<nav_msgs::msg::Odometry> serialization;
           nav_msgs::msg::Odometry msg;
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
-          return std::make_pair(stamp, msg);
+          return std::make_pair(stamp_ns, msg);
         }());
       } else if (topic == "/control/trajectory_follower/longitudinal/control_cmd") {
-        rosbag_data.ego_control_cmd.store.push_back([&extracted_serialized_msg, stamp]() {
+        rosbag_data.ego_control_cmd.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<autoware_auto_control_msgs::msg::AckermannControlCommand>
             serialization;
           autoware_auto_control_msgs::msg::AckermannControlCommand msg;
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
-          return std::make_pair(stamp, msg);
+          return std::make_pair(stamp_ns, msg);
         }());
       } else if (topic == "/control/trajectory_follower/longitudinal/debug") {
-        rosbag_data.ego_control_debug.store.push_back([&extracted_serialized_msg, stamp]() {
+        rosbag_data.ego_control_debug.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>
             serialization;
           autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic msg;
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
-          return std::make_pair(stamp, msg);
+          return std::make_pair(stamp_ns, msg);
         }());
       } else if (topic == "/perception/object_recognition/objects") {
-        rosbag_data.perception.store.push_back([&extracted_serialized_msg, stamp]() {
+        rosbag_data.perception.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<autoware_auto_perception_msgs::msg::PredictedObjects>
             serialization;
           autoware_auto_perception_msgs::msg::PredictedObjects msg;
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
-          return std::make_pair(stamp, msg);
+          return std::make_pair(stamp_ns, msg);
         }());
       }
     }
