@@ -328,9 +328,8 @@ public:
       }
     }
 
-    if(not rosbag_data.perception.publish_thread){
-      auto msga = std::make_shared<autoware_auto_perception_msgs::msg::PredictedObjects>();
-      rosbag_data.perception.publisher->publish(*msga);
+    if (not rosbag_data.perception.publish_thread) {
+      publishEmptyObjects();
     }
   }
 
