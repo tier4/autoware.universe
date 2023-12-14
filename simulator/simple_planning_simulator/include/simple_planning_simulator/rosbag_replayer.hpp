@@ -61,7 +61,7 @@ public:
 
     sub_autoware_state = node.create_subscription<autoware_auto_system_msgs::msg::AutowareState>(
       "/autoware/state", 1,
-      [this](const autoware_auto_system_msgs::msg::AutowareState::SharedPtr msg) { state = msg; });
+      [this](const autoware_auto_system_msgs::msg::AutowareState & msg) { state = msg; });
 
     checkServiceConnection();
   }
@@ -134,7 +134,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_goal_pose;
   rclcpp::Publisher<tier4_planning_msgs::msg::VelocityLimit>::SharedPtr pub_velocity_limit;
   rclcpp::Subscription<autoware_auto_system_msgs::msg::AutowareState>::SharedPtr sub_autoware_state;
-  autoware_auto_system_msgs::msg::AutowareState::SharedPtr state = nullptr;
+  autoware_auto_system_msgs::msg::AutowareState state;
 };
 
 class Config
@@ -296,7 +296,7 @@ public:
   void engageAutoware()
   {
     if (
-      autoware.getAutowareState()->state ==
+      autoware.getAutowareState().state ==
       autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
       autoware.engage(true);
     }

@@ -186,6 +186,15 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
 
   PoseWithCovarianceStamped::ConstSharedPtr initial_pose = std::make_shared<PoseWithCovarianceStamped>(real_rosbag_replayer_->getInitialPose());
   on_initialpose(initial_pose);
+
+  real_rosbag_replayer_->setRouteWithoutValidation();
+
+  real_rosbag_replayer_->publishEmptyObjects();
+
+//  sleep(15);
+//  real_rosbag_replayer_->initializeAutoware();
+//  sleep(15);
+//  real_rosbag_replayer_->prepareAutoware();
 }
 
 void SimplePlanningSimulator::initialize_vehicle_model()
