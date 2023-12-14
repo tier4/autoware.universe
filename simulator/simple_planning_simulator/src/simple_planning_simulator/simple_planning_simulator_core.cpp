@@ -279,6 +279,13 @@ void SimplePlanningSimulator::on_timer()
       has_set_route = true;
     }
   }
+  {
+    static bool has_engage = false;
+    if(!has_engage && real_rosbag_replayer_->engageAutoware()){
+      has_engage = true;
+    }
+  }
+
 
   // update vehicle dynamics
   {

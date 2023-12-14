@@ -289,13 +289,15 @@ public:
     rosbag_data.perception.publisher->publish(*msg);
   }
 
-  void engageAutoware()
+  bool engageAutoware()
   {
     if (
       autoware.getAutowareState().state ==
       autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
       autoware.engage(true);
+      return true;
     }
+    return false;
   }
 
   void publishRosbagData(int64_t current_time_ns)
