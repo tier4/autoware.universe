@@ -206,6 +206,8 @@ public:
     return autoware.getInitialPose();
   }
 
+  auto setPoseEstimation() { autoware.setPoseEstimation(); }
+
   auto getAutowareState() { return autoware.getAutowareState(); }
 
   void loadRosbag()
@@ -224,7 +226,6 @@ public:
       auto topic = serialized_message->topic_name;
       auto stamp = serialized_message->time_stamp - rosbag_start_time.count();
       if (topic == "/localization/odometry/filtered") {
-        std::cout << "extracting to ego_odom message..." << std::endl;
         rosbag_data.ego_odom.store.push_back([&extracted_serialized_msg, stamp]() {
           static rclcpp::Serialization<nav_msgs::msg::Odometry> serialization;
           nav_msgs::msg::Odometry msg;
@@ -361,13 +362,13 @@ private:
 
     void createPublishThead(std::chrono::system_clock::time_point start_time)
     {
-      // check start_time is nearly now
-        auto now = std::chrono::system_clock::now();
-        auto diff = std::chrono::duration_cast<std::chrono::seconds>(now - start_time);
-        if (std::abs(diff.count()) > 100) {
-          std::cerr << "start time is too old / " << std::endl;
-          exit(1);
-        }
+      // check start_time is nearly now;
+      auto diff = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now() - start_time);
+      if (std::abs(diff.count()) > 100) {
+        std::cerr << "start time is too old / " << std::endl;
+        exit(1);
+      }
       iterator = store.begin();
       publish_thread = std::make_unique<std::thread>([this, start_time]() {
         while (1) {
