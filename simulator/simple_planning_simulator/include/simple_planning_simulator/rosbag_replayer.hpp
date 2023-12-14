@@ -260,30 +260,25 @@ public:
     }
   }
 
-  void initializeAutoware()
+  bool setRoute()
   {
-    autoware.checkServiceConnection();
-    autoware.setPoseEstimation();
-    publishEmptyObjects();
+    // do if autoware is ready
+    if (
+      autoware.getAutowareState().state ==
+      autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ROUTE) {
+      autoware.checkServiceConnection();
+      autoware.setVelocityLimit(config.velocity_limit_mps);
+      autoware.setGoalPose();
+      return true;
+    }
+    return false;
   }
 
-  void prepareAutoware()
+  void setRouteWithoutValidation()
   {
+    autoware.checkServiceConnection();
     autoware.setVelocityLimit(config.velocity_limit_mps);
     autoware.setGoalPose();
-    publishEmptyObjects();
-    //    // wait for autoware to be ready
-    //    while (1) {
-    //      auto state = autoware.getAutowareState();
-    //      if (
-    //        state &&
-    //        state->state == autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
-    //        break;
-    //      }
-    //      std::cout << "waiting for autoware to be ready" << std::endl;
-    //      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    //    }
-    //    autoware.engage(true);
   }
 
   void publishEmptyObjects()

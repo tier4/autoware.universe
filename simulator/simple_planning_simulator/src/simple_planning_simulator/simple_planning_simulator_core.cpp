@@ -273,6 +273,12 @@ void SimplePlanningSimulator::on_timer()
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 5000, "waiting initialization...");
     return;
   }
+  {
+    static bool has_set_route = false;
+    if(!has_set_route && real_rosbag_replayer_->setRoute()){
+      has_set_route = true;
+    }
+  }
 
   // update vehicle dynamics
   {
