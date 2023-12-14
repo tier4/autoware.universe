@@ -368,6 +368,7 @@ private:
           std::cerr << "start time is too old / " << std::endl;
           exit(1);
         }
+      iterator = store.begin();
       publish_thread = std::make_unique<std::thread>([this, start_time]() {
         while (1) {
           // sleep until next message time stamp is reached
