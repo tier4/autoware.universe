@@ -114,6 +114,7 @@ private:
   rclcpp::Publisher<Odometry>::SharedPtr pub_odom_;
   rclcpp::Publisher<AccelWithCovarianceStamped>::SharedPtr pub_acc_;
   rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr pub_tf_;
+  rclcpp::Publisher<ControlModeReport>::SharedPtr pub_control_mode_report_;
 
   rclcpp::Subscription<GearReport>::SharedPtr sub_gear_report_;
   rclcpp::Subscription<GearCommand>::SharedPtr sub_manual_gear_cmd_;
@@ -284,6 +285,11 @@ private:
    * @param [in] state The kinematic state to publish as a TF
    */
   void publish_tf(const Odometry & odometry);
+
+  /**
+   * @brief publish control_mode report
+   */
+  void publish_control_mode_report();
 };
 }  // namespace vcu_planning_simulator
 }  // namespace simulation
