@@ -252,4 +252,9 @@ void DynamicAvoidanceModuleManager::updateModuleParams(
     m->updateModuleParams(p);
   });
 }
+
+bool DynamicAvoidanceModuleManager::isAlwaysExecutableModule() const
+{
+  return true;
+}
 }  // namespace behavior_path_planner
