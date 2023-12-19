@@ -2,14 +2,12 @@
 <launch>
   <!-- Parameter files -->
   <arg name="component_state_monitor_topic_path"/>
+  <arg name="diagnostic_graph_aggregator_param_path"/>
+  <arg name="diagnostic_graph_aggregator_graph_path"/>
   <arg name="emergency_handler_param_path"/>
   <arg name="duplicated_node_checker_param_path"/>
   <arg name="mrm_comfortable_stop_operator_param_path"/>
   <arg name="mrm_emergency_stop_operator_param_path"/>
-  <arg name="system_error_monitor_param_path"/>
-  <arg name="system_error_monitor_planning_simulator_param_path"/>
-  <arg name="diagnostic_aggregator_system_param_path"/>
-  <arg name="diagnostic_aggregator_vehicle_param_path"/>
   <arg name="dummy_diag_publisher_param_path"/>
   <arg name="system_monitor_cpu_monitor_param_path"/>
   <arg name="system_monitor_gpu_monitor_param_path"/>
@@ -64,19 +62,11 @@
       </include>
     </group>
 
-    <!-- Error Monitor -->
-    <group>
-      <let name="config_file" value="$(var system_error_monitor_param_path)" if="$(eval &quot;'$(var run_mode)'=='online'&quot;)"/>
-      <let name="config_file" value="$(var system_error_monitor_param_path)" if="$(eval &quot;'$(var run_mode)'=='logging_simulation'&quot;)"/>
-      <let name="config_file" value="$(var system_error_monitor_planning_simulator_param_path)" if="$(eval &quot;'$(var run_mode)'=='planning_simulation'&quot;)"/>
-      <include file="$(find-pkg-share system_error_monitor)/launch/system_error_monitor.launch.xml">
-        <arg name="config_file" value="$(var config_file)"/>
-        <arg name="extra_agg_config_file_sensing" value="$(var sensor_launch_pkg)/config/diagnostic_aggregator/sensor_kit.param.yaml"/>
-        <arg name="extra_agg_config_file_system" value="$(var diagnostic_aggregator_system_param_path)"/>
-        <arg name="extra_agg_config_file_vehicle" value="$(var diagnostic_aggregator_vehicle_param_path)"/>
-        <arg name="use_emergency_hold" value="false"/>
-      </include>
-    </group>
+    <!-- Diagnostic Graph Aggregator -->
+    <node pkg="diagnostic_graph_aggregator" exec="aggregator" name="diagnostic_graph_aggregator_self">
+      <param from="$(var diagnostic_graph_aggregator_param_path)"/>
+      <param name="graph_file" value="$(var diagnostic_graph_aggregator_graph_path)"/>
+    </node>
 
     <!-- Emergency Handler -->
     <group>
