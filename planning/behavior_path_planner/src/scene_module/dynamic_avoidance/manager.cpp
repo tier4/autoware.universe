@@ -84,6 +84,9 @@ DynamicAvoidanceModuleManager::DynamicAvoidanceModuleManager(
       node->declare_parameter<double>(ns + "crossing_object.min_oncoming_object_vel");
     p.max_oncoming_crossing_object_angle =
       node->declare_parameter<double>(ns + "crossing_object.max_oncoming_object_angle");
+
+    p.max_stopped_object_vel =
+      node->declare_parameter<double>(ns + "stopped_object.max_object_vel");
   }
 
   {  // drivable_area_generation
@@ -190,6 +193,9 @@ void DynamicAvoidanceModuleManager::updateModuleParams(
     updateParam<double>(
       parameters, ns + "crossing_object.max_oncoming_object_angle",
       p->max_oncoming_crossing_object_angle);
+
+    updateParam<double>(
+      parameters, ns + "stopped_object.max_object_vel", p->max_stopped_object_vel);
   }
 
   {  // drivable_area_generation

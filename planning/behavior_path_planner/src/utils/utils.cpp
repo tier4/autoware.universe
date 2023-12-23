@@ -3366,6 +3366,10 @@ void extractObstaclesFromDrivableArea(
   std::vector<std::vector<PolygonPoint>> right_polygons;
   std::vector<std::vector<PolygonPoint>> left_polygons;
   for (const auto & obstacle : obstacles) {
+    if (obstacle.poly.outer().empty()) {
+      continue;
+    }
+
     const auto & obj_pos = obstacle.pose.position;
 
     // get edge points of the object

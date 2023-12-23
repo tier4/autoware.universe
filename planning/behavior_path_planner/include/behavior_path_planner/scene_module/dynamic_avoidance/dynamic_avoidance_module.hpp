@@ -77,6 +77,7 @@ struct DynamicAvoidanceParameters
   double max_overtaking_crossing_object_angle{0.0};
   double min_oncoming_crossing_object_vel{0.0};
   double max_oncoming_crossing_object_angle{0.0};
+  double max_stopped_object_vel{0.0};
 
   // drivable area generation
   std::string polygon_generation_method{};
@@ -94,6 +95,12 @@ struct DynamicAvoidanceParameters
   double max_time_to_collision_oncoming_object{0.0};
   double start_duration_to_avoid_oncoming_object{0.0};
   double end_duration_to_avoid_oncoming_object{0.0};
+};
+
+struct TimeWhileCollision
+{
+  double time_to_start_collision;
+  double time_to_end_collision;
 };
 
 class DynamicAvoidanceModule : public SceneModuleInterface
@@ -315,7 +322,7 @@ private:
     const autoware_auto_perception_msgs::msg::Shape & obj_shape, const double obj_vel) const;
   bool isObjectFarFromPath(
     const PredictedObject & predicted_object, const double obj_dist_to_path) const;
-  double calcTimeToCollision(
+  TimeWhileCollision calcTimeWhileCollision(
     const std::vector<PathPointWithLaneId> & ego_path, const geometry_msgs::msg::Pose & obj_pose,
     const double obj_tangent_vel, const LatLonOffset & lat_lon_offset) const;
   std::optional<std::pair<size_t, size_t>> calcCollisionSection(
@@ -325,12 +332,13 @@ private:
     const autoware_auto_perception_msgs::msg::Shape & obj_shape) const;
   double calcValidLengthToAvoid(
     const PredictedPath & obj_path, const geometry_msgs::msg::Pose & obj_pose,
-    const autoware_auto_perception_msgs::msg::Shape & obj_shape) const;
+    const autoware_auto_perception_msgs::msg::Shape & obj_shape,
+    const bool is_object_same_direction) const;
   MinMaxValue calcMinMaxLongitudinalOffsetToAvoid(
     const std::vector<PathPointWithLaneId> & ref_path_points_for_obj_poly,
     const geometry_msgs::msg::Pose & obj_pose, const Polygon2d & obj_points, const double obj_vel,
     const PredictedPath & obj_path, const autoware_auto_perception_msgs::msg::Shape & obj_shape,
-    const double time_to_collision) const;
+    const TimeWhileCollision & time_while_collision) const;
   std::optional<MinMaxValue> calcMinMaxLateralOffsetToAvoid(
     const std::vector<PathPointWithLaneId> & ref_path_points_for_obj_poly,
     const Polygon2d & obj_points, const double obj_vel, const bool is_collision_left,
