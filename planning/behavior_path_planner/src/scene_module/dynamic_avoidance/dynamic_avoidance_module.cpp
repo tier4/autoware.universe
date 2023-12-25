@@ -807,9 +807,9 @@ TimeWhileCollision DynamicAvoidanceModule::calcTimeWhileCollision(
   const double relative_velocity = getEgoSpeed() - obj_tangent_vel;
 
   const double signed_time_to_start_collision = [&]() {
-    const double lon_offset_ego_front_to_obj_back = lon_offset_ego_to_obj_idx +
-                                                    lat_lon_offset.min_lon_offset -
-                                                    planner_data_->parameters.front_overhang;
+    const double lon_offset_ego_front_to_obj_back =
+      lon_offset_ego_to_obj_idx + lat_lon_offset.min_lon_offset -
+      (planner_data_->parameters.wheel_base + planner_data_->parameters.front_overhang);
     const double lon_offset_obj_front_to_ego_back = -lon_offset_ego_to_obj_idx -
                                                     lat_lon_offset.max_lon_offset -
                                                     planner_data_->parameters.rear_overhang;
@@ -1069,7 +1069,7 @@ MinMaxValue DynamicAvoidanceModule::calcMinMaxLongitudinalOffsetToAvoid(
              std::abs(relative_velocity) * parameters_->start_duration_to_avoid_oncoming_object;
     }
     // The ego and object are the opposite directional.
-    const double obj_acc = -1.0;
+    const double obj_acc = -0.5;
     const double decel_time = 1.0;
     const double obj_moving_dist =
       (std::pow(std::max(obj_vel + obj_acc * decel_time, 0.0), 2) - std::pow(obj_vel, 2)) / 2 /
@@ -1119,9 +1119,10 @@ double DynamicAvoidanceModule::calcValidLengthToAvoid(
   const size_t obj_seg_idx =
     motion_utils::findNearestSegmentIndex(input_path_points, obj_pose.position);
 
-  const double dist_threshold_paths = planner_data_->parameters.vehicle_width / 2.0 +
-                                      parameters_->lat_offset_from_obstacle +
-                                      calcObstacleMaxLength(obj_shape);
+  constexpr double dist_threshold_additional_margin = 0.5;
+  const double dist_threshold_paths =
+    planner_data_->parameters.vehicle_width / 2.0 + parameters_->lat_offset_from_obstacle +
+    calcObstacleWidth(obj_shape) / 2.0 + dist_threshold_additional_margin;
 
   // crop the ego's path by object position
   std::vector<PathPointWithLaneId> cropped_ego_path_points;
