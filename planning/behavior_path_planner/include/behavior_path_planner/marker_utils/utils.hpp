@@ -62,6 +62,10 @@ CollisionCheckDebugPair createObjectDebug(const ExtendedPredictedObject & obj);
 void updateCollisionCheckDebugMap(
   CollisionCheckDebugMap & debug_map, CollisionCheckDebugPair & object_debug, bool is_safe);
 
+MarkerArray createPointsMarkerArray(
+  const std::vector<Point> points, const std::string & ns, const int32_t id, const float r,
+  const float g, const float b);
+
 MarkerArray createPoseMarkerArray(
   const Pose & pose, std::string && ns, const int32_t & id, const float & r, const float & g,
   const float & b);
