@@ -675,8 +675,8 @@ void DynamicAvoidanceModule::updateTargetObjects()
       ref_path_points_for_obj_poly, object.pose, obj_points, object.vel, obj_path, object.shape,
       time_while_collision);
     const auto lat_offset_to_avoid = calcMinMaxLateralOffsetToAvoid(
-      ref_path_points_for_obj_poly, obj_points, object.vel, is_collision_left, object.lat_vel,
-      prev_object);
+      ref_path_points_for_obj_poly, obj_points, object.pose.position, object.vel, is_collision_left,
+      object.lat_vel, prev_object);
     if (!lat_offset_to_avoid) {
       RCLCPP_INFO_EXPRESSION(
         getLogger(), parameters_->enable_debug_info,
@@ -1204,28 +1204,31 @@ double DynamicAvoidanceModule::calcValidLengthToAvoid(
 
 std::optional<MinMaxValue> DynamicAvoidanceModule::calcMinMaxLateralOffsetToAvoid(
   const std::vector<PathPointWithLaneId> & ref_path_points_for_obj_poly,
-  const Polygon2d & obj_points, const double obj_vel, const bool is_collision_left,
-  const double obj_normal_vel, const std::optional<DynamicAvoidanceObject> & prev_object) const
+  const Polygon2d & obj_points, const geometry_msgs::msg::Point & obj_pos, const double obj_vel,
+  const bool is_collision_left, const double obj_normal_vel,
+  const std::optional<DynamicAvoidanceObject> & prev_object) const
 {
-  const bool enable_lowpass_filter = true;
-  /*
   const bool enable_lowpass_filter = [&]() {
-    if (!prev_ref_path_points_for_obj_poly_ || prev_ref_path_points_for_obj_poly_->size() < 2) {
+    if (
+      !prev_object || prev_object->ref_path_points_for_obj_poly.size() < 2 ||
+      ref_path_points_for_obj_poly.size() < 2) {
       return true;
     }
-    const size_t prev_front_seg_idx = motion_utils::findNearestSegmentIndex(
-      *prev_ref_path_points_for_obj_poly_,
-  ref_path_points_for_obj_poly.front().point.pose.position); constexpr double
-  min_lane_change_path_lat_offset = 1.0; if ( motion_utils::calcLateralOffset(
-        *prev_ref_path_points_for_obj_poly_,
-  ref_path_points_for_obj_poly.front().point.pose.position, prev_front_seg_idx) <
-  min_lane_change_path_lat_offset) { return true;
+    const size_t obj_point_idx =
+      motion_utils::findNearestIndex(ref_path_points_for_obj_poly, obj_pos);
+    const double paths_lat_diff = std::abs(motion_utils::calcLateralOffset(
+      prev_object->ref_path_points_for_obj_poly,
+      ref_path_points_for_obj_poly.at(obj_point_idx).point.pose.position));
+
+    std::cerr << paths_lat_diff << std::endl;
+    constexpr double min_paths_lat_diff = 0.3;
+    if (paths_lat_diff < min_paths_lat_diff) {
+      return true;
     }
     // NOTE: When the input reference path laterally changes, the low-pass filter is disabled not to
     // shift the obstacle polygon suddenly.
     return false;
   }();
-  */
 
   // calculate min/max lateral offset from object to path
   const auto obj_lat_abs_offset = [&]() {
