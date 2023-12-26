@@ -23,12 +23,26 @@
 #include <autoware_auto_planning_msgs/msg/path_point_with_lane_id.hpp>
 
 #include <lanelet2_core/geometry/Lanelet.h>
-#include <lanelet2_routing/RoutingGraphContainer.h>
-#include <tf2/utils.h>
 
 #include <memory>
 #include <utility>
 #include <vector>
+
+namespace behavior_path_planner::utils::path_safety_checker::filter
+{
+
+using autoware_auto_perception_msgs::msg::PredictedObject;
+using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
+
+bool velocity_filter(
+  const PredictedObject & object, double velocity_threshold, double max_velocity);
+
+bool position_filter(
+  PredictedObject & object, const std::vector<PathPointWithLaneId> & path_points,
+  const geometry_msgs::msg::Point & current_pose, const double forward_distance,
+  const double backward_distance);
+
+}  // namespace behavior_path_planner::utils::path_safety_checker::filter
 
 namespace behavior_path_planner::utils::path_safety_checker
 {
@@ -117,6 +131,19 @@ void filterObjectsByPosition(
   PredictedObjects & objects, const std::vector<PathPointWithLaneId> & path_points,
   const geometry_msgs::msg::Point & current_pose, const double forward_distance,
   const double backward_distance);
+
+/**
+ * @brief Filter objects based on their distance from a reference point.
+ *
+ * This function filters out objects that are outside a specified radius from a reference point.
+ *
+ * @param objects The predicted objects to filter.
+ * @param reference_point The reference point (e.g., current pose of the ego vehicle).
+ * @param search_radius The radius within which to retain objects.
+ */
+void filterObjectsWithinRadius(
+  PredictedObjects & objects, const geometry_msgs::msg::Point & reference_point,
+  const double search_radius);
 
 /**
  * @brief Filters the provided objects based on their classification.
@@ -233,6 +260,42 @@ TargetObjectsOnLane createTargetObjectsOnLane(
 bool isTargetObjectType(
   const PredictedObject & object, const ObjectTypesToCheck & target_object_types);
 
+/**
+ * @brief Filters objects in the 'selected' container based on the provided filter function.
+ *
+ * This function partitions the 'selected' container based on the 'filter' function
+ * and moves objects that satisfy the filter condition to the 'removed' container.
+ *
+ * @tparam Func The type of the filter function.
+ * @param selected [in,out] The container of objects to be filtered.
+ * @param removed [out] The container where objects not satisfying the filter condition are moved.
+ * @param filter The filter function that determines whether an object should be removed.
+ */
+template <typename Func>
+void filterObjects(PredictedObjects & selected, PredictedObjects & removed, Func filter)
+{
+  auto partitioned = std::partition(selected.objects.begin(), selected.objects.end(), filter);
+  removed.objects.insert(removed.objects.end(), partitioned, selected.objects.end());
+  selected.objects.erase(partitioned, selected.objects.end());
+}
+
+/**
+ * @brief Filters objects in the 'objects' container based on the provided filter function.
+ *
+ * This function is an overload that simplifies filtering when you don't need to specify a separate
+ * 'removed' container. It internally creates a 'removed_objects' container and calls the main
+ * 'filterObjects' function.
+ *
+ * @tparam Func The type of the filter function.
+ * @param objects [in,out] The container of objects to be filtered.
+ * @param filter The filter function that determines whether an object should be removed.
+ */
+template <typename Func>
+void filterObjects(PredictedObjects & objects, Func filter)
+{
+  [[maybe_unused]] PredictedObjects removed_objects{};
+  filterObjects(objects, removed_objects, filter);
+}
 }  // namespace behavior_path_planner::utils::path_safety_checker
 
-#endif  // BEHAVIOR_PATH_PLANNER__UTILS__PATH_SAFETY_CHECKER__OBJECTS_FILTERING_HPP_
+#endif  // BEHAVIOR_PATH_PLANNER_COMMON__UTILS__PATH_SAFETY_CHECKER__OBJECTS_FILTERING_HPP_

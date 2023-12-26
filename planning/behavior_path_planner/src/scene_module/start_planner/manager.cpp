@@ -33,7 +33,6 @@ StartPlannerModuleManager::StartPlannerModuleManager(
 
   std::string ns = "start_planner.";
 
-  p.verbose = node->declare_parameter<bool>(ns + "verbose");
   p.th_arrived_distance = node->declare_parameter<double>(ns + "th_arrived_distance");
   p.th_stopped_velocity = node->declare_parameter<double>(ns + "th_stopped_velocity");
   p.th_stopped_time = node->declare_parameter<double>(ns + "th_stopped_time");
@@ -172,9 +171,7 @@ StartPlannerModuleManager::StartPlannerModuleManager(
     p.ego_predicted_path_params.min_velocity =
       node->declare_parameter<double>(ego_path_ns + "min_velocity");
     p.ego_predicted_path_params.acceleration =
-      node->declare_parameter<double>(ego_path_ns + "acceleration");
-    p.ego_predicted_path_params.max_velocity =
-      node->declare_parameter<double>(ego_path_ns + "max_velocity");
+      node->declare_parameter<double>(ego_path_ns + "min_acceleration");
     p.ego_predicted_path_params.time_horizon_for_front_object =
       node->declare_parameter<double>(ego_path_ns + "time_horizon_for_front_object");
     p.ego_predicted_path_params.time_horizon_for_rear_object =
@@ -274,6 +271,41 @@ StartPlannerModuleManager::StartPlannerModuleManager(
       node->declare_parameter<double>(rss_ns + "longitudinal_distance_min_threshold");
     p.safety_check_params.rss_params.longitudinal_velocity_delta_time =
       node->declare_parameter<double>(rss_ns + "longitudinal_velocity_delta_time");
+  }
+
+  // surround moving obstacle check
+  std::string surround_moving_obstacle_check_ns = ns + "surround_moving_obstacle_check.";
+  {
+    p.search_radius =
+      node->declare_parameter<double>(surround_moving_obstacle_check_ns + "search_radius");
+    p.th_moving_obstacle_velocity = node->declare_parameter<double>(
+      surround_moving_obstacle_check_ns + "th_moving_obstacle_velocity");
+    // ObjectTypesToCheck
+    std::string obj_types_ns = surround_moving_obstacle_check_ns + "object_types_to_check.";
+    {
+      p.surround_moving_obstacles_type_to_check.check_car =
+        node->declare_parameter<bool>(obj_types_ns + "check_car");
+      p.surround_moving_obstacles_type_to_check.check_truck =
+        node->declare_parameter<bool>(obj_types_ns + "check_truck");
+      p.surround_moving_obstacles_type_to_check.check_bus =
+        node->declare_parameter<bool>(obj_types_ns + "check_bus");
+      p.surround_moving_obstacles_type_to_check.check_trailer =
+        node->declare_parameter<bool>(obj_types_ns + "check_trailer");
+      p.surround_moving_obstacles_type_to_check.check_unknown =
+        node->declare_parameter<bool>(obj_types_ns + "check_unknown");
+      p.surround_moving_obstacles_type_to_check.check_bicycle =
+        node->declare_parameter<bool>(obj_types_ns + "check_bicycle");
+      p.surround_moving_obstacles_type_to_check.check_motorcycle =
+        node->declare_parameter<bool>(obj_types_ns + "check_motorcycle");
+      p.surround_moving_obstacles_type_to_check.check_pedestrian =
+        node->declare_parameter<bool>(obj_types_ns + "check_pedestrian");
+    }
+  }
+
+  // debug
+  std::string debug_ns = ns + "debug.";
+  {
+    p.print_debug_info = node->declare_parameter<bool>(debug_ns + "print_debug_info");
   }
 
   // validation of parameters
