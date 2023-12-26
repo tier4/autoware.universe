@@ -92,7 +92,10 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
     "/initialpose", QoS{1}, std::bind(&SimplePlanningSimulator::on_initialpose, this, _1));
   sub_ackermann_cmd_ = create_subscription<AckermannControlCommand>(
     "input/ackermann_control_command", QoS{1},
-    [this](const AckermannControlCommand::SharedPtr msg) { current_ackermann_cmd_ = *msg; });
+    [this](const AckermannControlCommand::SharedPtr msg) {
+      current_ackermann_cmd_ = *msg;
+      time_controller_->on_command();
+    });
   sub_manual_ackermann_cmd_ = create_subscription<AckermannControlCommand>(
     "input/manual_ackermann_control_command", QoS{1},
     [this](const AckermannControlCommand::SharedPtr msg) { current_manual_ackermann_cmd_ = *msg; });
@@ -137,7 +140,6 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
   set_param_res_ = this->add_on_set_parameters_callback(
     std::bind(&SimplePlanningSimulator::on_parameter, this, _1));
 
-  timer_sampling_time_ms_ = static_cast<uint32_t>(declare_parameter("timer_sampling_time_ms", 25));
   on_timer_ = create_wall_timer(
     std::chrono::milliseconds(timer_sampling_time_ms_),
     std::bind(&SimplePlanningSimulator::on_timer, this));
@@ -273,6 +275,10 @@ void SimplePlanningSimulator::on_timer()
     RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 5000, "waiting initialization...");
     return;
   }
+
+  time_controller_->on_timer();
+  time_controller_->sleep_until_frame_time();
+
   {
     static bool has_set_route = false;
     if(!has_set_route && real_rosbag_replayer_->setRoute()){
