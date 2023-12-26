@@ -93,12 +93,12 @@ public:
       for (int i = 0; i < estimated_offset_time_ns / 1000000; i++) {
         bar += "=";
       }
-      std::cout << "estimated_offset_time_ns : " << bar << std::endl;
       static std::vector<double> estimated_offset_time_buffer;
 
-      constexpr int QUEUE_SIZE = 1000;
+      constexpr int QUEUE_SIZE = 200;
       if (estimated_offset_time_buffer.size() < QUEUE_SIZE) {
         // store 1000 estimated offset time
+        std::cout << "estimated_offset_time_ns : " << bar << std::endl;
         estimated_offset_time_buffer.push_back(estimated_offset_time_ns);
       } else if (estimated_offset_time_buffer.size() == QUEUE_SIZE) {
         // calculate average of 1000 estimated offset time
@@ -107,8 +107,9 @@ public:
           std::accumulate(
             estimated_offset_time_buffer.begin(), estimated_offset_time_buffer.end(), 0.0) /
           estimated_offset_time_buffer.size();
-        std::cout << "average : " << average << std::endl;
+//        std::cout << "average : " << average << std::endl;
         start_time_offset_ = getDuration(average);
+        std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
       }
     }
   }

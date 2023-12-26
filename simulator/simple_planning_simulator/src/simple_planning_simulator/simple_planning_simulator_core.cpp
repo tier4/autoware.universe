@@ -85,6 +85,9 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
   using std::placeholders::_1;
   using std::placeholders::_2;
 
+  timer_sampling_time_ms_ = static_cast<uint32_t>(declare_parameter("timer_sampling_time_ms", 25));
+  time_controller_ = std::make_unique<TimeController>(timer_sampling_time_ms_, get_clock());
+
   real_rosbag_replayer_ = std::make_unique<RealRosbagReplayer>(*this, "no27");
   real_rosbag_replayer_->loadRosbag();
 
