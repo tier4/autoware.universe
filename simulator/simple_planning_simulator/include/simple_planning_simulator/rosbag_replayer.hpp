@@ -44,6 +44,91 @@
 #include <string>
 #include <vector>
 
+using namespace std::chrono_literals;
+using namespace std::chrono;
+
+class TimeController
+{
+public:
+  TimeController(int cycle_time_ms, rclcpp::Clock::SharedPtr clock) : clock_(clock)
+  {
+    cycle_time_ = getDuration(cycle_time_ms * 1e6);
+  }
+
+  void on_timer()
+  {
+    if (!is_started_) {
+      start_time_ = clock_->now();
+      is_started_ = true;
+    } else {
+      auto diff_time = clock_->now() - start_time_;
+      diff_time_buffer_.push_back(diff_time);
+    }
+  }
+
+  void sleep_until_next_frame()
+  {
+    auto next_frame_time = start_time_ + start_time_offset_ + cycle_time_ * (cycle_num_ + 1);
+    clock_->sleep_until(next_frame_time);
+    cycle_num_++;
+  }
+
+  void sleep_until_frame_time()
+  {
+    auto frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
+    clock_->sleep_until(frame_time);
+  }
+
+  void on_command()
+  {
+    last_command_time_ = clock_->now();
+    double current_ns = last_command_time_.nanoseconds();
+    if (!is_started_) {
+      start_time_ = last_command_time_;
+    } else {
+      const double diff_time_ns = current_ns - start_time_.nanoseconds();
+      int cycle_num = static_cast<int>(diff_time_ns / cycle_time_.nanoseconds());
+      double estimated_offset_time_ns = diff_time_ns - cycle_num * cycle_time_.nanoseconds();
+      std::string bar;
+      for (int i = 0; i < estimated_offset_time_ns / 1000000; i++) {
+        bar += "=";
+      }
+      std::cout << "estimated_offset_time_ns : " << bar << std::endl;
+      static std::vector<double> estimated_offset_time_buffer;
+
+      constexpr int QUEUE_SIZE = 1000;
+      if (estimated_offset_time_buffer.size() < QUEUE_SIZE) {
+        // store 1000 estimated offset time
+        estimated_offset_time_buffer.push_back(estimated_offset_time_ns);
+      } else if (estimated_offset_time_buffer.size() == QUEUE_SIZE) {
+        // calculate average of 1000 estimated offset time
+        // and set it to start_time_offset_
+        auto average =
+          std::accumulate(
+            estimated_offset_time_buffer.begin(), estimated_offset_time_buffer.end(), 0.0) /
+          estimated_offset_time_buffer.size();
+        std::cout << "average : " << average << std::endl;
+        start_time_offset_ = getDuration(average);
+      }
+    }
+  }
+
+  rclcpp::Duration getDuration(double ns)
+  {
+    return rclcpp::Duration(nanoseconds(static_cast<int64_t>(ns)));
+  }
+
+private:
+  rclcpp::Time start_time_;
+  rclcpp::Duration start_time_offset_ = 0ms;
+  rclcpp::Duration cycle_time_ = 0ms;
+  rclcpp::Time last_command_time_;
+  bool is_started_ = false;
+  std::vector<rclcpp::Duration> diff_time_buffer_;
+  int cycle_num_ = 0;
+  rclcpp::Clock::SharedPtr clock_;
+};
+
 using Engage = tier4_external_api_msgs::srv::Engage;
 class AutowareOperator
 {
