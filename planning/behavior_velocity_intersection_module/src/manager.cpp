@@ -50,6 +50,8 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
     node.declare_parameter<bool>(ns + ".common.use_intersection_area");
   ip.common.default_stopline_margin =
     node.declare_parameter<double>(ns + ".common.default_stopline_margin");
+  ip.common.second_pass_judge_line_margin =
+    node.declare_parameter<double>(ns + ".common.second_pass_judge_line_margin");
   ip.common.stopline_overshoot_margin =
     node.declare_parameter<double>(ns + ".common.stopline_overshoot_margin");
   ip.common.path_interpolation_ds =
@@ -89,8 +91,6 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
     node.declare_parameter<double>(ns + ".collision_detection.collision_detection_hold_time");
   ip.collision_detection.min_predicted_path_confidence =
     node.declare_parameter<double>(ns + ".collision_detection.min_predicted_path_confidence");
-  ip.collision_detection.keep_detection_velocity_threshold =
-    node.declare_parameter<double>(ns + ".collision_detection.keep_detection_velocity_threshold");
   ip.collision_detection.velocity_profile.use_upstream =
     node.declare_parameter<bool>(ns + ".collision_detection.velocity_profile.use_upstream");
   ip.collision_detection.velocity_profile.minimum_upstream_velocity =
