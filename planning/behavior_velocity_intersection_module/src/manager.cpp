@@ -147,6 +147,8 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
   ip.occlusion.creep_during_peeking.creep_velocity =
     node.declare_parameter<double>(ns + ".occlusion.creep_during_peeking.creep_velocity");
   ip.occlusion.peeking_offset = node.declare_parameter<double>(ns + ".occlusion.peeking_offset");
+  ip.occlusion.occlusion_required_clearance_distance =
+    node.declare_parameter<double>(ns + ".occlusion.occlusion_required_clearance_distance");
   ip.occlusion.possible_object_bbox =
     node.declare_parameter<std::vector<double>>(ns + ".occlusion.possible_object_bbox");
   ip.occlusion.ignore_parked_vehicle_speed_threshold =

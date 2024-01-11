@@ -1166,6 +1166,7 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
 
   const auto & adjacent_lanelets = intersection_lanelets.adjacent();
   const auto & occlusion_attention_lanelets = intersection_lanelets.occlusion_attention();
+
   const auto & occlusion_attention_area = intersection_lanelets.occlusion_attention_area();
   debug_data_.attention_area = intersection_lanelets.attention_area();
   debug_data_.occlusion_attention_area = occlusion_attention_area;
@@ -1213,7 +1214,7 @@ IntersectionModule::DecisionResult IntersectionModule::modifyPathVelocityDetail(
     }
   }
 
-  const double is_amber_or_red =
+  const bool is_amber_or_red =
     (traffic_prioritized_level == TrafficPrioritizedLevel::PARTIALLY_PRIORITIZED) ||
     (traffic_prioritized_level == TrafficPrioritizedLevel::FULLY_PRIORITIZED);
   auto occlusion_status =
