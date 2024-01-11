@@ -17,7 +17,16 @@
 
 #include <behavior_velocity_planner_common/utilization/debug.hpp>
 #include <behavior_velocity_planner_common/utilization/util.hpp>
-#include <motion_utils/motion_utils.hpp>
+#include <motion_utils/marker/virtual_wall_marker_creator.hpp>
+#include <tier4_autoware_utils/ros/marker_helper.hpp>
+
+#include <tf2/utils.h>
+
+#ifdef ROS_DISTRO_GALACTIC
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#else
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#endif
 
 #include <string>
 #include <vector>
@@ -179,12 +188,36 @@ visualization_msgs::msg::MarkerArray IntersectionModule::createDebugMarkerArray(
       &debug_marker_array);
   }
 
+  if (debug_data_.first_attention_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        {debug_data_.first_attention_area.value()}, "first_attention_area", lane_id_, 1, 0.647,
+        0.0),
+      &debug_marker_array, now);
+  }
+
+  if (debug_data_.second_attention_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        {debug_data_.second_attention_area.value()}, "second_attention_area", lane_id_, 1, 0.647,
+        0.0),
+      &debug_marker_array, now);
+  }
+
   if (debug_data_.stuck_vehicle_detect_area) {
     appendMarkerArray(
       debug::createPolygonMarkerArray(
         debug_data_.stuck_vehicle_detect_area.value(), "stuck_vehicle_detect_area", lane_id_, now,
         0.3, 0.0, 0.0, 0.0, 0.5, 0.5),
       &debug_marker_array, now);
+  }
+
+  if (debug_data_.yield_stuck_detect_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        debug_data_.yield_stuck_detect_area.value(), "yield_stuck_detect_area", lane_id_, 0.6588235,
+        0.34509, 0.6588235),
+      &debug_marker_array);
   }
 
   if (debug_data_.ego_lane) {
@@ -223,7 +256,18 @@ visualization_msgs::msg::MarkerArray IntersectionModule::createDebugMarkerArray(
 
   appendMarkerArray(
     debug::createObjectsMarkerArray(
+      debug_data_.red_overshoot_ignore_targets, "red_overshoot_ignore_targets", module_id_, now,
+      0.0, 1.0, 0.0),
+    &debug_marker_array, now);
+
+  appendMarkerArray(
+    debug::createObjectsMarkerArray(
       debug_data_.stuck_targets, "stuck_targets", module_id_, now, 0.99, 0.99, 0.2),
+    &debug_marker_array, now);
+
+  appendMarkerArray(
+    debug::createObjectsMarkerArray(
+      debug_data_.yield_stuck_targets, "stuck_targets", module_id_, now, 0.4, 0.99, 0.2),
     &debug_marker_array, now);
 
   appendMarkerArray(

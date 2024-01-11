@@ -40,47 +40,66 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
 {
   const std::string ns(getModuleName());
   auto & ip = intersection_param_;
-  ip.common.attention_area_margin =
-    node.declare_parameter<double>(ns + ".common.attention_area_margin");
   ip.common.attention_area_length =
     node.declare_parameter<double>(ns + ".common.attention_area_length");
-  ip.common.attention_area_angle_thr =
+  ip.common.attention_area_margin =
+    node.declare_parameter<double>(ns + ".common.attention_area_margin");
+  ip.common.attention_area_angle_threshold =
     node.declare_parameter<double>(ns + ".common.attention_area_angle_threshold");
-  ip.common.stop_line_margin = node.declare_parameter<double>(ns + ".common.stop_line_margin");
-  ip.common.intersection_velocity =
-    node.declare_parameter<double>(ns + ".common.intersection_velocity");
-  ip.common.intersection_max_acc =
-    node.declare_parameter<double>(ns + ".common.intersection_max_accel");
-  ip.common.stop_overshoot_margin =
-    node.declare_parameter<double>(ns + ".common.stop_overshoot_margin");
   ip.common.use_intersection_area =
     node.declare_parameter<bool>(ns + ".common.use_intersection_area");
+  ip.common.default_stopline_margin =
+    node.declare_parameter<double>(ns + ".common.default_stopline_margin");
+  ip.common.stopline_overshoot_margin =
+    node.declare_parameter<double>(ns + ".common.stopline_overshoot_margin");
   ip.common.path_interpolation_ds =
     node.declare_parameter<double>(ns + ".common.path_interpolation_ds");
-  ip.common.consider_wrong_direction_vehicle =
-    node.declare_parameter<bool>(ns + ".common.consider_wrong_direction_vehicle");
+  ip.common.max_accel = node.declare_parameter<double>(ns + ".common.max_accel");
+  ip.common.max_jerk = node.declare_parameter<double>(ns + ".common.max_jerk");
+  ip.common.delay_response_time =
+    node.declare_parameter<double>(ns + ".common.delay_response_time");
 
+  ip.stuck_vehicle.turn_direction.left =
+    node.declare_parameter<bool>(ns + ".stuck_vehicle.turn_direction.left");
+  ip.stuck_vehicle.turn_direction.right =
+    node.declare_parameter<bool>(ns + ".stuck_vehicle.turn_direction.right");
+  ip.stuck_vehicle.turn_direction.straight =
+    node.declare_parameter<bool>(ns + ".stuck_vehicle.turn_direction.straight");
   ip.stuck_vehicle.use_stuck_stopline =
     node.declare_parameter<bool>(ns + ".stuck_vehicle.use_stuck_stopline");
   ip.stuck_vehicle.stuck_vehicle_detect_dist =
     node.declare_parameter<double>(ns + ".stuck_vehicle.stuck_vehicle_detect_dist");
-  ip.stuck_vehicle.stuck_vehicle_vel_thr =
-    node.declare_parameter<double>(ns + ".stuck_vehicle.stuck_vehicle_vel_thr");
-  /*
-  ip.stuck_vehicle.assumed_front_car_decel =
-    node.declare_parameter<double>(ns + ".stuck_vehicle.assumed_front_car_decel");
-  ip.stuck_vehicle.enable_front_car_decel_prediction =
-    node.declare_parameter<bool>(ns + ".stuck_vehicle.enable_front_car_decel_prediction");
-  */
-  ip.stuck_vehicle.timeout_private_area =
-    node.declare_parameter<double>(ns + ".stuck_vehicle.timeout_private_area");
+  ip.stuck_vehicle.stuck_vehicle_velocity_threshold =
+    node.declare_parameter<double>(ns + ".stuck_vehicle.stuck_vehicle_velocity_threshold");
+  ip.stuck_vehicle.disable_against_private_lane =
+    node.declare_parameter<bool>(ns + ".stuck_vehicle.disable_against_private_lane");
 
+  ip.yield_stuck.turn_direction.left =
+    node.declare_parameter<bool>(ns + ".yield_stuck.turn_direction.left");
+  ip.yield_stuck.turn_direction.right =
+    node.declare_parameter<bool>(ns + ".yield_stuck.turn_direction.right");
+  ip.yield_stuck.turn_direction.straight =
+    node.declare_parameter<bool>(ns + ".yield_stuck.turn_direction.straight");
+  ip.yield_stuck.distance_threshold =
+    node.declare_parameter<double>(ns + ".yield_stuck.distance_threshold");
+
+  ip.collision_detection.consider_wrong_direction_vehicle =
+    node.declare_parameter<bool>(ns + ".collision_detection.consider_wrong_direction_vehicle");
+  ip.collision_detection.collision_detection_hold_time =
+    node.declare_parameter<double>(ns + ".collision_detection.collision_detection_hold_time");
   ip.collision_detection.min_predicted_path_confidence =
     node.declare_parameter<double>(ns + ".collision_detection.min_predicted_path_confidence");
-  ip.collision_detection.minimum_ego_predicted_velocity =
-    node.declare_parameter<double>(ns + ".collision_detection.minimum_ego_predicted_velocity");
-  ip.collision_detection.state_transit_margin_time =
-    node.declare_parameter<double>(ns + ".collision_detection.state_transit_margin_time");
+  ip.collision_detection.keep_detection_velocity_threshold =
+    node.declare_parameter<double>(ns + ".collision_detection.keep_detection_velocity_threshold");
+  ip.collision_detection.velocity_profile.use_upstream =
+    node.declare_parameter<bool>(ns + ".collision_detection.velocity_profile.use_upstream");
+  ip.collision_detection.velocity_profile.minimum_upstream_velocity =
+    node.declare_parameter<double>(
+      ns + ".collision_detection.velocity_profile.minimum_upstream_velocity");
+  ip.collision_detection.velocity_profile.default_velocity =
+    node.declare_parameter<double>(ns + ".collision_detection.velocity_profile.default_velocity");
+  ip.collision_detection.velocity_profile.minimum_default_velocity = node.declare_parameter<double>(
+    ns + ".collision_detection.velocity_profile.minimum_default_velocity");
   ip.collision_detection.fully_prioritized.collision_start_margin_time =
     node.declare_parameter<double>(
       ns + ".collision_detection.fully_prioritized.collision_start_margin_time");
@@ -98,48 +117,52 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
       ns + ".collision_detection.not_prioritized.collision_start_margin_time");
   ip.collision_detection.not_prioritized.collision_end_margin_time = node.declare_parameter<double>(
     ns + ".collision_detection.not_prioritized.collision_end_margin_time");
-  ip.collision_detection.keep_detection_vel_thr =
-    node.declare_parameter<double>(ns + ".collision_detection.keep_detection_vel_thr");
-  ip.collision_detection.use_upstream_velocity =
-    node.declare_parameter<bool>(ns + ".collision_detection.use_upstream_velocity");
-  ip.collision_detection.minimum_upstream_velocity =
-    node.declare_parameter<double>(ns + ".collision_detection.minimum_upstream_velocity");
+  ip.collision_detection.yield_on_green_traffic_light.distance_to_assigned_lanelet_start =
+    node.declare_parameter<double>(
+      ns + ".collision_detection.yield_on_green_traffic_light.distance_to_assigned_lanelet_start");
+  ip.collision_detection.yield_on_green_traffic_light.duration = node.declare_parameter<double>(
+    ns + ".collision_detection.yield_on_green_traffic_light.duration");
+  ip.collision_detection.yield_on_green_traffic_light.object_dist_to_stopline =
+    node.declare_parameter<double>(
+      ns + ".collision_detection.yield_on_green_traffic_light.object_dist_to_stopline");
+  ip.collision_detection.ignore_on_amber_traffic_light.object_expected_deceleration =
+    node.declare_parameter<double>(
+      ns + ".collision_detection.ignore_on_amber_traffic_light.object_expected_deceleration");
+  ip.collision_detection.ignore_on_red_traffic_light.object_margin_to_path =
+    node.declare_parameter<double>(
+      ns + ".collision_detection.ignore_on_red_traffic_light.object_margin_to_path");
 
   ip.occlusion.enable = node.declare_parameter<bool>(ns + ".occlusion.enable");
   ip.occlusion.occlusion_attention_area_length =
     node.declare_parameter<double>(ns + ".occlusion.occlusion_attention_area_length");
-  ip.occlusion.enable_creeping = node.declare_parameter<bool>(ns + ".occlusion.enable_creeping");
-  ip.occlusion.occlusion_creep_velocity =
-    node.declare_parameter<double>(ns + ".occlusion.occlusion_creep_velocity");
-  ip.occlusion.peeking_offset = node.declare_parameter<double>(ns + ".occlusion.peeking_offset");
   ip.occlusion.free_space_max = node.declare_parameter<int>(ns + ".occlusion.free_space_max");
   ip.occlusion.occupied_min = node.declare_parameter<int>(ns + ".occlusion.occupied_min");
-  ip.occlusion.do_dp = node.declare_parameter<bool>(ns + ".occlusion.do_dp");
-  ip.occlusion.before_creep_stop_time =
-    node.declare_parameter<double>(ns + ".occlusion.before_creep_stop_time");
-  ip.occlusion.min_vehicle_brake_for_rss =
-    node.declare_parameter<double>(ns + ".occlusion.min_vehicle_brake_for_rss");
-  ip.occlusion.max_vehicle_velocity_for_rss =
-    node.declare_parameter<double>(ns + ".occlusion.max_vehicle_velocity_for_rss");
   ip.occlusion.denoise_kernel = node.declare_parameter<double>(ns + ".occlusion.denoise_kernel");
-  ip.occlusion.possible_object_bbox =
-    node.declare_parameter<std::vector<double>>(ns + ".occlusion.possible_object_bbox");
-  ip.occlusion.ignore_parked_vehicle_speed_threshold =
-    node.declare_parameter<double>(ns + ".occlusion.ignore_parked_vehicle_speed_threshold");
-  ip.occlusion.stop_release_margin_time =
-    node.declare_parameter<double>(ns + ".occlusion.stop_release_margin_time");
-  ip.occlusion.temporal_stop_before_attention_area =
-    node.declare_parameter<bool>(ns + ".occlusion.temporal_stop_before_attention_area");
-  ip.occlusion.absence_traffic_light.creep_velocity =
-    node.declare_parameter<double>(ns + ".occlusion.absence_traffic_light.creep_velocity");
-  ip.occlusion.absence_traffic_light.maximum_peeking_distance = node.declare_parameter<double>(
-    ns + ".occlusion.absence_traffic_light.maximum_peeking_distance");
   ip.occlusion.attention_lane_crop_curvature_threshold =
     node.declare_parameter<double>(ns + ".occlusion.attention_lane_crop_curvature_threshold");
   ip.occlusion.attention_lane_curvature_calculation_ds =
     node.declare_parameter<double>(ns + ".occlusion.attention_lane_curvature_calculation_ds");
+  ip.occlusion.creep_during_peeking.enable =
+    node.declare_parameter<bool>(ns + ".occlusion.creep_during_peeking.enable");
+  ip.occlusion.creep_during_peeking.creep_velocity =
+    node.declare_parameter<double>(ns + ".occlusion.creep_during_peeking.creep_velocity");
+  ip.occlusion.peeking_offset = node.declare_parameter<double>(ns + ".occlusion.peeking_offset");
+  ip.occlusion.possible_object_bbox =
+    node.declare_parameter<std::vector<double>>(ns + ".occlusion.possible_object_bbox");
+  ip.occlusion.ignore_parked_vehicle_speed_threshold =
+    node.declare_parameter<double>(ns + ".occlusion.ignore_parked_vehicle_speed_threshold");
+  ip.occlusion.occlusion_detection_hold_time =
+    node.declare_parameter<double>(ns + ".occlusion.occlusion_detection_hold_time");
+  ip.occlusion.temporal_stop_time_before_peeking =
+    node.declare_parameter<double>(ns + ".occlusion.temporal_stop_time_before_peeking");
+  ip.occlusion.temporal_stop_before_attention_area =
+    node.declare_parameter<bool>(ns + ".occlusion.temporal_stop_before_attention_area");
+  ip.occlusion.creep_velocity_without_traffic_light =
+    node.declare_parameter<double>(ns + ".occlusion.creep_velocity_without_traffic_light");
   ip.occlusion.static_occlusion_with_traffic_light_timeout =
     node.declare_parameter<double>(ns + ".occlusion.static_occlusion_with_traffic_light_timeout");
+
+  ip.debug.ttc = node.declare_parameter<std::vector<int64_t>>(ns + ".debug.ttc");
 }
 
 void IntersectionModuleManager::launchNewModules(
@@ -171,19 +194,18 @@ void IntersectionModuleManager::launchNewModules(
     }
 
     const std::string location = ll.attributeOr("location", "else");
-    const bool is_private_area = (location.compare("private") == 0);
     const auto associative_ids =
       planning_utils::getAssociativeIntersectionLanelets(ll, lanelet_map, routing_graph);
     bool has_traffic_light = false;
     if (const auto tl_reg_elems = ll.regulatoryElementsAs<lanelet::TrafficLight>();
         tl_reg_elems.size() != 0) {
       const auto tl_reg_elem = tl_reg_elems.front();
-      const auto stop_line_opt = tl_reg_elem->stopLine();
-      if (!!stop_line_opt) has_traffic_light = true;
+      const auto stopline_opt = tl_reg_elem->stopLine();
+      if (!!stopline_opt) has_traffic_light = true;
     }
     const auto new_module = std::make_shared<IntersectionModule>(
       module_id, lane_id, planner_data_, intersection_param_, associative_ids, turn_direction,
-      has_traffic_light, enable_occlusion_detection, is_private_area, node_,
+      has_traffic_light, enable_occlusion_detection, node_,
       logger_.get_child("intersection_module"), clock_);
     generateUUID(module_id);
     /* set RTC status as non_occluded status initially */
@@ -298,9 +320,10 @@ MergeFromPrivateModuleManager::MergeFromPrivateModuleManager(rclcpp::Node & node
   mp.stop_duration_sec = node.declare_parameter<double>(ns + ".stop_duration_sec");
   mp.attention_area_length =
     node.get_parameter("intersection.common.attention_area_length").as_double();
-  mp.stop_line_margin = node.get_parameter("intersection.common.stop_line_margin").as_double();
+  mp.stopline_margin = node.declare_parameter<double>(ns + ".stopline_margin");
   mp.path_interpolation_ds =
     node.get_parameter("intersection.common.path_interpolation_ds").as_double();
+  mp.stop_distance_threshold = node.declare_parameter<double>(ns + ".stop_distance_threshold");
 }
 
 void MergeFromPrivateModuleManager::launchNewModules(
