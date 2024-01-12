@@ -66,17 +66,26 @@ public:
     }
   }
 
-  void sleep_until_next_frame()
-  {
-    auto next_frame_time = start_time_ + start_time_offset_ + cycle_time_ * (cycle_num_ + 1);
-    clock_->sleep_until(next_frame_time);
-    cycle_num_++;
-  }
+  //  void sleep_until_next_frame()
+  //  {
+  //    if(start_time_offset_ > 0ms) {
+  //      auto next_frame_time = start_time_ + start_time_offset_ + cycle_time_ * (cycle_num_ + 1);
+  //      std::cout << "sleep: " << (next_frame_time + sim_frame_offset -
+  //      clock_->now()).nanoseconds() / 1000000.  << std::endl; clock_->sleep_until(next_frame_time
+  //      + sim_frame_offset); cycle_num_++;
+  //    }
+  //  }
 
   void sleep_until_frame_time()
   {
-    auto frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
-    clock_->sleep_until(frame_time);
+    if (start_time_offset_ > 0ms) {
+      auto frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
+      std::cout << "sleep: "
+                << (frame_time + sim_frame_offset - clock_->now()).nanoseconds() / 1000000.
+                << std::endl;
+      clock_->sleep_until(frame_time + sim_frame_offset);
+      cycle_num_++;
+    }
   }
 
   void on_command()
