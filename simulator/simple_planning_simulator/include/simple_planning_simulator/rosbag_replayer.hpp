@@ -70,8 +70,8 @@ public:
     // export frame_diff_time_buffer_ to csv file
     std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
     std::ofstream ofs(file_name);
-    for (auto & diff_time : frame_diff_time_buffer_) {
-      ofs << diff_time.nanoseconds() << std::endl;
+    for (const auto & diff_time : frame_diff_time_buffer_) {
+      ofs << diff_time.nanoseconds() << "," << std::endl;
     }
     ofs.close();
   }
