@@ -38,9 +38,12 @@
 #include <tier4_planning_msgs/msg/velocity_limit.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
+#include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -55,14 +58,34 @@ public:
     cycle_time_ = getDuration(cycle_time_ms * 1e6);
   }
 
+  ~TimeController()
+  {
+    // get current time string
+    using namespace std::chrono;
+    std::time_t current_time = system_clock::to_time_t(system_clock::now());
+    std::tm * ptm = std::localtime(&current_time);
+    std::stringstream ss_now;
+    ss_now << std::put_time(ptm, "%Y%m%d%H%M");
+
+    // export frame_diff_time_buffer_ to csv file
+    std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
+    std::ofstream ofs(file_name);
+    for (auto & diff_time : frame_diff_time_buffer_) {
+      ofs << diff_time.nanoseconds() << std::endl;
+    }
+    ofs.close();
+  }
+
   void on_timer()
   {
+    auto current_time = clock_->now();
     if (!is_started_) {
-      start_time_ = clock_->now();
+      start_time_ = current_time;
       is_started_ = true;
     } else {
-      auto diff_time = clock_->now() - start_time_;
+      auto diff_time = current_time - start_time_;
       diff_time_buffer_.push_back(diff_time);
+      frame_diff_time_buffer_.push_back(last_command_time_ - current_time);
     }
   }
 
@@ -116,9 +139,11 @@ public:
           std::accumulate(
             estimated_offset_time_buffer.begin(), estimated_offset_time_buffer.end(), 0.0) /
           estimated_offset_time_buffer.size();
-//        std::cout << "average : " << average << std::endl;
+        //        std::cout << "average : " << average << std::endl;
         start_time_offset_ = getDuration(average);
         std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
+        // add the extra one to avoid the offset calculation on every frame
+        estimated_offset_time_buffer.push_back(estimated_offset_time_ns);
       }
     }
   }
@@ -130,13 +155,15 @@ public:
 
 private:
   rclcpp::Time start_time_;
-  rclcpp::Duration start_time_offset_ = 0ms;
+  rclcpp::Duration start_time_offset_ = -100ms;
   rclcpp::Duration cycle_time_ = 0ms;
   rclcpp::Time last_command_time_;
   bool is_started_ = false;
   std::vector<rclcpp::Duration> diff_time_buffer_;
+  std::vector<rclcpp::Duration> frame_diff_time_buffer_;
   int cycle_num_ = 0;
   rclcpp::Clock::SharedPtr clock_;
+  rclcpp::Duration sim_frame_offset = 15ms;
 };
 
 using Engage = tier4_external_api_msgs::srv::Engage;
@@ -317,7 +344,7 @@ public:
       rclcpp::SerializedMessage extracted_serialized_msg(*serialized_message->serialized_data);
       auto topic = serialized_message->topic_name;
       auto stamp_ns = serialized_message->time_stamp - config.rosbag_start_time;
-      if(stamp_ns < 0){
+      if (stamp_ns < 0) {
         continue;
       }
       if (topic == "/localization/odometry/filtered") {
