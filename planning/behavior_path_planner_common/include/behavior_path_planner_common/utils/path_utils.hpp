@@ -111,6 +111,16 @@ BehaviorModuleOutput getReferencePath(
 
 BehaviorModuleOutput createGoalAroundPath(const std::shared_ptr<const PlannerData> & planner_data);
 
+PathWithLaneId extendPath(
+  const PathWithLaneId & prev_module_path, const PathWithLaneId & reference_path,
+  const double extend_length);
+PathWithLaneId extendPath(
+  const PathWithLaneId & prev_module_path, const PathWithLaneId & reference_path,
+  const Pose & extend_pose);
+std::optional<PathWithLaneId> cropPath(const PathWithLaneId & path, const Pose & end_pose);
+std::optional<PathWithLaneId> makePathToTargetPose(
+  const PathWithLaneId & target_path, const PathWithLaneId & reference_path,
+  const lanelet::ConstLanelets & lanes, const Pose & target_pose);
 }  // namespace behavior_path_planner::utils
 
 #endif  // BEHAVIOR_PATH_PLANNER_COMMON__UTILS__PATH_UTILS_HPP_

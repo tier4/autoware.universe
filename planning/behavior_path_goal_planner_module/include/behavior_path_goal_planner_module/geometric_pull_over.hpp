@@ -54,6 +54,11 @@ public:
   bool hasEnoughDistance(
     const PullOverPath & path, const lanelet::ConstLanelets & road_lanes,
     const bool is_in_goal_route_section, const Pose & goal_pose) const;
+  void setPreviousModuleOutput(const BehaviorModuleOutput & previous_module_output) override
+  {
+    previous_module_output_ = previous_module_output;
+    planner_.setPreviousModuleOutput(previous_module_output);
+  }
 
 protected:
   ParallelParkingParameters parallel_parking_parameters_;

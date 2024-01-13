@@ -684,4 +684,96 @@ BehaviorModuleOutput createGoalAroundPath(const std::shared_ptr<const PlannerDat
   return output;
 }
 
+PathWithLaneId extendPath(
+  const PathWithLaneId & target_path, const PathWithLaneId & reference_path,
+  const double extend_length)
+{
+  const auto & target_terminal_pose = target_path.points.back().point.pose;
+
+  // generate clipped road lane reference path from previous module path terminal pose to shift end
+  const size_t target_path_terminal_idx =
+    motion_utils::findNearestSegmentIndex(reference_path.points, target_terminal_pose.position);
+
+  PathWithLaneId clipped_path{};
+  clipped_path.points = motion_utils::cropPoints(
+    reference_path.points, target_terminal_pose.position, target_path_terminal_idx, extend_length,
+    0.0);
+
+  // shift clipped path to previous module path terminal pose
+  const double lateral_shift_from_reference_path =
+    motion_utils::calcLateralOffset(reference_path.points, target_terminal_pose.position);
+  for (auto & p : clipped_path.points) {
+    p.point.pose =
+      tier4_autoware_utils::calcOffsetPose(p.point.pose, 0, lateral_shift_from_reference_path, 0);
+  }
+
+  auto extended_path = target_path;
+  const auto start_point =
+    std::find_if(clipped_path.points.begin(), clipped_path.points.end(), [&](const auto & p) {
+      const bool is_forward =
+        tier4_autoware_utils::inverseTransformPoint(p.point.pose.position, target_terminal_pose).x >
+        0.0;
+      const bool is_close = tier4_autoware_utils::calcDistance2d(
+                              p.point.pose.position, target_terminal_pose.position) < 0.1;
+      return is_forward && !is_close;
+    });
+  std::copy(start_point, clipped_path.points.end(), std::back_inserter(extended_path.points));
+
+  extended_path.points = motion_utils::removeOverlapPoints(extended_path.points);
+
+  return extended_path;
+}
+
+PathWithLaneId extendPath(
+  const PathWithLaneId & target_path, const PathWithLaneId & reference_path,
+  const Pose & extend_pose)
+{
+  const auto & target_terminal_pose = target_path.points.back().point.pose;
+  const size_t target_path_terminal_idx =
+    motion_utils::findNearestSegmentIndex(reference_path.points, target_terminal_pose.position);
+  const double extend_distance = motion_utils::calcSignedArcLength(
+    reference_path.points, target_path_terminal_idx, extend_pose.position);
+
+  return extendPath(target_path, reference_path, extend_distance);
+}
+
+std::optional<PathWithLaneId> cropPath(const PathWithLaneId & path, const Pose & end_pose)
+{
+  const size_t end_idx = motion_utils::findNearestSegmentIndex(path.points, end_pose.position);
+  std::vector<PathPointWithLaneId> clipped_points{
+    path.points.begin(), path.points.begin() + end_idx};
+  if (clipped_points.empty()) {
+    return std::nullopt;
+  }
+
+  // add projected end pose to clipped points
+  PathPointWithLaneId projected_point = clipped_points.back();
+  const double offset = motion_utils::calcSignedArcLength(path.points, end_idx, end_pose.position);
+  projected_point.point.pose =
+    tier4_autoware_utils::calcOffsetPose(clipped_points.back().point.pose, offset, 0, 0);
+  clipped_points.push_back(projected_point);
+  auto clipped_path = path;
+  clipped_path.points = clipped_points;
+
+  return clipped_path;
+}
+
+std::optional<PathWithLaneId> makePathToTargetPose(
+  const PathWithLaneId & target_path, const PathWithLaneId & reference_path,
+  const lanelet::ConstLanelets & lanes, const Pose & target_pose)
+{
+  const Pose target_path_terminal_pose = target_path.points.back().point.pose;
+  const bool extend_previous_module_path =
+    lanelet::utils::getArcCoordinates(lanes, target_pose).length >
+    lanelet::utils::getArcCoordinates(lanes, target_path_terminal_pose).length;
+
+  // case1) extend path if target pose is behind of previous module path terminal pose
+  if (extend_previous_module_path) {
+    return utils::extendPath(target_path, reference_path, target_pose);
+  }
+
+  // case2) crop path if target pose is ahead of previous module path terminal pose
+  return utils::cropPath(target_path, target_pose);
+}
+
 }  // namespace behavior_path_planner::utils

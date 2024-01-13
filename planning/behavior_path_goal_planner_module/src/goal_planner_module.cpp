@@ -294,10 +294,11 @@ void GoalPlannerModule::onTimer()
   // plan candidate paths and set them to the member variable
   if (parameters.path_priority == "efficient_path") {
     for (const auto & planner : pull_over_planners_) {
-      // todo: temporary skip NON SHIFT planner when input path is not center line
-      if (!is_center_line_input_path && planner->getPlannerType() != PullOverPlannerType::SHIFT) {
-        continue;
-      }
+      // // todo: temporary skip NON SHIFT planner when input path is not center line
+      // if (!is_center_line_input_path && planner->getPlannerType() != PullOverPlannerType::SHIFT)
+      // {
+      //   continue;
+      // }
       for (const auto & goal_candidate : goal_candidates) {
         planCandidatePaths(planner, goal_candidate);
       }
@@ -1526,7 +1527,7 @@ PathWithLaneId GoalPlannerModule::generateStopPath() const
     const double s_end = s_current + common_parameters.forward_path_length;
     return route_handler->getCenterLinePath(current_lanes, s_start, s_end, true);
   });
-  const auto extended_prev_path = goal_planner_utils::extendPath(
+  const auto extended_prev_path = utils::extendPath(
     getPreviousModuleOutput().path, reference_path, common_parameters.forward_path_length);
 
   // calculate search start offset pose from the closest goal candidate pose with

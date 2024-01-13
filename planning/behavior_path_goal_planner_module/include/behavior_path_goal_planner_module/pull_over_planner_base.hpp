@@ -118,14 +118,14 @@ public:
   }
   virtual ~PullOverPlannerBase() = default;
 
-  void setPreviousModuleOutput(const BehaviorModuleOutput & previous_module_output)
-  {
-    previous_module_output_ = previous_module_output;
-  }
-
   void setPlannerData(const std::shared_ptr<const PlannerData> planner_data)
   {
     planner_data_ = planner_data;
+  }
+
+  virtual void setPreviousModuleOutput(const BehaviorModuleOutput & previous_module_output)
+  {
+    previous_module_output_ = previous_module_output;
   }
 
   virtual PullOverPlannerType getPlannerType() const = 0;

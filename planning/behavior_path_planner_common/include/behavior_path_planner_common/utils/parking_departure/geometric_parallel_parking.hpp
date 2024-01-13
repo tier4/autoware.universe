@@ -81,6 +81,10 @@ public:
   {
     planner_data_ = planner_data;
   }
+  void setPreviousModuleOutput(const BehaviorModuleOutput & previous_module_output)
+  {
+    previous_module_output_ = previous_module_output;
+  }
   void setTurningRadius(
     const BehaviorPathPlannerParameters & common_params, const double max_steer_angle);
 
@@ -104,6 +108,7 @@ public:
 private:
   std::shared_ptr<const PlannerData> planner_data_{nullptr};
   ParallelParkingParameters parameters_{};
+  BehaviorModuleOutput previous_module_output_;
 
   double R_E_min_{0.0};   // base_link
   double R_Bl_min_{0.0};  // front_left

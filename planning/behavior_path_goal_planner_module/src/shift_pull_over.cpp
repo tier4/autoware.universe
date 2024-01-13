@@ -148,10 +148,10 @@ std::optional<PullOverPath> ShiftPullOver::generatePullOverPath(
       lanelet::utils::getArcCoordinates(road_lanes, shift_end_pose).length >
       lanelet::utils::getArcCoordinates(road_lanes, prev_module_path_terminal_pose).length;
     if (extend_previous_module_path) {  // case1
-      return goal_planner_utils::extendPath(
+      return utils::extendPath(
         prev_module_path, road_lane_reference_path_to_shift_end, shift_end_pose);
     } else {  // case2
-      return goal_planner_utils::cropPath(prev_module_path, shift_end_pose);
+      return utils::cropPath(prev_module_path, shift_end_pose);
     }
   });
   if (!processed_prev_module_path || processed_prev_module_path->points.empty()) {
