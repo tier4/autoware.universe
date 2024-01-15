@@ -60,20 +60,7 @@ public:
 
   ~TimeController()
   {
-    // get current time string
-    using namespace std::chrono;
-    std::time_t current_time = system_clock::to_time_t(system_clock::now());
-    std::tm * ptm = std::localtime(&current_time);
-    std::stringstream ss_now;
-    ss_now << std::put_time(ptm, "%Y%m%d%H%M");
 
-    // export frame_diff_time_buffer_ to csv file
-    std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
-    std::ofstream ofs(file_name);
-    for (const auto & diff_time : frame_diff_time_buffer_) {
-      ofs << diff_time.nanoseconds() << "," << std::endl;
-    }
-    ofs.close();
   }
 
   void on_timer()
@@ -143,9 +130,55 @@ public:
         start_time_offset_ = getDuration(average);
         std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
         // add the extra one to avoid the offset calculation on every frame
-        estimated_offset_time_buffer.push_back(estimated_offset_time_ns);
+        estimated_offset_time_buffer.push_back(estimated_cmd_offset_time_ns);
+        // initialize cycle_num
+        cycle_num_ = static_cast<int>(
+          (current_time - (start_time_ + start_time_offset_)).nanoseconds() /
+          cycle_time_.nanoseconds());
+        cycle_num_++;
+        auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
+        // if offset time is larger than next sim frame time, use next frame
+        if ((cmd_frame_time + sim_frame_offset) > (current_time + cycle_time_)) {
+          cycle_num_++;
+        }
+      } else {
+        // sleep
+        {
+          cycle_num_++;
+          auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
+          std::cout << "sleep: "
+                    << (cmd_frame_time + sim_frame_offset - clock_->now()).nanoseconds() / 1000000.
+                    << std::endl;
+          clock_->sleep_until(cmd_frame_time + sim_frame_offset);
+        }
+
+        frame_diff_time_buffer_.push_back(clock_->now() - last_command_time_);
+
+        // save log and exit
+        if(frame_diff_time_buffer_.size() > 1000){
+          // get current time string
+          using namespace std::chrono;
+          std::time_t current_time_t = system_clock::to_time_t(system_clock::now());
+          std::tm * ptm = std::localtime(&current_time_t);
+          std::stringstream ss_now;
+          ss_now << std::put_time(ptm, "%Y%m%d%H%M");
+
+          // export frame_diff_time_buffer_ to csv file
+          std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
+          std::ofstream ofs(file_name);
+          for (const auto & diff_time : frame_diff_time_buffer_) {
+            ofs << diff_time.nanoseconds() << "," << std::endl;
+          }
+          ofs.close();
+          std::exit(0);
+        }
       }
     }
+  }
+
+  void on_command()
+  {
+    last_command_time_ = clock_->now();
   }
 
   rclcpp::Duration getDuration(double ns)
