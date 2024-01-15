@@ -66,7 +66,9 @@ public:
   void on_timer()
   {
     auto current_time = clock_->now();
-    if (!is_started_) {
+    /* average offset estimation between control frame and simulator frame */
+
+    if (!is_started_ || last_command_time_.get_clock_type() == RCL_SYSTEM_TIME) {
       start_time_ = current_time;
       is_started_ = true;
     } else {
