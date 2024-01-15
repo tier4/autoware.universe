@@ -72,63 +72,33 @@ public:
       start_time_ = current_time;
       is_started_ = true;
     } else {
-      auto diff_time = current_time - start_time_;
-      diff_time_buffer_.push_back(diff_time);
-      frame_diff_time_buffer_.push_back(last_command_time_ - current_time);
-    }
-  }
+      double cmd_ns = last_command_time_.nanoseconds();
+      const double diff_cmd_ns = cmd_ns - start_time_.nanoseconds();
+      int cmd_cycle_num = static_cast<int>(diff_cmd_ns / cycle_time_.nanoseconds());
+      double estimated_cmd_offset_time_ns =
+        diff_cmd_ns - (cmd_cycle_num * cycle_time_.nanoseconds());
 
-  //  void sleep_until_next_frame()
-  //  {
-  //    if(start_time_offset_ > 0ms) {
-  //      auto next_frame_time = start_time_ + start_time_offset_ + cycle_time_ * (cycle_num_ + 1);
-  //      std::cout << "sleep: " << (next_frame_time + sim_frame_offset -
-  //      clock_->now()).nanoseconds() / 1000000.  << std::endl; clock_->sleep_until(next_frame_time
-  //      + sim_frame_offset); cycle_num_++;
-  //    }
-  //  }
-
-  void sleep_until_frame_time()
-  {
-    if (start_time_offset_ > 0ms) {
-      auto frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
-      std::cout << "sleep: "
-                << (frame_time + sim_frame_offset - clock_->now()).nanoseconds() / 1000000.
-                << std::endl;
-      clock_->sleep_until(frame_time + sim_frame_offset);
-      cycle_num_++;
-    }
-  }
-
-  void on_command()
-  {
-    last_command_time_ = clock_->now();
-    double current_ns = last_command_time_.nanoseconds();
-    if (!is_started_) {
-      start_time_ = last_command_time_;
-    } else {
-      const double diff_time_ns = current_ns - start_time_.nanoseconds();
-      int cycle_num = static_cast<int>(diff_time_ns / cycle_time_.nanoseconds());
-      double estimated_offset_time_ns = diff_time_ns - cycle_num * cycle_time_.nanoseconds();
-      std::string bar;
-      for (int i = 0; i < estimated_offset_time_ns / 1000000; i++) {
-        bar += "=";
-      }
       static std::vector<double> estimated_offset_time_buffer;
 
       constexpr int QUEUE_SIZE = 200;
       if (estimated_offset_time_buffer.size() < QUEUE_SIZE) {
-        // store 1000 estimated offset time
-        std::cout << "estimated_offset_time_ns : " << bar << std::endl;
-        estimated_offset_time_buffer.push_back(estimated_offset_time_ns);
+        // store 200 estimated offset time
+        estimated_offset_time_buffer.push_back(estimated_cmd_offset_time_ns);
+        // show estimated offset time
+        {
+          std::string bar;
+          for (int i = 0; i < estimated_cmd_offset_time_ns / 1000000; i++) {
+            bar += "=";
+          }
+          std::cout << "estimated_offset_time_ns : " << bar << std::endl;
+        }
       } else if (estimated_offset_time_buffer.size() == QUEUE_SIZE) {
-        // calculate average of 1000 estimated offset time
+        // calculate average of 200 estimated offset time
         // and set it to start_time_offset_
         auto average =
           std::accumulate(
             estimated_offset_time_buffer.begin(), estimated_offset_time_buffer.end(), 0.0) /
           estimated_offset_time_buffer.size();
-        //        std::cout << "average : " << average << std::endl;
         start_time_offset_ = getDuration(average);
         std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
         // add the extra one to avoid the offset calculation on every frame
@@ -191,14 +161,14 @@ public:
 private:
   rclcpp::Time start_time_;
   rclcpp::Duration start_time_offset_ = -100ms;
-  rclcpp::Duration cycle_time_ = 0ms;
+  rclcpp::Duration cycle_time_ = 30ms;
   rclcpp::Time last_command_time_;
   bool is_started_ = false;
   std::vector<rclcpp::Duration> diff_time_buffer_;
   std::vector<rclcpp::Duration> frame_diff_time_buffer_;
   int cycle_num_ = 0;
   rclcpp::Clock::SharedPtr clock_;
-  rclcpp::Duration sim_frame_offset = 15ms;
+  rclcpp::Duration sim_frame_offset = 5ms;
 };
 
 using Engage = tier4_external_api_msgs::srv::Engage;
