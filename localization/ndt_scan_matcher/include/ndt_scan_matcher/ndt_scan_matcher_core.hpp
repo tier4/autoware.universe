@@ -105,7 +105,7 @@ private:
     const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg);
   void publish_pose(
     const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg,
-    const bool is_converged);
+    const std::array<double, 36> & ndt_covariance, const bool is_converged);
   void publish_point_cloud(
     const rclcpp::Time & sensor_ros_time, const std::string & frame_id,
     const pcl::shared_ptr<pcl::PointCloud<PointSource>> & sensor_points_in_map_ptr);
@@ -123,6 +123,8 @@ private:
   bool validate_converged_param(
     const double & transform_probability, const double & nearest_voxel_transformation_likelihood);
 
+  std::array<double, 36> rotate_covariance(
+    const std::array<double, 36> & src_covariance, const Eigen::Matrix3d & rotation) const;
   std::optional<Eigen::Matrix4f> interpolate_regularization_pose(
     const rclcpp::Time & sensor_ros_time);
   void add_regularization_pose(const rclcpp::Time & sensor_ros_time);

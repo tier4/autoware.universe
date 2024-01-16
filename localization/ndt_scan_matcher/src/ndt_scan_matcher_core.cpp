@@ -437,6 +437,31 @@ void NDTScanMatcher::callback_sensor_points(
     ++skipping_publish_num;
     RCLCPP_WARN(get_logger(), "Not Converged");
   }
+  int32_t start_time_to_change_cov = 1634865591;
+  int32_t end_time_to_change_cov = 1634865655;
+  bool enable_big_lon_cov_1st = (sensor_ros_time.seconds() > start_time_to_change_cov) &&
+                                (sensor_ros_time.seconds() < end_time_to_change_cov);
+
+  start_time_to_change_cov = 1634865658;
+  end_time_to_change_cov = 163486563;
+  bool enable_big_lon_cov_2nd = (sensor_ros_time.seconds() > start_time_to_change_cov) &&
+                                (sensor_ros_time.seconds() < end_time_to_change_cov);
+  if (enable_big_lon_cov_1st || enable_big_lon_cov_2nd) {
+    // 車両進行方向に分散を十分大きくする(信頼度を落とす)
+    output_pose_covariance_[0] = 9.0;
+  } else {
+    output_pose_covariance_[0] = 0.0225;
+  }
+
+  // covariance estimation
+  const Eigen::Quaterniond map_to_base_link_quat = Eigen::Quaterniond(
+    result_pose_msg.orientation.w, result_pose_msg.orientation.x, result_pose_msg.orientation.y,
+    result_pose_msg.orientation.z);
+  const Eigen::Matrix3d map_to_base_link_rotation =
+    map_to_base_link_quat.normalized().toRotationMatrix();
+
+  std::array<double, 36> ndt_covariance =
+    rotate_covariance(output_pose_covariance_, map_to_base_link_rotation);
 
   // publish
   initial_pose_with_covariance_pub_->publish(interpolator.get_current_pose());
@@ -447,7 +472,7 @@ void NDTScanMatcher::callback_sensor_points(
     make_float32_stamped(sensor_ros_time, ndt_result.nearest_voxel_transformation_likelihood));
   iteration_num_pub_->publish(make_int32_stamped(sensor_ros_time, ndt_result.iteration_num));
   publish_tf(sensor_ros_time, result_pose_msg);
-  publish_pose(sensor_ros_time, result_pose_msg, is_converged);
+  publish_pose(sensor_ros_time, result_pose_msg, ndt_covariance, is_converged);
   publish_marker(sensor_ros_time, transformation_msg_array);
   publish_initial_to_result_distances(
     sensor_ros_time, result_pose_msg, interpolator.get_current_pose(), interpolator.get_old_pose(),
@@ -529,7 +554,7 @@ void NDTScanMatcher::publish_tf(
 
 void NDTScanMatcher::publish_pose(
   const rclcpp::Time & sensor_ros_time, const geometry_msgs::msg::Pose & result_pose_msg,
-  const bool is_converged)
+  const std::array<double, 36> & ndt_covariance, const bool is_converged)
 {
   geometry_msgs::msg::PoseStamped result_pose_stamped_msg;
   result_pose_stamped_msg.header.stamp = sensor_ros_time;
@@ -540,7 +565,7 @@ void NDTScanMatcher::publish_pose(
   result_pose_with_cov_msg.header.stamp = sensor_ros_time;
   result_pose_with_cov_msg.header.frame_id = map_frame_;
   result_pose_with_cov_msg.pose.pose = result_pose_msg;
-  result_pose_with_cov_msg.pose.covariance = output_pose_covariance_;
+  result_pose_with_cov_msg.pose.covariance = ndt_covariance;
 
   if (is_converged) {
     ndt_pose_pub_->publish(result_pose_stamped_msg);
@@ -654,6 +679,28 @@ bool NDTScanMatcher::validate_converged_param(
       this->get_logger(), *this->get_clock(), 1, "Unknown converged param type.");
   }
   return is_ok_converged_param;
+}
+
+std::array<double, 36> NDTScanMatcher::rotate_covariance(
+  const std::array<double, 36> & src_covariance, const Eigen::Matrix3d & rotation) const
+{
+  std::array<double, 36> ret_covariance = src_covariance;
+
+  Eigen::Matrix3d src_cov;
+  src_cov << src_covariance[0], src_covariance[1], src_covariance[2], src_covariance[6],
+    src_covariance[7], src_covariance[8], src_covariance[12], src_covariance[13],
+    src_covariance[14];
+
+  Eigen::Matrix3d ret_cov;
+  ret_cov = rotation * src_cov * rotation.transpose();
+
+  for (Eigen::Index i = 0; i < 3; ++i) {
+    ret_covariance[i] = ret_cov(0, i);
+    ret_covariance[i + 6] = ret_cov(1, i);
+    ret_covariance[i + 12] = ret_cov(2, i);
+  }
+
+  return ret_covariance;
 }
 
 std::optional<Eigen::Matrix4f> NDTScanMatcher::interpolate_regularization_pose(
