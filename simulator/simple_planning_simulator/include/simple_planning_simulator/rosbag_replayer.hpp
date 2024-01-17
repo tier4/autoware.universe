@@ -70,8 +70,12 @@ public:
 
     if (!is_started_ || last_command_time_.get_clock_type() == RCL_SYSTEM_TIME) {
       start_time_ = current_time;
+    if (!is_started_ && last_command_time_.get_clock_type() == RCL_ROS_TIME) {
+      start_time_ = last_command_time_;
       is_started_ = true;
-    } else {
+    }
+
+    if(is_started_){
       double cmd_ns = last_command_time_.nanoseconds();
       const double diff_cmd_ns = cmd_ns - start_time_.nanoseconds();
       int cmd_cycle_num = static_cast<int>(diff_cmd_ns / cycle_time_.nanoseconds());
