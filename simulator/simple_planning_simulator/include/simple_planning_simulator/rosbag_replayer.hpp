@@ -102,19 +102,20 @@ public:
           estimated_offset_time_buffer.size();
         average -= cycle_time_.nanoseconds() / 2.0;
         start_time_offset_ = getDuration(average);
-        std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
+        std::cout << "average_offset_time_ns : " << average / 1000000 << std::endl;
         // add the extra one to avoid the offset calculation on every frame
         estimated_offset_time_buffer.push_back(estimated_cmd_offset_time_ns);
         // initialize cycle_num
         cycle_num_ = static_cast<int>(
           (current_time - (start_time_ + start_time_offset_) + (cycle_time_*0.5)).nanoseconds() /
           cycle_time_.nanoseconds());
-        cycle_num_++;
         auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
         // if offset time is larger than next sim frame time, use next frame
         if ((cmd_frame_time + sim_frame_offset) > (current_time + cycle_time_)) {
           cycle_num_++;
         }
+        cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
+        std::cout << "frame_time_precision: " << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000 << std::endl;
       } else {
         has_measured_offset_ = true;
         std::stringstream ss;
@@ -164,6 +165,11 @@ public:
     return rclcpp::Duration(nanoseconds(static_cast<int64_t>(ns)));
   }
 
+  bool has_measured_offset() const
+  {
+    return has_measured_offset_;
+  }
+
 private:
   rclcpp::Time start_time_;
   rclcpp::Duration start_time_offset_ = -100ms;
@@ -174,7 +180,8 @@ private:
   std::vector<rclcpp::Duration> frame_diff_time_buffer_;
   int cycle_num_ = 0;
   rclcpp::Clock::SharedPtr clock_;
-  rclcpp::Duration sim_frame_offset = 5ms;
+  rclcpp::Duration sim_frame_offset = 15ms;
+  bool has_measured_offset_ = false;
 };
 
 using Engage = tier4_external_api_msgs::srv::Engage;

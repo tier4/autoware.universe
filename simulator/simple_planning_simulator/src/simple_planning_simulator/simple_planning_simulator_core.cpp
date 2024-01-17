@@ -280,7 +280,6 @@ void SimplePlanningSimulator::on_timer()
   }
 
   time_controller_->on_timer();
-  time_controller_->sleep_until_frame_time();
 
   {
     static bool has_set_route = false;
@@ -290,7 +289,7 @@ void SimplePlanningSimulator::on_timer()
   }
   {
     static bool has_engage = false;
-    if(!has_engage && real_rosbag_replayer_->engageAutoware()){
+    if(!has_engage && time_controller_->has_measured_offset() && real_rosbag_replayer_->engageAutoware()){
       has_engage = true;
     }
   }
