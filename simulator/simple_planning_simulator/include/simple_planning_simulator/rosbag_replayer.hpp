@@ -214,11 +214,14 @@ public:
     }
   }
 
-  void engage(bool engage)
+  void engage(bool engage, bool wait = true)
   {
     auto req = std::make_shared<Engage::Request>();
     req->engage = engage;
     auto future = client_engage->async_send_request(req);
+    if (!wait) {
+      return;
+    }
     auto status = future.wait_for(std::chrono::seconds(1));
     if (status == std::future_status::ready) {
       auto response = future.get();
@@ -434,7 +437,7 @@ public:
     if (
       autoware.getAutowareState().state ==
       autoware_auto_system_msgs::msg::AutowareState::WAITING_FOR_ENGAGE) {
-      autoware.engage(true);
+      autoware.engage(true, false);
       return true;
     }
     return false;
