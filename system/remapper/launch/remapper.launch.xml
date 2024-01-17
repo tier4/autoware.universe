@@ -1,0 +1,95 @@
+<launch>
+  <arg name="input_operation_mode_availability" default="/system/operation_mode/availability"/>
+  <arg name="input_to_can_bus" default="/j6/to_can_bus"/>
+  <arg name="input_control_cmd" default="/control/command/control_cmd"/>
+  <arg name="input_tf" default="/tf"/>
+
+  <arg name="input_operation_mode_state" default="/api/operation_mode/state"/>
+  <arg name="input_initialization_state" default="/api/localization/initialization_state"/>
+  <arg name="input_pose_with_covariance" default="/localization/pose_with_covariance"/>
+  <arg name="input_routing_state" default="/api/routing/state"/>
+  <arg name="input_routing_route" default="/api/routing/route"/>
+
+  <arg name="input_autoware_state" default="/autoware/state"/>
+  <!-- <arg name="input_initialization_state" default="/api/localization/initialization_state"/> -->
+  <!-- <arg name="input_routing_state" default="/api/routing/state"/> -->
+  <!-- <arg name="input_operation_mode_state" default="/api/operation_mode/state"/> -->
+  <arg name="input_control_mode" default="/vehicle/status/control_mode"/>
+  <arg name="input_get_emergency" default="/api/external/get/emergency"/>
+  <arg name="input_mrm_state" default="/api/fail_safe/mrm_state"/>
+  <arg name="input_diagnostics_graph" default="/diagnostics_graph"/>
+  <arg name="input_diagnostics_graph_supervisor" default="/diagnostics_graph/supervisor"/>
+  <arg name="input_rois0" default="/perception/object_recognition/detection/rois0/rois"/>
+  <arg name="input_rois1" default="/perception/object_recognition/detection/rois1/rois"/>
+  <arg name="input_rois2" default="/perception/object_recognition/detection/rois2/rois"/>
+  <arg name="input_rois3" default="/perception/object_recognition/detection/rois3/rois"/>
+  <arg name="input_rois4" default="/perception/object_recognition/detection/rois4/rois"/>
+  <arg name="input_rois5" default="/perception/object_recognition/detection/rois5/rois"/>
+  <arg name="input_rois6" default="/perception/object_recognition/detection/rois6/rois"/>
+  
+  <arg name="output_rois0" default="/perception/object_recognition/detection/rois0"/>
+  <arg name="output_rois1" default="/perception/object_recognition/detection/rois1"/>
+  <arg name="output_rois2" default="/perception/object_recognition/detection/rois2"/>
+  <arg name="output_rois3" default="/perception/object_recognition/detection/rois3"/>
+  <arg name="output_rois4" default="/perception/object_recognition/detection/rois4"/>
+  <arg name="output_rois5" default="/perception/object_recognition/detection/rois5"/>
+  <arg name="output_rois6" default="/perception/object_recognition/detection/rois6"/>
+
+  <group>
+    <node pkg="remapper" exec="remapper" name="remapper" output="screen">
+      <!-- input -->
+      <remap from="~/input/system/operation_mode/availability" to="$(var input_operation_mode_availability)"/>
+      <remap from="~/input/j6/to_can_bus" to="$(var input_to_can_bus)"/>
+      <remap from="~/input/control/command/control_cmd" to="$(var input_control_cmd)"/>
+      <remap from="~/input/tf" to="$(var input_tf)"/>
+
+      <remap from="~/input/api/operation_mode/state" to="$(var input_operation_mode_state)"/>
+      <remap from="~/input/api/localization/initialization_state" to="$(var input_initialization_state)"/>
+      <remap from="~/input/localization/pose_with_covariance" to="$(var input_pose_with_covariance)"/>
+      <remap from="~/input/api/routing/state" to="$(var input_routing_state)"/>
+      <remap from="~/input/api/routing/route" to="$(var input_routing_route)"/>
+
+      <remap from="~/input/autoware/state" to="$(var input_autoware_state)"/>
+      <remap from="~/input/vehicle/status/control_mode" to="$(var input_control_mode)"/>
+      <remap from="~/input/api/external/get/emergency" to="$(var input_get_emergency)"/>
+      <remap from="~/input/api/fail_safe/mrm_state" to="$(var input_mrm_state)"/>
+      <remap from="~/input/diagnostics_graph" to="$(var input_diagnostics_graph)"/>
+      <remap from="~/input/diagnostics_graph/supervisor" to="$(var input_diagnostics_graph_supervisor)"/>
+
+      <remap from="~/input/rois0" to="$(var input_rois0)"/>
+      <remap from="~/input/rois1" to="$(var input_rois1)"/>
+      <remap from="~/input/rois2" to="$(var input_rois2)"/>
+      <remap from="~/input/rois3" to="$(var input_rois3)"/>
+      <remap from="~/input/rois4" to="$(var input_rois4)"/>
+      <remap from="~/input/rois5" to="$(var input_rois5)"/>
+      <remap from="~/input/rois6" to="$(var input_rois6)"/>
+      
+      <!-- output -->
+      <remap from="~/output/system/operation_mode/availability" to="/$(var ecu_name)$(var input_operation_mode_availability)/$(var ecu_name)"/>
+      <remap from="~/output/j6/to_can_bus" to="/$(var ecu_name)$(var input_to_can_bus)"/>
+      <remap from="~/output/control/command/control_cmd" to="/$(var ecu_name)$(var input_control_cmd)"/>
+      <remap from="~/output/tf" to="/$(var ecu_name)$(var input_tf)"/>
+
+      <remap from="~/output/api/operation_mode/state" to="/$(var ecu_name)$(var input_operation_mode_state)"/>
+      <remap from="~/output/api/localization/initialization_state" to="/$(var ecu_name)$(var input_initialization_state)"/>
+      <remap from="~/output/localization/pose_with_covariance" to="/$(var ecu_name)$(var input_pose_with_covariance)"/>
+      <remap from="~/output/api/routing/state" to="/$(var ecu_name)$(var input_routing_state)"/>
+      <remap from="~/output/api/routing/route" to="/$(var ecu_name)$(var input_routing_route)"/>
+
+      <remap from="~/output/autoware/state" to="/$(var ecu_name)$(var input_autoware_state)"/>
+      <remap from="~/output/vehicle/status/control_mode" to="/$(var ecu_name)$(var input_control_mode)"/>
+      <remap from="~/output/api/external/get/emergency" to="/$(var ecu_name)$(var input_get_emergency)"/>
+      <remap from="~/output/api/fail_safe/mrm_state" to="/$(var ecu_name)$(var input_mrm_state)"/>
+      <remap from="~/output/diagnostics_graph" to="/$(var ecu_name)$(var input_diagnostics_graph)"/>
+      <remap from="~/output/diagnostics_graph/supervisor" to="/$(var ecu_name)$(var input_diagnostics_graph_supervisor)"/>
+
+      <remap from="~/output/rois0" to="$(var output_rois0)"/>
+      <remap from="~/output/rois1" to="$(var output_rois1)"/>
+      <remap from="~/output/rois2" to="$(var output_rois2)"/>
+      <remap from="~/output/rois3" to="$(var output_rois3)"/>
+      <remap from="~/output/rois4" to="$(var output_rois4)"/>
+      <remap from="~/output/rois5" to="$(var output_rois5)"/>
+      <remap from="~/output/rois6" to="$(var output_rois6)"/>
+    </node>
+  </group>
+</launch>
