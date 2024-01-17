@@ -116,18 +116,22 @@ public:
           cycle_num_++;
         }
       } else {
+        has_measured_offset_ = true;
+        std::stringstream ss;
         // sleep
         {
           cycle_num_++;
           auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
-          std::cout << "sleep: "
-                    << (cmd_frame_time + sim_frame_offset - clock_->now()).nanoseconds() / 1000000.
-                    << std::endl;
+          ss << "offset[ms]: " << start_time_offset_.nanoseconds() / 1000000. << ", ";
+          ss << "frame_time_precision: " << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000. << ", ";
+          auto sleep_duration = cmd_frame_time + sim_frame_offset - current_time;
+          ss << "sleep: " << sleep_duration.nanoseconds() / 1000000.;
           clock_->sleep_until(cmd_frame_time + sim_frame_offset);
         }
 
         frame_diff_time_buffer_.push_back(clock_->now() - last_command_time_);
-
+        ss << ", frame_diff_time: " << (clock_->now() - last_command_time_).nanoseconds() / 1000000. << std::endl;
+        std::cout << ss.str() << std::endl;
         // save log and exit
         if(frame_diff_time_buffer_.size() > 1000){
           // get current time string
