@@ -67,9 +67,6 @@ public:
   {
     auto current_time = clock_->now();
     /* average offset estimation between control frame and simulator frame */
-
-    if (!is_started_ || last_command_time_.get_clock_type() == RCL_SYSTEM_TIME) {
-      start_time_ = current_time;
     if (!is_started_ && last_command_time_.get_clock_type() == RCL_ROS_TIME) {
       start_time_ = last_command_time_;
       is_started_ = true;
@@ -77,7 +74,7 @@ public:
 
     if(is_started_){
       double cmd_ns = last_command_time_.nanoseconds();
-      const double diff_cmd_ns = cmd_ns - start_time_.nanoseconds();
+      const double diff_cmd_ns = cmd_ns - start_time_.nanoseconds() + cycle_time_.nanoseconds() / 2.0;
       int cmd_cycle_num = static_cast<int>(diff_cmd_ns / cycle_time_.nanoseconds());
       double estimated_cmd_offset_time_ns =
         diff_cmd_ns - (cmd_cycle_num * cycle_time_.nanoseconds());
@@ -103,13 +100,14 @@ public:
           std::accumulate(
             estimated_offset_time_buffer.begin(), estimated_offset_time_buffer.end(), 0.0) /
           estimated_offset_time_buffer.size();
+        average -= cycle_time_.nanoseconds() / 2.0;
         start_time_offset_ = getDuration(average);
         std::cout << "offset_time : " << start_time_offset_.seconds() << std::endl;
         // add the extra one to avoid the offset calculation on every frame
         estimated_offset_time_buffer.push_back(estimated_cmd_offset_time_ns);
         // initialize cycle_num
         cycle_num_ = static_cast<int>(
-          (current_time - (start_time_ + start_time_offset_)).nanoseconds() /
+          (current_time - (start_time_ + start_time_offset_) + (cycle_time_*0.5)).nanoseconds() /
           cycle_time_.nanoseconds());
         cycle_num_++;
         auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
