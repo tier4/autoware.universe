@@ -146,7 +146,7 @@ public:
           std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
           std::ofstream ofs(file_name);
           for (const auto & diff_time : frame_diff_time_buffer_) {
-            ofs << diff_time.nanoseconds() << "," << std::endl;
+            ofs << diff_time.nanoseconds() << std::endl;
           }
           ofs.close();
           std::exit(0);
