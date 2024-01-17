@@ -70,7 +70,7 @@ TopicStateMonitorNode::TopicStateMonitorNode(const rclcpp::NodeOptions & node_op
   topic_state_monitor_->setParam(param_);
 
   // Subscriber
-  rclcpp::QoS qos = rclcpp::QoS{1};
+  rclcpp::QoS qos = rclcpp::QoS{50};
   if (node_param_.transient_local) {
     qos.transient_local();
   }
