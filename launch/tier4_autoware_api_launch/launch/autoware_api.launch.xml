@@ -1,8 +1,15 @@
 <launch>
+  <arg name="is_redundant" default="true"/>
+
   <!-- AD API options -->
   <arg name="launch_deprecated_api" default="false"/>
   <arg name="launch_default_ad_api" default="true"/>
   <arg name="launch_rviz_adaptors" default="true"/>
+  <arg name="launch_ad_api_distributor" default="true" if="$(var is_redundant)"/>
+  <arg name="launch_ad_api_distributor" default="false" unless="$(var is_redundant)"/>
+
+  <arg name="is_main" if="$(eval &quot;'$(var ecu_name)'=='main'&quot;)" default="true"/>
+  <arg name="is_main" unless="$(eval &quot;'$(var ecu_name)'=='main'&quot;)" default="false"/>
 
   <!-- rosbridge options -->
   <arg name="rosbridge_enabled" default="false"/>
@@ -15,9 +22,15 @@
   </group>
 
   <!-- AD API -->
+  <group if="$(var launch_default_ad_api)">
+    <include file="$(find-pkg-share ad_api_distributor)/launch/remapped_api.launch.py" if="$(var is_redundant)">
+      <arg name="prefix" value="$(var ecu_name)"/>
+    </include>
+    <include file="$(find-pkg-share default_ad_api)/launch/default_ad_api.launch.py" unless="$(var is_redundant)"/>
+  </group>
   <group>
-    <include file="$(find-pkg-share default_ad_api)/launch/default_ad_api.launch.py" if="$(var launch_default_ad_api)"/>
     <include file="$(find-pkg-share ad_api_adaptors)/launch/rviz_adaptors.launch.xml" if="$(var launch_rviz_adaptors)"/>
+    <include file="$(find-pkg-share ad_api_distributor)/launch/distributor.launch.xml" if="$(var launch_ad_api_distributor)"/>
   </group>
 
   <!-- RTC controller -->
