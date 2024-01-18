@@ -30,6 +30,8 @@
   </group>
   <group>
     <include file="$(find-pkg-share ad_api_adaptors)/launch/rviz_adaptors.launch.xml" if="$(var launch_rviz_adaptors)"/>
+  </group>
+  <group if="$(var is_main)">
     <include file="$(find-pkg-share ad_api_distributor)/launch/distributor.launch.xml" if="$(var launch_ad_api_distributor)"/>
   </group>
 
