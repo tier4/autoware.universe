@@ -327,6 +327,42 @@ public:
   std::string rosbag_directory;
 };
 
+struct SeriesData
+{
+  std::vector<double> data;
+  std::vector<rclcpp::Time> stamp;
+  rclcpp::Time stamp_offset;
+  std::string name;
+
+  SeriesData(std::string name) : name(name) {}
+  void push_back(double data_, rclcpp::Time stamp_)
+  {
+    this->data.push_back(data_);
+    this->stamp.push_back(stamp_);
+  }
+  void set_offset(rclcpp::Time offset) { stamp_offset = offset; }
+  void save(std::string dir)
+  {
+    dir = dir + "/" + name;
+    if(not std::filesystem::exists(dir)){
+      std::filesystem::create_directories(dir);
+    }
+    {
+      std::ofstream ofs(dir + "/" + name + "_stamp.csv");
+      for (size_t i = 0; i < stamp.size(); i++) {
+        ofs << (stamp[i] - stamp_offset).nanoseconds() / 1000000. << std::endl;
+      }
+      ofs.close();
+    }
+    {
+      std::ofstream ofs(dir + "/" + name + "_data.csv");
+      for (size_t i = 0; i < data.size(); i++) {
+        ofs << data[i] << std::endl;
+      }
+      ofs.close();
+    }
+  }
+};
 class RealRosbagReplayer
 {
 public:
