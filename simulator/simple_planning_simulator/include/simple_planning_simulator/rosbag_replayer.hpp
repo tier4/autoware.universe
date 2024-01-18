@@ -363,6 +363,58 @@ struct SeriesData
     }
   }
 };
+
+struct DataCollection
+{
+  std::map<std::string, SeriesData> series;
+  DataCollection()
+  {
+    series.emplace("ttc_sim", SeriesData{"ttc_sim"});
+    series.emplace("ttc_real", SeriesData{"ttc_real"});
+    series.emplace("distance_sim", SeriesData{"distance_sim"});
+    series.emplace("distance_real", SeriesData{"distance_real"});
+    series.emplace("velocity_sim", SeriesData{"velocity_sim"});
+    series.emplace("velocity_real", SeriesData{"velocity_real"});
+    series.emplace("sim_frame_stamp", SeriesData{"sim_frame_stamp"});
+    series.emplace("cmd_frame_stamp", SeriesData{"cmd_frame_stamp"});
+    series.emplace("frame_stamp_diff", SeriesData{"frame_stamp_diff"});
+  }
+
+  bool is_started = false;
+  rclcpp::Time start_time;
+  rclcpp::Duration log_duration = 30s;
+
+  void start()
+  {
+    start_time = rclcpp::Clock().now();
+    for (auto & s : series) {
+      s.second.set_offset(start_time);
+    }
+    is_started = true;
+  }
+
+  bool should_finish()
+  {
+    if (not is_started) {
+      return false;
+    }
+
+    auto duration = rclcpp::Clock().now() - start_time;
+    std::cout << "duration: " << duration.seconds() << std::endl;
+    return (rclcpp::Clock().now() - start_time) > log_duration;
+  }
+
+  void save(std::string dir)
+  {
+    if(not std::filesystem::exists(dir)){
+      std::filesystem::create_directories(dir);
+    }
+    for (auto & s : series) {
+      s.second.save(dir);
+    }
+  }
+};
+
 class RealRosbagReplayer
 {
 public:
