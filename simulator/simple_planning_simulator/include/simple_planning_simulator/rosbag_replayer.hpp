@@ -69,9 +69,10 @@ public:
       is_started_ = true;
     }
 
-    if(is_started_){
+    if (is_started_) {
       double cmd_ns = last_command_time_.nanoseconds();
-      const double diff_cmd_ns = cmd_ns - start_time_.nanoseconds() + cycle_time_.nanoseconds() / 2.0;
+      const double diff_cmd_ns =
+        cmd_ns - start_time_.nanoseconds() + cycle_time_.nanoseconds() / 2.0;
       int cmd_cycle_num = static_cast<int>(diff_cmd_ns / cycle_time_.nanoseconds());
       double estimated_cmd_offset_time_ns =
         diff_cmd_ns - (cmd_cycle_num * cycle_time_.nanoseconds());
@@ -112,7 +113,8 @@ public:
           cycle_num_++;
         }
         cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
-        std::cout << "frame_time_precision: " << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000 << std::endl;
+        std::cout << "frame_time_precision: "
+                  << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000 << std::endl;
       } else {
         has_measured_offset_ = true;
         std::stringstream ss;
@@ -121,7 +123,8 @@ public:
           cycle_num_++;
           auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
           ss << "offset[ms]: " << start_time_offset_.nanoseconds() / 1000000. << ", ";
-          ss << "frame_time_precision: " << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000. << ", ";
+          ss << "frame_time_precision: "
+             << (cmd_frame_time - last_command_time_).nanoseconds() / 1000000. << ", ";
           auto sleep_duration = cmd_frame_time + sim_frame_offset - current_time;
           ss << "sleep: " << sleep_duration.nanoseconds() / 1000000.;
           clock_->sleep_until(cmd_frame_time + sim_frame_offset);
@@ -162,10 +165,7 @@ public:
     return rclcpp::Duration(nanoseconds(static_cast<int64_t>(ns)));
   }
 
-  bool has_measured_offset() const
-  {
-    return has_measured_offset_;
-  }
+  bool has_measured_offset() const { return has_measured_offset_; }
 
 private:
   rclcpp::Time start_time_;
@@ -344,7 +344,7 @@ struct SeriesData
   void save(std::string dir)
   {
     dir = dir + "/" + name;
-    if(not std::filesystem::exists(dir)){
+    if (not std::filesystem::exists(dir)) {
       std::filesystem::create_directories(dir);
     }
     {
@@ -406,7 +406,7 @@ struct DataCollection
 
   void save(std::string dir)
   {
-    if(not std::filesystem::exists(dir)){
+    if (not std::filesystem::exists(dir)) {
       std::filesystem::create_directories(dir);
     }
     for (auto & s : series) {
