@@ -58,10 +58,7 @@ public:
     cycle_time_ = getDuration(cycle_time_ms * 1e6);
   }
 
-  ~TimeController()
-  {
-
-  }
+  ~TimeController() {}
 
   void on_timer()
   {
@@ -333,9 +330,12 @@ public:
 class RealRosbagReplayer
 {
 public:
-  RealRosbagReplayer(rclcpp::Node & node, std::string config_name)
+  std::unique_ptr<TimeController> time_controller_ = nullptr;
+
+  RealRosbagReplayer(rclcpp::Node & node, std::string config_name, int timer_sampling_time_ms)
   : config(config_name), rosbag_data(node), autoware(node)
   {
+    time_controller_ = std::make_unique<TimeController>(timer_sampling_time_ms, node.get_clock());
     marker_publisher = node.create_publisher<visualization_msgs::msg::Marker>(
       "/planning/mission_planning/mission_planning/debug/trajectory_marker", 1);
     distance_publisher = node.create_publisher<tier4_debug_msgs::msg::Float32Stamped>(

@@ -206,9 +206,7 @@ private:
   } vehicle_model_type_;  //!< @brief vehicle model type to decide the model dynamics
   std::shared_ptr<SimModelInterface> vehicle_model_ptr_;  //!< @brief vehicle model pointer
 
-  std::unique_ptr<RealRosbagReplayer> real_rosbag_replayer_ = nullptr;  //!< @brief real rosbag replayer
-
-  std::unique_ptr<TimeController> time_controller_ = nullptr;  //!< @brief time controller
+  std::unique_ptr<RealRosbagReplayer> real_rosbag_replayer_ = nullptr;  //!< @brief real rosbag replayer//!< @brief time controller
 
   /**
    * @brief set current_vehicle_cmd_ptr_ with received message

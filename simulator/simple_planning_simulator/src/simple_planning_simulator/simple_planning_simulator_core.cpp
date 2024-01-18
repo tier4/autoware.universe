@@ -86,9 +86,8 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
   using std::placeholders::_2;
 
   timer_sampling_time_ms_ = static_cast<uint32_t>(declare_parameter("timer_sampling_time_ms", 25));
-  time_controller_ = std::make_unique<TimeController>(timer_sampling_time_ms_, get_clock());
 
-  real_rosbag_replayer_ = std::make_unique<RealRosbagReplayer>(*this, "no27");
+  real_rosbag_replayer_ = std::make_unique<RealRosbagReplayer>(*this, "no27", timer_sampling_time_ms_);
   real_rosbag_replayer_->loadRosbag();
 
   sub_init_pose_ = create_subscription<PoseWithCovarianceStamped>(
@@ -97,7 +96,7 @@ SimplePlanningSimulator::SimplePlanningSimulator(const rclcpp::NodeOptions & opt
     "input/ackermann_control_command", QoS{1},
     [this](const AckermannControlCommand::SharedPtr msg) {
       current_ackermann_cmd_ = *msg;
-      time_controller_->on_command();
+      real_rosbag_replayer_->time_controller_->on_command();
     });
   sub_manual_ackermann_cmd_ = create_subscription<AckermannControlCommand>(
     "input/manual_ackermann_control_command", QoS{1},
@@ -279,7 +278,11 @@ void SimplePlanningSimulator::on_timer()
     return;
   }
 
-  time_controller_->on_timer();
+  real_rosbag_replayer_->time_controller_->on_timer();
+
+  if(real_rosbag_replayer_->should_finish()){
+    real_rosbag_replayer_->finish();
+  }
 
   {
     static bool has_set_route = false;
@@ -289,7 +292,7 @@ void SimplePlanningSimulator::on_timer()
   }
   {
     static bool has_engage = false;
-    if(!has_engage && time_controller_->has_measured_offset() && real_rosbag_replayer_->engageAutoware()){
+    if(!has_engage && real_rosbag_replayer_->time_controller_->has_measured_offset() && real_rosbag_replayer_->engageAutoware()){
       has_engage = true;
     }
   }
