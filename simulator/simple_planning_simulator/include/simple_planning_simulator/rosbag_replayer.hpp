@@ -456,14 +456,14 @@ public:
       if (stamp_ns < 0) {
         continue;
       }
-      if (topic == "/localization/odometry/filtered") {
+      if (topic == "/localization/kinematic_state") {
         rosbag_data.ego_odom.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<nav_msgs::msg::Odometry> serialization;
           nav_msgs::msg::Odometry msg;
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp_ns, msg);
         }());
-      } else if (topic == "/control/trajectory_follower/longitudinal/control_cmd") {
+      } else if (topic == "/control/command/control_cmd") {
         rosbag_data.ego_control_cmd.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<autoware_auto_control_msgs::msg::AckermannControlCommand>
             serialization;
@@ -471,7 +471,7 @@ public:
           serialization.deserialize_message(&extracted_serialized_msg, &msg);
           return std::make_pair(stamp_ns, msg);
         }());
-      } else if (topic == "/control/trajectory_follower/longitudinal/debug") {
+      } else if (topic == "/control/trajectory_follower/longitudinal/diagnostic") {
         rosbag_data.ego_control_debug.store.push_back([&extracted_serialized_msg, stamp_ns]() {
           static rclcpp::Serialization<autoware_auto_system_msgs::msg::Float32MultiArrayDiagnostic>
             serialization;
