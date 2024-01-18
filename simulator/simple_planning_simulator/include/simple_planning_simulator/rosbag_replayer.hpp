@@ -142,29 +142,30 @@ public:
         frame_diff_time_buffer_.push_back(clock_->now() - last_command_time_);
         ss << ", frame_diff_time: " << (clock_->now() - last_command_time_).nanoseconds() / 1000000. << std::endl;
         std::cout << ss.str() << std::endl;
-        // save log and exit
-        if(frame_diff_time_buffer_.size() > 1000){
-          // get current time string
-          using namespace std::chrono;
-          std::time_t current_time_t = system_clock::to_time_t(system_clock::now());
-          std::tm * ptm = std::localtime(&current_time_t);
-          std::stringstream ss_now;
-          ss_now << std::put_time(ptm, "%Y%m%d%H%M");
+      }
+    }
+  }
+
   std::function<void(rclcpp::Duration)> on_calc_offset = nullptr;
   std::function<void(rclcpp::Time)> on_cmd = nullptr;
   std::function<void(rclcpp::Time)> on_sim = nullptr;
 
-          // export frame_diff_time_buffer_ to csv file
-          std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
-          std::ofstream ofs(file_name);
-          for (const auto & diff_time : frame_diff_time_buffer_) {
-            ofs << diff_time.nanoseconds() << std::endl;
-          }
-          ofs.close();
-          std::exit(0);
-        }
-      }
+  void saveData()
+  {
+    // get current time string
+    using namespace std::chrono;
+    std::time_t current_time_t = system_clock::to_time_t(system_clock::now());
+    std::tm * ptm = std::localtime(&current_time_t);
+    std::stringstream ss_now;
+    ss_now << std::put_time(ptm, "%Y%m%d%H%M");
+
+    // export frame_diff_time_buffer_ to csv file
+    std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
+    std::ofstream ofs(file_name);
+    for (const auto & diff_time : frame_diff_time_buffer_) {
+      ofs << diff_time.nanoseconds() << std::endl;
     }
+    ofs.close();
   }
 
   void on_command()
@@ -514,6 +515,16 @@ public:
     return autoware.getInitialPose();
   }
 
+  void finish()
+  {
+    std::string date_str =
+      std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+    std::string path = "data/" + date_str;
+    std::cout << "save data to " << path << std::endl;
+    data.save(path);
+    std::exit(0);
+  }
+
   auto setPoseEstimation() { autoware.setPoseEstimation(); }
 
   auto getAutowareState() { return autoware.getAutowareState(); }
@@ -608,6 +619,8 @@ public:
     return false;
   }
 
+  bool should_finish() { return data.should_finish(); }
+
   void publishRosbagData(int64_t current_time_ns)
   {
     auto publish = [this, current_time_ns](auto & store, auto & publisher) {
@@ -632,6 +645,7 @@ public:
     bool is_over_line = (dx_line * dy_ego - dx_ego * dy_line > 0);
     if (is_over_line) {
       if (not rosbag_data.perception.publish_thread) {
+        data.start();
         rosbag_data.startPublishThreads(std::chrono::system_clock::now());
       }
     }
