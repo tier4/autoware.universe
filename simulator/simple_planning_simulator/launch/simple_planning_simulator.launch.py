@@ -20,6 +20,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 import yaml
+from launch.events import Shutdown
 
 
 def launch_setup(context, *args, **kwargs):
@@ -46,6 +47,7 @@ def launch_setup(context, *args, **kwargs):
         name="simple_planning_simulator",
         namespace="simulation",
         output="screen",
+        on_exit=Shutdown(),
         parameters=[
             vehicle_info_param,
             vehicle_characteristics_param,
