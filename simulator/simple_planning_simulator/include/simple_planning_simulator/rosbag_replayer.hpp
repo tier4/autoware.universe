@@ -128,6 +128,15 @@ public:
           auto sleep_duration = cmd_frame_time + sim_frame_offset - current_time;
           ss << "sleep: " << sleep_duration.nanoseconds() / 1000000.;
           clock_->sleep_until(cmd_frame_time + sim_frame_offset);
+          //          clock_->sleep_until(cmd_frame_time + sim_frame_offset);
+        }
+
+        if (on_sim) {
+          on_sim(clock_->now());
+        }
+
+        if (on_calc_offset) {
+          on_calc_offset((clock_->now() - last_command_time_));
         }
 
         frame_diff_time_buffer_.push_back(clock_->now() - last_command_time_);
@@ -141,6 +150,9 @@ public:
           std::tm * ptm = std::localtime(&current_time_t);
           std::stringstream ss_now;
           ss_now << std::put_time(ptm, "%Y%m%d%H%M");
+  std::function<void(rclcpp::Duration)> on_calc_offset = nullptr;
+  std::function<void(rclcpp::Time)> on_cmd = nullptr;
+  std::function<void(rclcpp::Time)> on_sim = nullptr;
 
           // export frame_diff_time_buffer_ to csv file
           std::string file_name = "frame_diff_time_" + ss_now.str() + ".csv";
@@ -158,6 +170,9 @@ public:
   void on_command()
   {
     last_command_time_ = clock_->now();
+    if (on_cmd) {
+      on_cmd(last_command_time_);
+    }
   }
 
   rclcpp::Duration getDuration(double ns)
@@ -558,6 +573,7 @@ public:
         rosbag_data.startPublishThreads(std::chrono::system_clock::now());
       }
     }
+    on_odom_sim(msg);
 
     if (not rosbag_data.perception.publish_thread) {
       publishEmptyObjects();
@@ -581,6 +597,7 @@ private:
     typename std::vector<MessageWithStamp>::iterator iterator;
     typename rclcpp::Publisher<MessageT>::SharedPtr publisher = nullptr;
     std::unique_ptr<std::thread> publish_thread = nullptr;
+    std::function<void(const MessageT &)> on_publish = nullptr;
 
     void createPublisher(rclcpp::Node & node)
     {
@@ -603,6 +620,9 @@ private:
           if (iterator != store.end()) {
             std::this_thread::sleep_until(start_time + std::chrono::nanoseconds(iterator->first));
             publisher->publish(iterator->second);
+            if (on_publish) {
+              on_publish(iterator->second);
+            }
             iterator++;
           } else {
             break;
