@@ -551,16 +551,16 @@ MarkerArray createDebugMarkerArray(
     add(createOtherObjectsMarkerArray(objects, ns));
   };
 
-  const auto addShiftLength =
-    [&](const auto & shift_length, const auto & ns, auto r, auto g, auto b) {
-      add(createShiftLengthMarkerArray(shift_length, path, ns, r, g, b));
-    };
+  // const auto addShiftLength =
+  //   [&](const auto & shift_length, const auto & ns, auto r, auto g, auto b) {
+  //     add(createShiftLengthMarkerArray(shift_length, path, ns, r, g, b));
+  //   };
 
-  const auto addShiftGrad = [&](
-                              const auto & shift_grad, const auto & shift_length, const auto & ns,
-                              auto r, auto g, auto b) {
-    add(createShiftGradMarkerArray(shift_grad, shift_length, path, ns, r, g, b));
-  };
+  // const auto addShiftGrad = [&](
+  //                             const auto & shift_grad, const auto & shift_length, const auto &
+  //                             ns, auto r, auto g, auto b) {
+  //   add(createShiftGradMarkerArray(shift_grad, shift_length, path, ns, r, g, b));
+  // };
 
   // ignore objects
   {
@@ -617,20 +617,20 @@ MarkerArray createDebugMarkerArray(
     add(showPolygon(debug.collision_check, "ego_and_target_polygon_relation"));
   }
 
-  // shift length
-  {
-    addShiftLength(debug.pos_shift, "merged_length_pos", 0.0, 0.7, 0.5);
-    addShiftLength(debug.neg_shift, "merged_length_neg", 0.0, 0.5, 0.7);
-    addShiftLength(debug.total_shift, "merged_length_total", 0.99, 0.4, 0.2);
-  }
+  // // shift length
+  // {
+  //   addShiftLength(debug.pos_shift, "merged_length_pos", 0.0, 0.7, 0.5);
+  //   addShiftLength(debug.neg_shift, "merged_length_neg", 0.0, 0.5, 0.7);
+  //   addShiftLength(debug.total_shift, "merged_length_total", 0.99, 0.4, 0.2);
+  // }
 
-  // shift grad
-  {
-    addShiftGrad(debug.pos_shift_grad, debug.pos_shift, "merged_grad_pos", 0.0, 0.7, 0.5);
-    addShiftGrad(debug.neg_shift_grad, debug.neg_shift, "merged_grad_neg", 0.0, 0.5, 0.7);
-    addShiftGrad(debug.total_forward_grad, debug.total_shift, "grad_forward", 0.99, 0.4, 0.2);
-    addShiftGrad(debug.total_backward_grad, debug.total_shift, "grad_backward", 0.4, 0.2, 0.9);
-  }
+  // // shift grad
+  // {
+  //   addShiftGrad(debug.pos_shift_grad, debug.pos_shift, "merged_grad_pos", 0.0, 0.7, 0.5);
+  //   addShiftGrad(debug.neg_shift_grad, debug.neg_shift, "merged_grad_neg", 0.0, 0.5, 0.7);
+  //   addShiftGrad(debug.total_forward_grad, debug.total_shift, "grad_forward", 0.99, 0.4, 0.2);
+  //   addShiftGrad(debug.total_backward_grad, debug.total_shift, "grad_backward", 0.4, 0.2, 0.9);
+  // }
 
   // detection area
   size_t i = 0;
@@ -642,11 +642,11 @@ MarkerArray createDebugMarkerArray(
   {
     add(createPathMarkerArray(path, "centerline_resampled", 0, 0.0, 0.9, 0.5));
     add(createDrivableBounds(data, "drivable_bound", 1.0, 0.0, 0.42));
-    add(laneletsAsTriangleMarkerArray(
-      "drivable_lanes", transformToLanelets(data.drivable_lanes),
-      createMarkerColor(0.16, 1.0, 0.69, 0.2)));
-    add(laneletsAsTriangleMarkerArray(
-      "current_lanes", data.current_lanelets, createMarkerColor(1.0, 1.0, 1.0, 0.2)));
+    // add(laneletsAsTriangleMarkerArray(
+    //   "drivable_lanes", transformToLanelets(data.drivable_lanes),
+    //   createMarkerColor(0.16, 1.0, 0.69, 0.2)));
+    // add(laneletsAsTriangleMarkerArray(
+    //   "current_lanes", data.current_lanelets, createMarkerColor(1.0, 1.0, 1.0, 0.2)));
     add(laneletsAsTriangleMarkerArray(
       "safety_check_lanes", debug.safety_check_lanes, createMarkerColor(1.0, 0.0, 0.42, 0.2)));
   }
