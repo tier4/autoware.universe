@@ -578,6 +578,37 @@ public:
         }());
       }
     }
+
+    rosbag_data.perception.on_publish =
+      [this](const autoware_auto_perception_msgs::msg::PredictedObjects & msg) {
+        auto target_object =
+          std::find_if(msg.objects.begin(), msg.objects.end(), [this](auto object) {
+            return object.object_id.uuid[0] == config.forward_vehicle_uuid[0] &&
+                   object.object_id.uuid[1] == config.forward_vehicle_uuid[1];
+          });
+        if (target_object != msg.objects.end()) {
+          forward_vehicle_object = *target_object;
+        }
+      };
+
+    rosbag_data.ego_odom.on_publish = [this](const nav_msgs::msg::Odometry & msg) {
+      on_odom_real(msg);
+    };
+
+    time_controller_->on_calc_offset = [this](rclcpp::Duration diff) {
+      data.series.at("frame_stamp_diff")
+        .push_back(diff.nanoseconds() / 1000000., rclcpp::Clock().now());
+    };
+
+    time_controller_->on_cmd = [this](rclcpp::Time time) {
+      data.series.at("cmd_frame_stamp")
+        .push_back(time.nanoseconds() / 1000000., rclcpp::Clock().now());
+    };
+
+    time_controller_->on_sim = [this](rclcpp::Time time) {
+      data.series.at("sim_frame_stamp")
+        .push_back(time.nanoseconds() / 1000000., rclcpp::Clock().now());
+    };
   }
 
   bool setRoute()
@@ -658,9 +689,12 @@ public:
   }
 
 private:
+  std::optional<autoware_auto_perception_msgs::msg::PredictedObject> forward_vehicle_object =
+    std::nullopt;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_publisher;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr distance_publisher;
   rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr ttc_publisher;
+  DataCollection data;
 
   Config config;
 
