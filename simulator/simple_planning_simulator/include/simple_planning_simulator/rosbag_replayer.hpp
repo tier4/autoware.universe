@@ -105,7 +105,7 @@ public:
         estimated_offset_time_buffer.push_back(estimated_cmd_offset_time_ns);
         // initialize cycle_num
         cycle_num_ = static_cast<int>(
-          (current_time - (start_time_ + start_time_offset_) + (cycle_time_*0.5)).nanoseconds() /
+          (current_time - (start_time_ + start_time_offset_) + (cycle_time_ * 0.5)).nanoseconds() /
           cycle_time_.nanoseconds());
         auto cmd_frame_time = start_time_ + start_time_offset_ + cycle_time_ * cycle_num_;
         // if offset time is larger than next sim frame time, use next frame
@@ -140,7 +140,8 @@ public:
         }
 
         frame_diff_time_buffer_.push_back(clock_->now() - last_command_time_);
-        ss << ", frame_diff_time: " << (clock_->now() - last_command_time_).nanoseconds() / 1000000. << std::endl;
+        ss << ", frame_diff_time: " << (clock_->now() - last_command_time_).nanoseconds() / 1000000.
+           << std::endl;
         std::cout << ss.str() << std::endl;
       }
     }
