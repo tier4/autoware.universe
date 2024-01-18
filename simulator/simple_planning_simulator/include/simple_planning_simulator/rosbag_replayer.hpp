@@ -447,6 +447,68 @@ public:
       "/planning/mission_planning/mission_planning/debug/ttc", 1);
   }
 
+  double calc_dist_between_vehicles(
+    geometry_msgs::msg::Pose ego_vehicle_pose, geometry_msgs::msg::Pose forward_vehicle_pose,
+    bool is_sim)
+  {
+    auto quatToYaw = [](geometry_msgs::msg::Quaternion quat) {
+      auto q = quat;
+      auto yaw = atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      return yaw;
+    };
+    auto yaw_ego = quatToYaw(ego_vehicle_pose.orientation);
+    auto yaw_forward = quatToYaw(forward_vehicle_pose.orientation);
+    auto yaw_diff = std::fabs(yaw_ego - yaw_forward);
+    auto euclidean_dist = std::hypot(
+      forward_vehicle_pose.position.x - ego_vehicle_pose.position.x,
+      forward_vehicle_pose.position.y - ego_vehicle_pose.position.y);
+    auto length_forward_vehicle = forward_vehicle_object->shape.dimensions.x;
+    auto width_forward_vehicle = forward_vehicle_object->shape.dimensions.y;
+    auto dist_between_vehicles = euclidean_dist * std::cos(yaw_diff) - config.baselink_to_front -
+                                 (length_forward_vehicle / 2.0 * std::cos(yaw_diff) +
+                                  width_forward_vehicle / 2.0 * std::sin(yaw_diff));
+    return dist_between_vehicles;
+  }
+
+  void on_odom_sim(const nav_msgs::msg::Odometry & msg)
+  {
+    if (not forward_vehicle_object) {
+      return;
+    }
+
+    auto distance = calc_dist_between_vehicles(
+      msg.pose.pose, forward_vehicle_object->kinematics.initial_pose_with_covariance.pose, true);
+
+    auto velocity = msg.twist.twist.linear.x;
+    auto ttc = 0.0;
+    if (velocity != 0.0) {
+      ttc = distance / velocity;
+    }
+    auto now = rclcpp::Clock().now();
+    data.series.at("velocity_sim").push_back(velocity, now);
+    data.series.at("distance_sim").push_back(distance, now);
+    data.series.at("ttc_sim").push_back(ttc, now);
+  }
+
+  void on_odom_real(const nav_msgs::msg::Odometry & msg)
+  {
+    if (not forward_vehicle_object) {
+      return;
+    }
+
+    auto distance = calc_dist_between_vehicles(
+      msg.pose.pose, forward_vehicle_object->kinematics.initial_pose_with_covariance.pose, false);
+    auto velocity = msg.twist.twist.linear.x;
+    auto ttc = 0.0;
+    if (velocity != 0.0) {
+      ttc = distance / velocity;
+    }
+    auto now = rclcpp::Clock().now();
+    data.series.at("velocity_real").push_back(velocity, now);
+    data.series.at("distance_real").push_back(distance, now);
+    data.series.at("ttc_real").push_back(ttc, now);
+  }
+
   auto getInitialPose() -> geometry_msgs::msg::PoseWithCovarianceStamped
   {
     return autoware.getInitialPose();
