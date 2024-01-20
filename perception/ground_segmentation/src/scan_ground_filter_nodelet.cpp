@@ -76,6 +76,8 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     debug_publisher_ptr_ = std::make_unique<DebugPublisher>(this, "scan_ground_filter");
     stop_watch_ptr_->tic("cyclic_time");
     stop_watch_ptr_->tic("processing_time");
+    process_time_pub_ = this->create_publisher<driving_log_replayer_msgs::msg::ProcessTime>(
+      "scan_ground_filter/debug/processing_time", rclcpp::QoS(10));
   }
 }
 
@@ -575,6 +577,10 @@ void ScanGroundFilterComponent::filter(
       "debug/cyclic_time_ms", cyclic_time_ms);
     debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/processing_time_ms", processing_time_ms);
+    driving_log_replayer_msgs::msg::ProcessTime process_time_msg;
+    process_time_msg.header = input->header;
+    process_time_msg.process_time = processing_time_ms;
+    process_time_pub_->publish(process_time_msg);
   }
 }
 
