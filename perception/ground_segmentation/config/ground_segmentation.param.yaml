@@ -2,7 +2,7 @@
   ros__parameters:
     additional_lidars: []
     ransac_input_topics: []
-    use_single_frame_filter: False
+    use_single_frame_filter: True
     use_time_series_filter: True
 
     common_crop_box_filter:
