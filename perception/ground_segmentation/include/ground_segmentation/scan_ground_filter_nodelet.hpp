@@ -20,8 +20,8 @@
 
 #include <vehicle_info_util/vehicle_info.hpp>
 
-#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <driving_log_replayer_msgs/msg/process_time.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <pcl/filters/extract_indices.h>
 #include <pcl/filters/voxel_grid.h>
@@ -72,7 +72,7 @@ private:
     PointLabel point_state{PointLabel::INIT};
 
     size_t orig_index;  // index of this point in the source pointcloud
-    PointXYZIE * orig_point;
+    pcl::PointXYZ * orig_point;
   };
   using PointCloudRefVector = std::vector<PointRef>;
 
@@ -176,6 +176,7 @@ private:
     split_height_distance_;                 // useful for close points
   bool use_virtual_ground_point_;
   bool use_recheck_ground_cluster_;  // to enable recheck ground cluster
+  bool evaluation_mode_;
   size_t radial_dividers_num_;
   VehicleInfo vehicle_info_;
 
@@ -195,10 +196,10 @@ private:
    *     each element will contain the points ordered
    */
   void convertPointcloud(
-    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
     std::vector<PointCloudRefVector> & out_radial_ordered_points_manager);
   void convertPointcloudGridScan(
-    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud,
+    const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud,
     std::vector<PointCloudRefVector> & out_radial_ordered_points_manager);
   /*!
    * Output ground center of front wheels as the virtual ground point
@@ -242,9 +243,10 @@ private:
    * @param in_indices Indices of the points to be both removed and kept
    * @param out_object_cloud_ptr Resulting PointCloud with the indices kept
    */
+  template <typename PointT>
   void extractObjectPoints(
-    const pcl::PointCloud<PointXYZIE>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
-    pcl::PointCloud<PointXYZIE>::Ptr out_object_cloud_ptr);
+    const typename pcl::PointCloud<PointT>::Ptr in_cloud_ptr, const pcl::PointIndices & in_indices,
+    typename pcl::PointCloud<PointT>::Ptr out_object_cloud_ptr);
 
   /** \brief Parameter service callback result : needed to be hold */
   OnSetParametersCallbackHandle::SharedPtr set_param_res_;
