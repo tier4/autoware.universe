@@ -40,6 +40,8 @@ endif()
 
 install(PROGRAMS
   tool/dump
+  example/mrm_test_diag_controller.py
+  example/mrm_test_diag_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
