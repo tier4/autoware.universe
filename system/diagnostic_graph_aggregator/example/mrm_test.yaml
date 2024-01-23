@@ -1,0 +1,45 @@
+nodes:
+  - path: /autoware/modes/stop
+    type: ok
+
+  - path: /autoware/modes/autonomous
+    type: and
+    list:
+      - { type: link, link: /test/autonomous }
+  
+  - path: /autoware/modes/local
+    type: ok
+      
+  - path: /autoware/modes/remote
+    type: ok
+        
+  - path: /autoware/modes/emergency_stop
+    type: and
+    list:
+      - { type: link, link: /test/emergency_stop }
+
+  - path: /autoware/modes/comfortable_stop
+    type: and
+    list:
+      - { type: link, link: /test/comfortable_stop }
+
+  - path: /autoware/modes/pull_over
+    type: and
+    list:
+      - { type: link, link: /test/pull_over }
+        
+  - path: /test/autonomous
+    type: diag
+    diag: "test/autonomous: status"
+      
+  - path: /test/emergency_stop
+    type: diag
+    diag: "test/emergency_stop: status"
+      
+  - path: /test/comfortable_stop
+    type: diag
+    diag: "test/comfortable_stop: status"
+
+  - path: /test/pull_over
+    type: diag
+    diag: "test/pull_over: status"
