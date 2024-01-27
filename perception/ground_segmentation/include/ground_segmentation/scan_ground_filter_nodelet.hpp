@@ -20,7 +20,6 @@
 
 #include <vehicle_info_util/vehicle_info.hpp>
 
-#include <driving_log_replayer_msgs/msg/process_time.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 
 #include <pcl/filters/extract_indices.h>
@@ -258,9 +257,6 @@ private:
   std::unique_ptr<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_{
     nullptr};
   std::unique_ptr<tier4_autoware_utils::DebugPublisher> debug_publisher_ptr_{nullptr};
-
-  // for evaluation (send timestamp)
-  rclcpp::Publisher<driving_log_replayer_msgs::msg::ProcessTime>::SharedPtr process_time_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

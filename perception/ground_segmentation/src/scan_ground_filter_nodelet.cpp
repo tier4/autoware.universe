@@ -77,8 +77,6 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     debug_publisher_ptr_ = std::make_unique<DebugPublisher>(this, "scan_ground_filter");
     stop_watch_ptr_->tic("cyclic_time");
     stop_watch_ptr_->tic("processing_time");
-    process_time_pub_ = this->create_publisher<driving_log_replayer_msgs::msg::ProcessTime>(
-      "scan_ground_filter/debug/processing_time", rclcpp::QoS(10));
   }
 }
 
@@ -542,9 +540,7 @@ void ScanGroundFilterComponent::extractObjectPoints(
   }
 }
 
-void ScanGroundFilterComponent::filter(
-  const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices,
-  PointCloud2 & output)
+void ScanGroundFilterComponent::filter(const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices, PointCloud2 & output)
 {
   std::scoped_lock lock(mutex_);
   stop_watch_ptr_->toc("processing_time", true);
@@ -567,8 +563,7 @@ void ScanGroundFilterComponent::filter(
     classifyPointCloud(radial_ordered_points, no_ground_indices);
   }
 
-  extractObjectPoints<pcl::PointXYZ>(
-    current_sensor_cloud_ptr, no_ground_indices, no_ground_cloud_ptr);
+  extractObjectPoints<pcl::PointXYZ>(current_sensor_cloud_ptr, no_ground_indices, no_ground_cloud_ptr);
   pcl::toROSMsg(*no_ground_cloud_ptr, *no_ground_cloud_msg_ptr);
 
   no_ground_cloud_msg_ptr->header = input->header;
@@ -581,20 +576,13 @@ void ScanGroundFilterComponent::filter(
       "debug/cyclic_time_ms", cyclic_time_ms);
     debug_publisher_ptr_->publish<tier4_debug_msgs::msg::Float64Stamped>(
       "debug/processing_time_ms", processing_time_ms);
-    driving_log_replayer_msgs::msg::ProcessTime process_time_msg;
-    process_time_msg.header = input->header;
-    process_time_msg.process_time = processing_time_ms;
-    process_time_pub_->publish(process_time_msg);
   }
 
   if (evaluation_mode_) {
-    // return
     pcl::PointCloud<PointXYZIE>::Ptr labeled_sensor_cloud_ptr(new pcl::PointCloud<PointXYZIE>);
-    pcl::PointCloud<PointXYZIE>::Ptr no_gnd_labeled_sensor_cloud_ptr(
-      new pcl::PointCloud<PointXYZIE>);
+    pcl::PointCloud<PointXYZIE>::Ptr no_gnd_labeled_sensor_cloud_ptr(new pcl::PointCloud<PointXYZIE>);
     pcl::fromROSMsg(*input, *labeled_sensor_cloud_ptr);
-    extractObjectPoints<PointXYZIE>(
-      labeled_sensor_cloud_ptr, no_ground_indices, no_gnd_labeled_sensor_cloud_ptr);
+    extractObjectPoints<PointXYZIE>(labeled_sensor_cloud_ptr, no_ground_indices, no_gnd_labeled_sensor_cloud_ptr);
     pcl::toROSMsg(*no_gnd_labeled_sensor_cloud_ptr, *no_ground_cloud_msg_ptr);
     no_ground_cloud_msg_ptr->header = input->header;
     output = *no_ground_cloud_msg_ptr;
