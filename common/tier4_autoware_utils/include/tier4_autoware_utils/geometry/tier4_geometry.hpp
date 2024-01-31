@@ -27,17 +27,22 @@ namespace tier4_geometry
 {
 using tier4_autoware_utils::Point2d;
 
+bool getIntersectingPolygon(const Polygon2d & p1, const Polygon2d & p2, Polygon2d & intersection);
+std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const Polygon2d & p2);
+bool segmentsIntersect(
+  const Line2d & l1, const Line2d & l2, Point2d & intersect_point, const double & epsilon = 1E-5);
+bool isPointInPolygon(const std::vector<Point2d> & vertices, const Point2d & p);
 struct Matrix2d : public Eigen::Matrix2d
 {
-  Matrix2d(const Point2d & P1, const Point2d & P2) : Eigen::Matrix2d()
+  Matrix2d(const Point2d & p1, const Point2d & p2) : Eigen::Matrix2d()
   {
     // Initialize the matrix based on the Point2d objects
     // For example, set the matrix elements to the x and y values of the points
     // Replace the following lines with your specific logic
-    (*this)(0, 0) = P1.x();
-    (*this)(0, 1) = P1.y();
-    (*this)(1, 0) = P2.x();
-    (*this)(1, 1) = P2.y();
+    (*this)(0, 0) = p1.x();
+    (*this)(0, 1) = p1.y();
+    (*this)(1, 0) = p2.x();
+    (*this)(1, 1) = p2.y();
   }
 };
 
@@ -69,23 +74,29 @@ public:
   Polygon2d(const Polygon2d & other) = default;
   Polygon2d & operator=(const Polygon2d & other) = default;
 
-  double getArea();
+  double getArea() const { return area; };
 
-  int getNvertices();
-  int getNSegments();
+  int getNVertices() const { return apex.size(); };
+  int getNSegments() const { return line_segments.size(); };
 
   /**
    * Fill an empty convex hull with its apexes.
    * @param apex_: Vector of points (C. Hull vertices ordered CCW)
    **/
-  void setApexes(std::vector<Point2d> const & apex_);
+  void setApexes(std::vector<Point2d> const & apex_)
+  {
+    apex = apex_;
+    assert(apex.size() >= 3);
+    computeArea();
+    computeLineSegments();
+  };
 
   /**
    * Uses the Ray casting algorithm:
    *https://en.wikipedia.org/wiki/Point_in_polygon to determine if a Point is
    *inside this Polygon
    **/
-  bool isPointInside(const Point2d & P);
+  bool isPointInside(const Point2d & p) const { return isPointInPolygon(apex, p); };
 
 private:
   /**
@@ -96,17 +107,17 @@ private:
   **/
   void computeArea()
   {  // The inner triangles of the Polygon are
-     // added to get the areaof the polygon
+     // added to get the area of the polygon
     // A formula for this is:
     // area = 0.5 * det{([x1,x2],[y1,y2]) + ([x2,x3],[y2,y3]) + ... +
     // ([xn,x1],[yn,y1])}
     area = 0;
-    Matrix2d apexMatrix(apex[apex.size() - 1], apex[0]);
+    const Matrix2d apexMatrix(apex[apex.size() - 1], apex[0]);
     // The loop below ignores the Matrix ([xn,x1],[yn,y1]), so we add it manually
     // to the sum
     area = apexMatrix.determinant();
     for (int i = 0; i < apex.size() - 1; ++i) {
-      Matrix2d temp(apex[i], apex[i + 1]);
+      const Matrix2d temp(apex[i], apex[i + 1]);
       area += temp.determinant();
     }
 
@@ -117,23 +128,106 @@ private:
    * Fills an internal class member: line_segments with the lines or "edges"
    * connecting each polygon vertex
    */
-  void computeLineSegments();
+  void computeLineSegments()
+  {
+    line_segments.reserve(apex.size());
+
+    for (int i = 0; i < apex.size() - 1; ++i) {
+      Line2d segment(apex[i], apex[i + 1]);
+      line_segments.push_back(segment);
+    }
+    Line2d segment(apex[apex.size() - 1], apex[0]);
+    line_segments.push_back(segment);
+  };
 };
 
-bool pointInPolygon(std::vector<Point2d> const & vertices, const Point2d P);
+/**
+    This Function uses the ray-casting algorithm to decide whether the point is
+   inside the given polygon. See
+   https://en.wikipedia.org/wiki/Point_in_polygon#Ray_casting_algorithm. For
+   this implementation, the ray goes in the -x direction, from P(x,y) to
+   P(-inf,y)
+    @param vertices: Vertices of the Polygon. vector of Points.
+    @param p: The Point that is being tested.
+    @return true or false
+*/
+bool isPointInPolygon(const std::vector<Point2d> & vertices, const Point2d & p)
+{
+  const int n_vertices = vertices.size();
+  int i, j;
+  bool inside = false;
+  // looping for all the edges
+  for (i = 0; i < n_vertices; ++i) {
+    int j = (i + 1) % n_vertices;
+
+    // The vertices of the edge we are checking.
+    const double xp0 = vertices[i].x();
+    const double yp0 = vertices[i].y();
+    const double xp1 = vertices[j].x();
+    const double yp1 = vertices[j].y();
+
+    // Check whether the edge intersects a line from (-inf,p.y()) to (p.x(),p.y()).
+
+    // First check if the line crosses the horizontal line at p.y() in either
+    // direction.
+    if ((yp0 <= p.y()) && (yp1 > p.y()) || (yp1 <= p.y()) && (yp0 > p.y())) {
+      // If so, get the point where it crosses that line. Note that we can't get
+      // a division by zero here - if yp1 == yp0 then the above condition is
+      // false.
+      const double cross = (xp1 - xp0) * (p.y() - yp0) / (yp1 - yp0) + xp0;
+
+      // Finally check if it crosses to the left of our test point.
+      if (cross < p.x()) inside = !inside;
+    }
+  }
+  return inside;
+};
 
 /**
  * Check if two Line segments intersect
  *@param vertices: Vertices of the Polygon
- *@param L1: First Line Segment to test.
- *@param L2: Second Line Segment to test.
+ *@param l1: First Line Segment to test.
+ *@param l2: Second Line Segment to test.
  *@param intersect_point: The intersection point data (if it exists) will be
  *copied here.
- *@param epsilon: The tolerance used when comparing floating point substraction
+ *@param epsilon: The tolerance used when comparing floating point subtraction
  *results to 0
  *@return true or false
  */
-bool segmentsIntersect(Line2d * L1, Line2d * L2, Point2d * intersect_point, const double & epsilon);
+bool segmentsIntersect(
+  const Line2d & l1, const Line2d & l2, Point2d & intersect_point, const double epsilon = 1E-5)
+{
+  const double ax = l1.p2.x() - l1.p1.x();  // direction of line a
+  const double ay = l1.p2.y() - l1.p1.y();  // ax and ay as above
+
+  const double bx = l2.p1.x() - l2.p2.x();  // direction of line b, reversed
+  const double by = l2.p1.y() - l2.p2.y();
+
+  const double dx = l2.p1.x() - l1.p1.x();  // right-hand side
+  const double dy = l2.p1.y() - l1.p1.y();
+
+  const double det = ax * by - ay * bx;
+
+  // floating point error forces us to use a non zero, small epsilon
+  // lines are parallel, they could be collinear, but in that
+  // case,  we dont care since the points will be detected when
+  // we check if other lines of the polygon intersect
+  if (std::abs(det) < epsilon) return false;
+
+  const double t = (dx * by - dy * bx) / det;
+  const double u = (ax * dy - ay * dx) / det;
+  // if both t and u between 0 and 1, the segments intersect
+  const bool intersect = !(t < 0 || t > 1 || u < 0 || u > 1);
+
+  if (intersect) {
+    // If both lines intersect, we have the point by the equation P = p1 +
+    // (p2-p1)*t or p = p3 + (p4-p3) * u
+    const auto segment = l1.p2 - l1.p1;
+    intersect_point = l1.p1 + (segment)*t;
+  }
+
+  return intersect;
+};
 
 /**
  * Sorts a vector of Points CCW by setting one Point as "center", and checking
@@ -142,27 +236,91 @@ bool segmentsIntersect(Line2d * L1, Line2d * L2, Point2d * intersect_point, cons
  * "Center".
  * @param point_vector: Vector of points to sort CCW
  */
-void sortPointsCCW(std::vector<Point2d> * point_vector);
+void sortPointsCCW(std::vector<Point2d> & point_vector)
+{
+  Point2d center = point_vector.at(0);  //  We make a pivot to check angles against
+
+  // sort all points by polar angle
+  for (Point2d & p : point_vector) {
+    double angle = center.get_angle(p);
+    p.set_angle(angle);
+  }
+
+  // sort the points using overloaded < operator from the Point struct
+  // this program sorts them counterclockwise;
+  std::sort(point_vector.begin(), point_vector.end());
+};
 
 /**
  * If two polygons intersect, returns a non-ordered list of vertices
  * corresponding to the polygon formed by the intersection of the two original
  * polygons
- * @param P1: Polygon to check for intersection.
- * @param P2: Polygon to check for intersection.
+ * @param p1: Polygon to check for intersection.
+ * @param p2: Polygon to check for intersection.
  * @returns
  */
-std::vector<Point2d> getIntersectionPolygonVertices(Polygon2d * P1, Polygon2d * P2);
+std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const Polygon2d & p2)
+{
+  std::vector<Point2d> intersection_vertices;
+  int n_vert_p1 = p1.getNVertices();
+  int n_vert_p2 = p2.getNVertices();
+  int n_segment_p1 = p1.getNSegments();
+  int n_segment_p2 = p2.getNSegments();
+
+  intersection_vertices.reserve(n_vert_p1 + n_vert_p2);
+  // Check which apexes of Polygon1 (if any) are inside polygon2
+  for (int i = 0; i < n_vert_p1; ++i) {
+    if (p2.isPointInside(p1.apex[i])) {
+      intersection_vertices.push_back(p1.apex[i]);
+    }
+  }
+  // Check which apexes of Polygon2 (if any) are inside polygon1
+  for (int i = 0; i < n_vert_p2; ++i) {
+    if (p1.isPointInside(p2.apex[i])) {
+      intersection_vertices.push_back(p2.apex[i]);
+    }
+  }
+  // Check if the line segments connecting each apex of each polygon, happen
+  // to intersect
+  for (int i = 0; i < n_segment_p1; ++i) {
+    for (int j = 0; j < n_segment_p2; ++j) {
+      Point2d intersection;
+      double eps = 0.00001;
+
+      bool segments_intersect =
+        segmentsIntersect(p1.line_segments[i], p2.line_segments[j], intersection, eps);
+      if (segments_intersect) {
+        // If the segments intersect, they create a Vertex for the intersection
+        // polygon
+        intersection_vertices.push_back(intersection);
+      }
+    }
+  }
+  return intersection_vertices;
+};
 
 /**
  * If two polygons intersect, stores the corresponding polygon created by the
  * intersection
- * @param P1: Polygon to check for intersection.
- * @param P2: Polygon to check for intersection.
- * @param Intersection: Intersecting polygon (if it exists) data is stored here
- * @returns true or false, f the polygons intersect or not
+ * @param p1: Polygon to check for intersection.
+ * @param p2: Polygon to check for intersection.
+ * @param intersection: Intersecting polygon (if it exists) data is stored here
+ * @returns true or false, if the polygons intersect or not
  */
-bool getIntersectingPolygon(Polygon2d * P1, Polygon2d * P2, Polygon2d * Intersection);
+bool getIntersectingPolygon(const Polygon2d & p1, const Polygon2d & p2, Polygon2d & intersection)
+{
+  std::vector<Point2d> intersection_vertices = getIntersectionPolygonVertices(p1, p2);
+
+  if (intersection_vertices.size() < 3)
+    return false;  // intersect polygon requires 3 vertices to exist
+
+  // Now we have the points that make the intersection of two polygons, we
+  // need to organize them CCW
+  sortPointsCCW(intersection_vertices);
+  // Add Points to the C. Hull
+  intersection.setApexes(intersection_vertices);
+  return true;
+};
 
 }  // namespace tier4_geometry
 }  // namespace tier4_autoware_utils

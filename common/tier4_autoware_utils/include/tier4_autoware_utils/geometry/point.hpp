@@ -32,9 +32,53 @@ struct Point3d;
 struct Point2d : public Eigen::Vector2d
 {
   Point2d() = default;
-  Point2d(const double x, const double y) : Eigen::Vector2d(x, y) {}
+  Point2d(const double x, const double y) : Eigen::Vector2d(x, y) { computeAngle(); }
 
   [[nodiscard]] Point3d to_3d(const double z = 0.0) const;
+  double angle;
+
+  // get angle between this point and another.
+  // Will be used to organize points CCW
+  double get_angle(Point2d & P)
+  {
+    // check to make sure the angle won't be "0"
+    if (P.x() == this->x()) {
+      return 0;
+    }
+
+    return (std::atan2((P.y() - this->y()), (P.x() - this->x())));
+  }
+  void set_angle(double d) { angle = d; }
+  void computeAngle() { angle = std::atan2(this->y(), this->x()); }
+
+  // for sorting based on angles
+  bool operator<(const Point2d & p) const { return (angle < p.angle); }
+
+  Point2d operator*(const double & scalar) const
+  {
+    Point2d res;
+    res.x() = this->x() * scalar;
+    res.y() = this->y() * scalar;
+    return res;
+  }
+
+  Point2d operator+(const Point2d & P) const
+  {
+    Point2d res;
+    res.x() = this->x() + P.x();
+    res.y() = this->y() + P.y();
+    res.computeAngle();
+    return res;
+  }
+
+  Point2d operator-(const Point2d & P) const
+  {
+    Point2d res;
+    res.x() = this->x() - P.x();
+    res.y() = this->y() - P.y();
+    res.computeAngle();
+    return res;
+  }
 };
 
 struct Point3d : public Eigen::Vector3d
