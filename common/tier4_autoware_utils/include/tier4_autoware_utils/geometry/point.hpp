@@ -26,12 +26,10 @@
 
 namespace tier4_autoware_utils
 {
-struct Point2d;
-struct Point3d;
-
 struct Point2d : public Eigen::Vector2d
 {
   Point2d() = default;
+  Point2d(geometry_msgs::msg::Point p) : Eigen::Vector2d(p.x, p.y) { computeAngle(); };
   Point2d(const double x, const double y) : Eigen::Vector2d(x, y) { computeAngle(); }
 
   [[nodiscard]] Point3d to_3d(const double z = 0.0) const;

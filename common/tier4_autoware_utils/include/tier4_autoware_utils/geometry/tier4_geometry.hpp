@@ -286,9 +286,9 @@ std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const 
   for (int i = 0; i < n_segment_p1; ++i) {
     for (int j = 0; j < n_segment_p2; ++j) {
       Point2d intersection;
-      double eps = 0.00001;
+      const double eps = 0.00001;
 
-      bool segments_intersect =
+      const bool segments_intersect =
         segmentsIntersect(p1.line_segments[i], p2.line_segments[j], intersection, eps);
       if (segments_intersect) {
         // If the segments intersect, they create a Vertex for the intersection
