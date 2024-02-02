@@ -12,6 +12,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+          token: ${{ secrets.WORKFLOW_TOKEN }}
       - name: Commit Results
         run: |
           git config --local user.email "action@github.com"
