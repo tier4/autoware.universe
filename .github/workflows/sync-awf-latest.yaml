@@ -13,8 +13,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Commit Results
-        with:
-          token: ${{ secrets.WORKFLOW_TOKEN }}
+      - name: Make change to workflow file
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
