@@ -18,27 +18,27 @@
 
 #include "tier4_autoware_utils/geometry/point.hpp"
 
+#include <tier4_autoware_utils/geometry/boost_geometry.hpp>
+
 #include <geometry_msgs/msg/pose.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <vector>
-
 namespace tier4_autoware_utils
 {
 namespace tier4_geometry
 {
-using tier4_autoware_utils::Point2d;
+using tier4_autoware_utils::Point2dS;
 
-bool getIntersectingPolygon(const Polygon2d & p1, const Polygon2d & p2, Polygon2d & intersection);
-std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const Polygon2d & p2);
-bool segmentsIntersect(
-  const Line2d & l1, const Line2d & l2, Point2d & intersect_point, const double & epsilon = 1E-5);
-bool isPointInPolygon(const std::vector<Point2d> & vertices, const Point2d & p);
-struct Matrix2d : public Eigen::Matrix2d
+class Polygon2dS;
+class Line2dS;
+class Matrix2dS;
+struct Matrix2dS : public Eigen::Matrix2d
 {
-  Matrix2d(const Point2d & p1, const Point2d & p2) : Eigen::Matrix2d()
+  Matrix2dS(const Point2dS & p1, const Point2dS & p2) : Eigen::Matrix2d()
   {
-    // Initialize the matrix based on the Point2d objects
+    // Initialize the matrix based on the Point2dS objects
     // For example, set the matrix elements to the x and y values of the points
     // Replace the following lines with your specific logic
     (*this)(0, 0) = p1.x();
@@ -48,33 +48,55 @@ struct Matrix2d : public Eigen::Matrix2d
   }
 };
 
-struct Line2d
+struct Line2dS
 {
 public:
-  Point2d p1, p2;
-  Line2d(Point2d & p1_, Point2d & p2_) : p1(p1_), p2(p2_) {}
-  Line2d() {}
-  Line2d(const Line2d & other) = default;
-  Line2d & operator=(const Line2d & other) = default;
+  Point2dS p1, p2;
+  Line2dS(Point2dS & p1_, Point2dS & p2_) : p1(p1_), p2(p2_) {}
+  Line2dS() {}
+  Line2dS(const Line2dS & other) = default;
+  Line2dS & operator=(const Line2dS & other) = default;
 };
 
-class Polygon2d
+class Polygon2dS
 {
 public:
-  std::vector<Point2d> apex;
-  std::vector<Line2d> line_segments;
+  std::vector<Point2dS> apex;
+  std::vector<Line2dS> line_segments;
   double area;
-  int id;
 
-  Polygon2d();
-  Polygon2d(std::vector<Point2d> const & apex_, int id_) : apex(apex_), id(id_)
+  Polygon2dS();
+  explicit Polygon2dS(std::vector<Point2dS> const & apex_) : apex(apex_)
   {
     assert(apex.size() >= 3);
     computeArea();
     computeLineSegments();
   };
-  Polygon2d(const Polygon2d & other) = default;
-  Polygon2d & operator=(const Polygon2d & other) = default;
+
+  explicit Polygon2dS(const std::vector<geometry_msgs::msg::Point> & polygon)
+  {
+    assert(polygon.size() >= 3);
+    for (const auto point : polygon) {
+      Point2dS vertex(point.x, point.y);
+      apex.push_back(vertex);
+    }
+    computeArea();
+    computeLineSegments();
+  };
+
+  explicit Polygon2dS(const boost::geometry::model::polygon<Point2d> & polygon)
+  {
+    assert(polygon.outer().size() >= 3);
+    for (const auto point : polygon.outer()) {
+      Point2dS vertex(point.x(), point.y());
+      apex.push_back(vertex);
+    }
+    computeArea();
+    computeLineSegments();
+  };
+
+  Polygon2dS(const Polygon2dS & other) = default;
+  Polygon2dS & operator=(const Polygon2dS & other) = default;
 
   double getArea() const { return area; }
 
@@ -85,7 +107,7 @@ public:
    * Fill an empty convex hull with its apexes.
    * @param apex_: Vector of points (C. Hull vertices ordered CCW)
    **/
-  void setApexes(std::vector<Point2d> const & apex_)
+  void setApexes(std::vector<Point2dS> const & apex_)
   {
     apex = apex_;
     assert(apex.size() >= 3);
@@ -98,7 +120,6 @@ public:
    *https://en.wikipedia.org/wiki/Point_in_polygon to determine if a Point is
    *inside this Polygon
    **/
-  bool isPointInside(const Point2d & p) const { return isPointInPolygon(apex, p); }
 
 private:
   /**
@@ -113,12 +134,12 @@ private:
   **/
   void computeArea()
   {
-    const Matrix2d apexMatrix(apex[apex.size() - 1], apex[0]);
+    const Matrix2dS apexMatrix(apex[apex.size() - 1], apex[0]);
     // The loop below ignores the Matrix ([xn,x1],[yn,y1]), so we add it manually
     // to the sum
     area = apexMatrix.determinant();
     for (int i = 0; i < apex.size() - 1; ++i) {
-      const Matrix2d temp(apex[i], apex[i + 1]);
+      const Matrix2dS temp(apex[i], apex[i + 1]);
       area += temp.determinant();
     }
 
@@ -134,10 +155,10 @@ private:
     line_segments.reserve(apex.size());
 
     for (int i = 0; i < apex.size() - 1; ++i) {
-      Line2d segment(apex[i], apex[i + 1]);
+      Line2dS segment(apex[i], apex[i + 1]);
       line_segments.push_back(segment);
     }
-    Line2d segment(apex[apex.size() - 1], apex[0]);
+    Line2dS segment(apex[apex.size() - 1], apex[0]);
     line_segments.push_back(segment);
   };
 };
@@ -152,7 +173,7 @@ private:
     @param p: The Point that is being tested.
     @return true or false
 */
-bool isPointInPolygon(const std::vector<Point2d> & vertices, const Point2d & p)
+inline bool isPointInPolygon(const std::vector<Point2dS> & vertices, const Point2dS & p)
 {
   const int n_vertices = vertices.size();
   int i, j;
@@ -195,8 +216,8 @@ bool isPointInPolygon(const std::vector<Point2d> & vertices, const Point2d & p)
  *results to 0
  *@return true or false
  */
-bool segmentsIntersect(
-  const Line2d & l1, const Line2d & l2, Point2d & intersect_point, const double epsilon = 1E-5)
+inline bool segmentsIntersect(
+  const Line2dS & l1, const Line2dS & l2, Point2dS & intersect_point, const double epsilon = 1E-5)
 {
   const double ax = l1.p2.x() - l1.p1.x();  // direction of line a
   const double ay = l1.p2.y() - l1.p1.y();  // ax and ay as above
@@ -237,12 +258,12 @@ bool segmentsIntersect(
  * "Center".
  * @param point_vector: Vector of points to sort CCW
  */
-void sortPointsCCW(std::vector<Point2d> & point_vector)
+inline void sortPointsCCW(std::vector<Point2dS> & point_vector)
 {
-  Point2d center = point_vector.at(0);  //  We make a pivot to check angles against
+  Point2dS center = point_vector.at(0);  //  We make a pivot to check angles against
 
   // sort all points by polar angle
-  for (Point2d & p : point_vector) {
+  for (Point2dS & p : point_vector) {
     double angle = center.get_angle(p);
     p.set_angle(angle);
   }
@@ -260,9 +281,10 @@ void sortPointsCCW(std::vector<Point2d> & point_vector)
  * @param p2: Polygon to check for intersection.
  * @returns
  */
-std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const Polygon2d & p2)
+inline std::optional<std::vector<Point2dS>> getIntersectionPolygonVertices(
+  const Polygon2dS & p1, const Polygon2dS & p2)
 {
-  std::vector<Point2d> intersection_vertices;
+  std::vector<Point2dS> intersection_vertices;
   int n_vert_p1 = p1.getNVertices();
   int n_vert_p2 = p2.getNVertices();
   int n_segment_p1 = p1.getNSegments();
@@ -271,13 +293,13 @@ std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const 
   intersection_vertices.reserve(n_vert_p1 + n_vert_p2);
   // Check which apexes of Polygon1 (if any) are inside polygon2
   for (int i = 0; i < n_vert_p1; ++i) {
-    if (p2.isPointInside(p1.apex[i])) {
+    if (isPointInPolygon(p2.apex, p1.apex.at(i))) {
       intersection_vertices.push_back(p1.apex[i]);
     }
   }
   // Check which apexes of Polygon2 (if any) are inside polygon1
   for (int i = 0; i < n_vert_p2; ++i) {
-    if (p1.isPointInside(p2.apex[i])) {
+    if (isPointInPolygon(p1.apex, p2.apex.at(i))) {
       intersection_vertices.push_back(p2.apex[i]);
     }
   }
@@ -285,7 +307,7 @@ std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const 
   // to intersect
   for (int i = 0; i < n_segment_p1; ++i) {
     for (int j = 0; j < n_segment_p2; ++j) {
-      Point2d intersection;
+      Point2dS intersection;
       const double eps = 0.00001;
 
       const bool segments_intersect =
@@ -297,6 +319,7 @@ std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const 
       }
     }
   }
+  if (intersection_vertices.empty()) return std::nullopt;
   return intersection_vertices;
 };
 
@@ -308,18 +331,20 @@ std::vector<Point2d> getIntersectionPolygonVertices(const Polygon2d & p1, const 
  * @param intersection: Intersecting polygon (if it exists) data is stored here
  * @returns true or false, if the polygons intersect or not
  */
-bool getIntersectingPolygon(const Polygon2d & p1, const Polygon2d & p2, Polygon2d & intersection)
+inline bool getIntersectingPolygon(
+  const Polygon2dS & p1, const Polygon2dS & p2, Polygon2dS & intersection)
 {
-  std::vector<Point2d> intersection_vertices = getIntersectionPolygonVertices(p1, p2);
+  auto intersection_vertices = getIntersectionPolygonVertices(p1, p2);
 
-  if (intersection_vertices.size() < 3)
+  if (!intersection_vertices) return false;
+  if (intersection_vertices.value().size() < 3)
     return false;  // intersect polygon requires 3 vertices to exist
 
   // Now we have the points that make the intersection of two polygons, we
   // need to organize them CCW
-  sortPointsCCW(intersection_vertices);
+  sortPointsCCW(intersection_vertices.value());
   // Add Points to the C. Hull
-  intersection.setApexes(intersection_vertices);
+  intersection.setApexes(intersection_vertices.value());
   return true;
 };
 

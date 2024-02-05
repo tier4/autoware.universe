@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef TIER4_AUTOWARE_UTILS__GEOMETRY__BOOST_GEOMETRY_HPP_
-#define TIER4_AUTOWARE_UTILS__GEOMETRY__BOOST_GEOMETRY_HPP_
+#ifndef TIER4_AUTOWARE_UTILS__GEOMETRY__POINT_HPP_
+#define TIER4_AUTOWARE_UTILS__GEOMETRY__POINT_HPP_
 
 #include <boost/geometry/core/cs.hpp>
 #include <boost/geometry/geometries/geometries.hpp>
@@ -26,18 +26,21 @@
 
 namespace tier4_autoware_utils
 {
-struct Point2d : public Eigen::Vector2d
-{
-  Point2d() = default;
-  Point2d(geometry_msgs::msg::Point p) : Eigen::Vector2d(p.x, p.y) { computeAngle(); };
-  Point2d(const double x, const double y) : Eigen::Vector2d(x, y) { computeAngle(); }
+struct Point2dS;
+struct Point3dS;
 
-  [[nodiscard]] Point3d to_3d(const double z = 0.0) const;
+struct Point2dS : public Eigen::Vector2d
+{
+  Point2dS() = default;
+  explicit Point2dS(geometry_msgs::msg::Point p) : Eigen::Vector2d(p.x, p.y) { computeAngle(); }
+  Point2dS(const double x, const double y) : Eigen::Vector2d(x, y) { computeAngle(); }
+
+  [[nodiscard]] Point3dS to_3d(const double z = 0.0) const;
   double angle;
 
   // get angle between this point and another.
   // Will be used to organize points CCW
-  double get_angle(Point2d & P)
+  double get_angle(Point2dS & P)
   {
     // check to make sure the angle won't be "0"
     if (P.x() == this->x()) {
@@ -50,28 +53,28 @@ struct Point2d : public Eigen::Vector2d
   void computeAngle() { angle = std::atan2(this->y(), this->x()); }
 
   // for sorting based on angles
-  bool operator<(const Point2d & p) const { return (angle < p.angle); }
+  bool operator<(const Point2dS & p) const { return (angle < p.angle); }
 
-  Point2d operator*(const double & scalar) const
+  Point2dS operator*(const double & scalar) const
   {
-    Point2d res;
+    Point2dS res;
     res.x() = this->x() * scalar;
     res.y() = this->y() * scalar;
     return res;
   }
 
-  Point2d operator+(const Point2d & P) const
+  Point2dS operator+(const Point2dS & P) const
   {
-    Point2d res;
+    Point2dS res;
     res.x() = this->x() + P.x();
     res.y() = this->y() + P.y();
     res.computeAngle();
     return res;
   }
 
-  Point2d operator-(const Point2d & P) const
+  Point2dS operator-(const Point2dS & P) const
   {
-    Point2d res;
+    Point2dS res;
     res.x() = this->x() - P.x();
     res.y() = this->y() - P.y();
     res.computeAngle();
@@ -79,41 +82,24 @@ struct Point2d : public Eigen::Vector2d
   }
 };
 
-struct Point3d : public Eigen::Vector3d
+struct Point3dS : public Eigen::Vector3d
 {
-  Point3d() = default;
-  Point3d(const double x, const double y, const double z) : Eigen::Vector3d(x, y, z) {}
+  Point3dS() = default;
+  Point3dS(const double x, const double y, const double z) : Eigen::Vector3d(x, y, z) {}
 
-  [[nodiscard]] Point2d to_2d() const;
+  [[nodiscard]] Point2dS to_2d() const;
 };
 
-inline Point3d Point2d::to_3d(const double z) const
+inline Point3dS Point2dS::to_3d(const double z) const
 {
-  return Point3d{x(), y(), z};
+  return Point3dS{x(), y(), z};
 }
 
-inline Point2d Point3d::to_2d() const
+inline Point2dS Point3dS::to_2d() const
 {
-  return Point2d{x(), y()};
+  return Point2dS{x(), y()};
 }
 
-inline geometry_msgs::msg::Point toMsg(const Point3d & point)
-{
-  geometry_msgs::msg::Point msg;
-  msg.x = point.x();
-  msg.y = point.y();
-  msg.z = point.z();
-  return msg;
-}
-
-inline Point3d fromMsg(const geometry_msgs::msg::Point & msg)
-{
-  Point3d point;
-  point.x() = msg.x;
-  point.y() = msg.y;
-  point.z() = msg.z;
-  return point;
-}
 }  // namespace tier4_autoware_utils
 
-#endif  // TIER4_AUTOWARE_UTILS__GEOMETRY__BOOST_GEOMETRY_HPP_
+#endif  // TIER4_AUTOWARE_UTILS__GEOMETRY__POINT_HPP_
