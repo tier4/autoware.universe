@@ -20,6 +20,7 @@
 
 #include <geometry_msgs/msg/pose.hpp>
 
+#include <algorithm>
 #include <vector>
 
 namespace tier4_autoware_utils
@@ -75,10 +76,10 @@ public:
   Polygon2d(const Polygon2d & other) = default;
   Polygon2d & operator=(const Polygon2d & other) = default;
 
-  double getArea() const { return area; };
+  double getArea() const { return area; }
 
-  int getNVertices() const { return apex.size(); };
-  int getNSegments() const { return line_segments.size(); };
+  int getNVertices() const { return apex.size(); }
+  int getNSegments() const { return line_segments.size(); }
 
   /**
    * Fill an empty convex hull with its apexes.
@@ -90,14 +91,14 @@ public:
     assert(apex.size() >= 3);
     computeArea();
     computeLineSegments();
-  };
+  }
 
   /**
    * Uses the Ray casting algorithm:
    *https://en.wikipedia.org/wiki/Point_in_polygon to determine if a Point is
    *inside this Polygon
    **/
-  bool isPointInside(const Point2d & p) const { return isPointInPolygon(apex, p); };
+  bool isPointInside(const Point2d & p) const { return isPointInPolygon(apex, p); }
 
 private:
   /**
@@ -105,14 +106,13 @@ private:
   https://byjus.com/maths/convex-polygon/ We compute and add the area of the
   inner triangles of the c. hull to get its total area. \return convex hull area
   (double)
+
+  The inner triangles of the Polygon are added to get the area of the polygon.
+  A formula for this is:area = 0.5 * det{([x1,x2],[y1,y2]) + ([x2,x3],[y2,y3]) + ...
+  +([xn,x1],[yn,y1])}
   **/
   void computeArea()
-  {  // The inner triangles of the Polygon are
-     // added to get the area of the polygon
-    // A formula for this is:
-    // area = 0.5 * det{([x1,x2],[y1,y2]) + ([x2,x3],[y2,y3]) + ... +
-    // ([xn,x1],[yn,y1])}
-    area = 0;
+  {
     const Matrix2d apexMatrix(apex[apex.size() - 1], apex[0]);
     // The loop below ignores the Matrix ([xn,x1],[yn,y1]), so we add it manually
     // to the sum
@@ -143,8 +143,8 @@ private:
 };
 
 /**
-    This Function uses the ray-casting algorithm to decide whether the point is
-   inside the given polygon. See
+   This Function uses the ray-casting algorithm to decide whether a point is
+   inside a given polygon. See
    https://en.wikipedia.org/wiki/Point_in_polygon#Ray_casting_algorithm. For
    this implementation, the ray goes in the -x direction, from P(x,y) to
    P(-inf,y)
@@ -250,7 +250,7 @@ void sortPointsCCW(std::vector<Point2d> & point_vector)
   // sort the points using overloaded < operator from the Point struct
   // this program sorts them counterclockwise;
   std::sort(point_vector.begin(), point_vector.end());
-};
+}
 
 /**
  * If two polygons intersect, returns a non-ordered list of vertices
