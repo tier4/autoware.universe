@@ -15,9 +15,10 @@
 #ifndef TRAFFIC_LIGHT_UTILS__TRAFFIC_LIGHT_UTILS_HPP_
 #define TRAFFIC_LIGHT_UTILS__TRAFFIC_LIGHT_UTILS_HPP_
 
+#include "autoware_perception_msgs/msg/traffic_signal_element.hpp"
+#include "tier4_perception_msgs/msg/traffic_light.hpp"
 #include "tier4_perception_msgs/msg/traffic_light_element.hpp"
 #include "tier4_perception_msgs/msg/traffic_light_roi.hpp"
-#include "tier4_perception_msgs/msg/traffic_signal.hpp"
 
 #include <lanelet2_core/primitives/LineString.h>
 #include <lanelet2_core/primitives/Primitive.h>
@@ -32,9 +33,9 @@ bool isRoiValid(
 
 void setRoiInvalid(tier4_perception_msgs::msg::TrafficLightRoi & roi);
 
-bool isSignalUnknown(const tier4_perception_msgs::msg::TrafficSignal & signal);
+bool isSignalUnknown(const tier4_perception_msgs::msg::TrafficLight & signal);
 
-void setSignalUnknown(tier4_perception_msgs::msg::TrafficSignal & signal, float confidence = -1);
+void setSignalUnknown(tier4_perception_msgs::msg::TrafficLight & signal, float confidence = -1);
 
 tf2::Vector3 getTrafficLightTopLeft(const lanelet::ConstLineString3d & traffic_light);
 
