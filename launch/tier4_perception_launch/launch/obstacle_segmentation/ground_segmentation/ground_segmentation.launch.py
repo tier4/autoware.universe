@@ -43,7 +43,7 @@ class GroundSegmentationPipeline:
         self.single_frame_obstacle_seg_output = (
             "/perception/obstacle_segmentation/single_frame/pointcloud_raw"
         )
-        self.output_topic = "/perception/obstacle_segmentation/pointcloud"
+        self.output_topic = LaunchConfiguration("output/pointcloud").perform(context)
         self.use_single_frame_filter = self.ground_segmentation_param["use_single_frame_filter"]
         self.use_time_series_filter = self.ground_segmentation_param["use_time_series_filter"]
 
@@ -533,6 +533,7 @@ def generate_launch_description():
     add_launch_arg("use_pointcloud_container", "False")
     add_launch_arg("container_name", "perception_pipeline_container")
     add_launch_arg("input/pointcloud", "/sensing/lidar/concatenated/pointcloud")
+    add_launch_arg("output/pointcloud", "/perception/obstacle_segmentation/pointcloud")
 
     set_container_executable = SetLaunchConfiguration(
         "container_executable",
