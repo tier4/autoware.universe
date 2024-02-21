@@ -65,7 +65,7 @@
     <!-- Diagnostic Graph Aggregator -->
     <node pkg="diagnostic_graph_aggregator" exec="aggregator" name="diagnostic_graph_aggregator_self">
       <param from="$(var diagnostic_graph_aggregator_param_path)"/>
-      <param name="graph_file" value="$(var diagnostic_graph_aggregator_graph_path)"/>
+      <param name="graph_file" value="$(find-pkg-share diagnostic_graph_aggregator)/example/mrm_test.yaml"/>
     </node>
 
     <!-- Emergency Handler -->

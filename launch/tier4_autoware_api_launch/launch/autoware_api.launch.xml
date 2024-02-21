@@ -1,5 +1,5 @@
 <launch>
-  <arg name="is_redundant" default="true"/>
+  <arg name="is_redundant" default="false"/>
 
   <!-- AD API options -->
   <arg name="launch_deprecated_api" default="false"/>

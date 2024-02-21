@@ -1,5 +1,5 @@
 <launch>
-  <let name="is_redundant" value="true"/>
+  <let name="is_redundant" value="false"/>
 
   <arg name="input_operation_mode_availability" default="/supervisor/system/operation_mode/request/$(var ecu_name)" if="$(var is_redundant)"/>
   <arg name="input_operation_mode_availability" default="/system/operation_mode/availability" unless="$(var is_redundant)"/>
