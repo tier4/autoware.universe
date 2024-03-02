@@ -126,7 +126,6 @@ private:
   double timeout_sec_ = 0.1;
 
   bool publish_synchronized_pointcloud_;
-  bool keep_input_frame_in_synchronized_pointcloud_;
   std::string synchronized_pointcloud_postfix_;
 
   std::set<std::string> not_subscribed_topic_names_;
