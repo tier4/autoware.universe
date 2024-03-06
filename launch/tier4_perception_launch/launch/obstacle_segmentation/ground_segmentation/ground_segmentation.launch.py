@@ -71,6 +71,18 @@ class GroundSegmentationPipeline:
         return p
 
     def create_additional_pipeline(self, lidar_name):
+        max_z = (
+            self.vehicle_info["max_height_offset"]
+            + self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"][
+                "margin_max_z"
+            ]
+        )
+        min_z = (
+            self.vehicle_info["min_height_offset"]
+            + self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"][
+                "margin_min_z"
+            ]
+        )
         components = []
         components.append(
             ComposableNode(
@@ -85,6 +97,8 @@ class GroundSegmentationPipeline:
                     {
                         "input_frame": LaunchConfiguration("base_frame"),
                         "output_frame": LaunchConfiguration("base_frame"),
+                        "max_z": max_z,
+                        "min_z": min_z,
                     },
                     self.ground_segmentation_param[f"{lidar_name}_crop_box_filter"]["parameters"],
                 ],
@@ -207,6 +221,14 @@ class GroundSegmentationPipeline:
         return components
 
     def create_common_pipeline(self, input_topic, output_topic):
+        max_z = (
+            self.vehicle_info["max_height_offset"]
+            + self.ground_segmentation_param["common_crop_box_filter"]["parameters"]["margin_max_z"]
+        )
+        min_z = (
+            self.vehicle_info["min_height_offset"]
+            + self.ground_segmentation_param["common_crop_box_filter"]["parameters"]["margin_min_z"]
+        )
         components = []
         components.append(
             ComposableNode(
@@ -221,6 +243,8 @@ class GroundSegmentationPipeline:
                     {
                         "input_frame": LaunchConfiguration("base_frame"),
                         "output_frame": LaunchConfiguration("base_frame"),
+                        "max_z": max_z,
+                        "min_z": min_z,
                     },
                     self.ground_segmentation_param["common_crop_box_filter"]["parameters"],
                 ],
