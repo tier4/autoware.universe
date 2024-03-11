@@ -67,7 +67,6 @@
   <exec_depend>mission_planner</exec_depend>
   <exec_depend>motion_velocity_smoother</exec_depend>
   <exec_depend>obstacle_avoidance_planner</exec_depend>
-  <exec_depend>obstacle_cruise_planner</exec_depend>
   <exec_depend>obstacle_stop_planner</exec_depend>
   <exec_depend>planning_evaluator</exec_depend>
   <exec_depend>planning_topic_converter</exec_depend>
