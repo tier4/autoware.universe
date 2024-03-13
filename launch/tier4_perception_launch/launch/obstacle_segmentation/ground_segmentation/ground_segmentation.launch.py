@@ -292,27 +292,6 @@ class GroundSegmentationPipeline:
         return components
 
     @staticmethod
-    def create_time_series_outlier_filter_components(input_topic, output_topic):
-        components = []
-        components.append(
-            ComposableNode(
-                package="occupancy_grid_map_outlier_filter",
-                plugin="occupancy_grid_map_outlier_filter::OccupancyGridMapOutlierFilterComponent",
-                name="occupancy_grid_map_outlier_filter",
-                remappings=[
-                    ("~/input/occupancy_grid_map", "/perception/occupancy_grid_map/map"),
-                    ("~/input/pointcloud", input_topic),
-                    ("~/output/pointcloud", output_topic),
-                ],
-                extra_arguments=[
-                    {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
-                ],
-            )
-        )
-
-        return components
-
-    @staticmethod
     def create_single_frame_outlier_filter_components(input_topic, output_topic, context):
         components = []
         components.append(
@@ -499,15 +478,6 @@ def launch_setup(context, *args, **kwargs):
                 if pipeline.use_time_series_filter
                 else pipeline.output_topic,
                 context=context,
-            )
-        )
-    if pipeline.use_time_series_filter:
-        components.extend(
-            pipeline.create_time_series_outlier_filter_components(
-                input_topic=relay_topic
-                if pipeline.use_single_frame_filter
-                else pipeline.single_frame_obstacle_seg_output,
-                output_topic=pipeline.output_topic,
             )
         )
     individual_container = ComposableNodeContainer(
