@@ -13,6 +13,7 @@
   <!-- Perception module -->
   <group>
     <push-ros-namespace namespace="perception"/>
+
     <!-- Object segmentation module -->
     <group>
       <push-ros-namespace namespace="obstacle_segmentation"/>
