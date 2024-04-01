@@ -350,7 +350,7 @@ def launch_setup(context, *args, **kwargs):
         package="rclcpp_components",
         executable=LaunchConfiguration("container_executable"),
         composable_node_descriptions=[
-            controller_component,
+            # controller_component,
             control_validator_component,
             lane_departure_component,
             shift_decider_component,
