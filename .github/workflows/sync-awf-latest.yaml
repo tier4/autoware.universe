@@ -4,7 +4,8 @@ on:
   schedule:
     - cron: 0 15 * * *
   workflow_dispatch:
-
+  repository_dispatch:
+    types: [sync-awf-latest]
 jobs:
   sync-awf-latest:
     runs-on: ubuntu-latest
