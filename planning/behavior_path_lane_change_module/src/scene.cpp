@@ -1175,18 +1175,17 @@ bool NormalLaneChange::getLaneChangePaths(
       };
 
       // get path on original lanes
-      const auto prepare_velocity = std::max(
+      const auto prepare_velocity = std::clamp(
         current_velocity + sampled_longitudinal_acc * prepare_duration,
-        minimum_lane_changing_velocity);
+        minimum_lane_changing_velocity, getCommonParam().max_vel);
 
       // compute actual longitudinal acceleration
       const double longitudinal_acc_on_prepare =
         (prepare_duration < 1e-3) ? 0.0
                                   : ((prepare_velocity - current_velocity) / prepare_duration);
 
-      const double prepare_length =
-        current_velocity * prepare_duration +
-        0.5 * longitudinal_acc_on_prepare * std::pow(prepare_duration, 2);
+      const auto prepare_length = utils::lane_change::calcPhaseLength(
+        current_velocity, getCommonParam().max_vel, longitudinal_acc_on_prepare, prepare_duration);
 
       auto prepare_segment = getPrepareSegment(current_lanes, backward_path_length, prepare_length);
 
@@ -1238,11 +1237,12 @@ bool NormalLaneChange::getLaneChangePaths(
           utils::lane_change::calcLaneChangingAcceleration(
             initial_lane_changing_velocity, max_path_velocity, lane_changing_time,
             sampled_longitudinal_acc);
-        const auto lane_changing_length =
-          initial_lane_changing_velocity * lane_changing_time +
-          0.5 * longitudinal_acc_on_lane_changing * lane_changing_time * lane_changing_time;
-        const auto terminal_lane_changing_velocity =
-          initial_lane_changing_velocity + longitudinal_acc_on_lane_changing * lane_changing_time;
+        const auto lane_changing_length = utils::lane_change::calcPhaseLength(
+          initial_lane_changing_velocity, getCommonParam().max_vel,
+          longitudinal_acc_on_lane_changing, lane_changing_time);
+        const auto terminal_lane_changing_velocity = std::min(
+          initial_lane_changing_velocity + longitudinal_acc_on_lane_changing * lane_changing_time,
+          getCommonParam().max_vel);
         utils::lane_change::setPrepareVelocity(
           prepare_segment, current_velocity, terminal_lane_changing_velocity);
 
@@ -1737,7 +1737,7 @@ PathSafetyStatus NormalLaneChange::isLaneChangePathSafe(
     for (const auto & obj_path : obj_predicted_paths) {
       const auto collided_polygons = utils::path_safety_checker::getCollidedPolygons(
         path, ego_predicted_path, obj, obj_path, common_parameters, rss_params, 1.0,
-        current_debug_data.second);
+        get_max_velocity_for_safety_check(), current_debug_data.second);
 
       if (collided_polygons.empty()) {
         utils::path_safety_checker::updateCollisionCheckDebugMap(
@@ -1830,6 +1830,17 @@ bool NormalLaneChange::isVehicleStuck(
     "No stationary objects found in obstacle_check_distance and Ego is not in "
     "terminal of current lanes");
   return false;
+}
+
+double NormalLaneChange::get_max_velocity_for_safety_check() const
+{
+  const auto external_velocity_limit_ptr = planner_data_->external_limit_max_velocity;
+  if (external_velocity_limit_ptr) {
+    return std::min(
+      static_cast<double>(external_velocity_limit_ptr->max_velocity), getCommonParam().max_vel);
+  }
+
+  return getCommonParam().max_vel;
 }
 
 bool NormalLaneChange::isVehicleStuck(const lanelet::ConstLanelets & current_lanes) const
