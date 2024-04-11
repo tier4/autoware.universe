@@ -641,18 +641,20 @@ void calc_path_line_list(
   std::vector<geometry_msgs::msg::Point> & points, const bool is_simple)
 {
   const int circle_line_num = is_simple ? 5 : 10;
+  const int line_interval = is_simple ? 2 : 1;
+  const int circle_interval = is_simple ? 4 : 1;
 
-  for (int i = 0; i < static_cast<int>(paths.path.size()) - 1; ++i) {
+  for (int i = 0; i < static_cast<int>(paths.path.size()) - line_interval; i += line_interval) {
     geometry_msgs::msg::Point point;
     point.x = paths.path.at(i).position.x;
     point.y = paths.path.at(i).position.y;
     point.z = paths.path.at(i).position.z;
     points.push_back(point);
-    point.x = paths.path.at(i + 1).position.x;
-    point.y = paths.path.at(i + 1).position.y;
-    point.z = paths.path.at(i + 1).position.z;
+    point.x = paths.path.at(i + line_interval).position.x;
+    point.y = paths.path.at(i + line_interval).position.y;
+    point.z = paths.path.at(i + line_interval).position.z;
     points.push_back(point);
-    if (!is_simple || i % 2 == 0) {
+    if (!is_simple || i % circle_interval == 0) {
       calc_circle_line_list(point, 0.25, points, circle_line_num);
     }
   }
