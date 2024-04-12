@@ -56,7 +56,7 @@ namespace tf2
  * \param t_out The transformed point, as a Point32 message.
  * \param transform The timestamped transform to apply, as a TransformStamped message.
  */
-template <>
+/* template <>
 inline void doTransform(
   const geometry_msgs::msg::Point32 & t_in, geometry_msgs::msg::Point32 & t_out,
   const geometry_msgs::msg::TransformStamped & transform)
@@ -65,7 +65,7 @@ inline void doTransform(
   t_out.x = static_cast<float>(v_out[0]);
   t_out.y = static_cast<float>(v_out[1]);
   t_out.z = static_cast<float>(v_out[2]);
-}
+} */
 
 /*************/
 /** Polygon **/
@@ -77,7 +77,7 @@ inline void doTransform(
  * \param t_out The transformed polygon.
  * \param transform The timestamped transform to apply, as a TransformStamped message.
  */
-template <>
+/* template <>
 inline void doTransform(
   const geometry_msgs::msg::Polygon & t_in, geometry_msgs::msg::Polygon & t_out,
   const geometry_msgs::msg::TransformStamped & transform)
@@ -93,7 +93,7 @@ inline void doTransform(
     t_out.points[i].y = static_cast<float>(v_out[1]);
     t_out.points[i].z = static_cast<float>(v_out[2]);
   }
-}
+} */
 
 /******************/
 /** Quaternion32 **/
