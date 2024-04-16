@@ -118,7 +118,10 @@ class GroundSegmentationPipeline:
                     ("output", f"{lidar_name}/pointcloud"),
                 ],
                 parameters=[
-                    self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["parameters"]
+                    self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["parameters"],
+                    {"input_frame": "base_link"},
+                    {"output_frame": "base_link"},
+                    {"output_intensity_field": LaunchConfiguration("output_intensity_field")},
                 ],
                 extra_arguments=[
                     {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
@@ -268,6 +271,7 @@ class GroundSegmentationPipeline:
                     self.vehicle_info,
                     {"input_frame": "base_link"},
                     {"output_frame": "base_link"},
+                    {"output_intensity_field": LaunchConfiguration("output_intensity_field")},
                 ],
                 extra_arguments=[
                     {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
@@ -563,6 +567,7 @@ def generate_launch_description():
     add_launch_arg("use_pointcloud_container", "False")
     add_launch_arg("container_name", "perception_pipeline_container")
     add_launch_arg("input/pointcloud", "/sensing/lidar/concatenated/pointcloud")
+    add_launch_arg("output_intensity_field", "False")
 
     set_container_executable = SetLaunchConfiguration(
         "container_executable",
