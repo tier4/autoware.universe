@@ -55,7 +55,7 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     split_height_distance_ = declare_parameter("split_height_distance", 0.2);
     use_virtual_ground_point_ = declare_parameter("use_virtual_ground_point", true);
     use_recheck_ground_cluster_ = declare_parameter("use_recheck_ground_cluster", true);
-    evaluation_mode_ = static_cast<bool>(declare_parameter("evaluation_mode", false));
+    evaluation_mode_ = static_cast<bool>(declare_parameter("evaluation_mode", true));
     radial_dividers_num_ = std::ceil(2.0 * M_PI / radial_divider_angle_rad_);
     vehicle_info_ = VehicleInfoUtil(*this).getVehicleInfo();
 
