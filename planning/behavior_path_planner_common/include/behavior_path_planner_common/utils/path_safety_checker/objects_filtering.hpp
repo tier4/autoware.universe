@@ -223,6 +223,16 @@ bool isCentroidWithinLanelets(
   const PredictedObject & object, const lanelet::ConstLanelets & target_lanelets);
 
 /**
+ * @brief Checks if the polygon of a given object is overlapped with the provided lanelets.
+ *
+ * @param object The predicted object to check.
+ * @param target_lanelets The lanelets to check against.
+ * @return bool True if the object's polygon is overlapped with the lanelets, otherwise false.
+ */
+bool isPolygonOverlapLanelets(
+  const PredictedObject & object, const lanelet::ConstLanelets & target_lanelets);
+
+/**
  * @brief Transforms a given object into an extended predicted object.
  *
  * @param object The predicted object to transform.

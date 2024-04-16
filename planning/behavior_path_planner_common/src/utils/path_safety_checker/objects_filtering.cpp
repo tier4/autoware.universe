@@ -285,6 +285,23 @@ bool isCentroidWithinLanelets(
   return std::any_of(target_lanelets.begin(), target_lanelets.end(), is_within);
 }
 
+bool isPolygonOverlapLanelets(
+  const PredictedObject & object, const lanelet::ConstLanelets & target_lanelets)
+{
+  if (target_lanelets.empty()) {
+    return false;
+  }
+
+  const auto object_polygon = tier4_autoware_utils::toPolygon2d(object);
+
+  const auto is_overlap = [&](const auto & llt) {
+    const auto lanelet_polygon = utils::toPolygon2d(llt);
+    return !boost::geometry::disjoint(lanelet_polygon, object_polygon);
+  };
+
+  return std::any_of(target_lanelets.begin(), target_lanelets.end(), is_overlap);
+}
+
 ExtendedPredictedObject transform(
   const PredictedObject & object, const double safety_check_time_horizon,
   const double safety_check_time_resolution)
@@ -355,7 +372,7 @@ TargetObjectsOnLane createTargetObjectsOnLane(
   const auto append_objects_on_lane = [&](auto & lane_objects, const auto & check_lanes) {
     std::for_each(
       filtered_objects.objects.begin(), filtered_objects.objects.end(), [&](const auto & object) {
-        if (isCentroidWithinLanelets(object, check_lanes)) {
+        if (isPolygonOverlapLanelets(object, check_lanes)) {
           lane_objects.push_back(
             transform(object, safety_check_time_horizon, safety_check_time_resolution));
         }
