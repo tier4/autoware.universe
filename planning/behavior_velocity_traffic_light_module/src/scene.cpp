@@ -214,9 +214,6 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
   const double signed_arc_length_to_stop_point = motion_utils::calcSignedArcLength(
     input_path.points, self_pose->pose.position, stop_line_point_msg);
   setDistance(signed_arc_length_to_stop_point);
-  RCLCPP_WARN_STREAM(
-    rclcpp::get_logger("debug"),
-    "signed_arc_length_to_stop_point: " << signed_arc_length_to_stop_point);
 
   // Check state
   if (state_ == State::APPROACH) {
