@@ -148,6 +148,8 @@ private:
 
   // Traffic Light State
   TrafficSignal looking_tl_state_;
+
+  bool print_debug_info_{true};
 };
 }  // namespace behavior_velocity_planner
 

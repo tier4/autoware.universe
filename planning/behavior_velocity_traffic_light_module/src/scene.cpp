@@ -214,6 +214,9 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
   const double signed_arc_length_to_stop_point = motion_utils::calcSignedArcLength(
     input_path.points, self_pose->pose.position, stop_line_point_msg);
   setDistance(signed_arc_length_to_stop_point);
+  RCLCPP_WARN_STREAM(
+    rclcpp::get_logger("debug"),
+    "signed_arc_length_to_stop_point: " << signed_arc_length_to_stop_point);
 
   // Check state
   if (state_ == State::APPROACH) {
@@ -233,6 +236,8 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
 
     const bool is_unknown_signal = isUnknownSignal(looking_tl_state_);
     const bool is_signal_timed_out = isTrafficSignalTimedOut();
+    const bool is_stop_signal = isStopSignal();
+    const bool is_stop_required = is_unknown_signal || is_signal_timed_out || is_stop_signal;
 
     // Decide if stop or proceed using the remaining time to red signal
     // If the upcoming traffic signal color is unknown or timed out, do not use the time to red and
@@ -241,20 +246,27 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
       planner_data_->getRestTimeToRedSignal(traffic_light_reg_elem_.id());
     const bool is_time_to_red_signal_available =
       (rest_time_to_red_signal.has_value() && !isDataTimeout(rest_time_to_red_signal->stamp));
-    const bool is_stop_required = is_unknown_signal || is_signal_timed_out;
 
     if (planner_param_.v2i_use_rest_time && is_time_to_red_signal_available && !is_stop_required) {
       if (!canPassStopLineBeforeRed(*rest_time_to_red_signal, signed_arc_length_to_stop_point)) {
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "cannot pass stop line before red");
         *path = insertStopPose(input_path, stop_line_point_idx, stop_line_point, stop_reason);
+        is_prev_state_stop_ = true;
       }
+
+      is_prev_state_stop_ = false;
       return true;
     }
 
-    // Check if stop is coming.
-    const bool is_stop_signal = isStopSignal();
+    if (print_debug_info_) {
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "is_stop_signal: " << is_stop_signal);
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "is_unknown_signal: " << is_unknown_signal);
+      RCLCPP_WARN_STREAM(
+        rclcpp::get_logger("debug"), "is_signal_timed_out: " << is_signal_timed_out);
+    }
 
     // Update stop signal received time
-    if (is_stop_signal || is_unknown_signal || is_signal_timed_out) {
+    if (is_stop_required) {
       if (!stop_signal_received_time_ptr_) {
         stop_signal_received_time_ptr_ = std::make_unique<Time>(clock_->now());
       }
@@ -268,7 +280,12 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
         ? std::max((clock_->now() - *stop_signal_received_time_ptr_).seconds(), 0.0)
         : 0.0;
     const bool to_be_stopped =
-      is_stop_signal && (is_prev_state_stop_ || time_diff > planner_param_.stop_time_hysteresis);
+      is_stop_required && (is_prev_state_stop_ || time_diff > planner_param_.stop_time_hysteresis);
+
+    if (print_debug_info_) {
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "time_diff: " << time_diff);
+      RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "to_be_stopped: " << to_be_stopped);
+    }
 
     setSafe(!to_be_stopped);
     if (isActivated()) {
@@ -278,6 +295,9 @@ bool TrafficLightModule::modifyPathVelocity(PathWithLaneId * path, StopReason * 
 
     // Decide whether to stop or pass even if a stop signal is received.
     if (!isPassthrough(signed_arc_length_to_stop_point)) {
+      if (print_debug_info_) {
+        RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "cannot pass through");
+      }
       *path = insertStopPose(input_path, stop_line_point_idx, stop_line_point, stop_reason);
       is_prev_state_stop_ = true;
     }
@@ -356,6 +376,15 @@ bool TrafficLightModule::isPassthrough(const double & signed_arc_length) const
   const bool reachable = signed_arc_length < reachable_distance;
 
   const auto & enable_pass_judge = planner_param_.enable_pass_judge;
+
+  if (print_debug_info_) {
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "signed_arc_length: " << signed_arc_length);
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "reachable_distance: " << reachable_distance);
+    RCLCPP_WARN_STREAM(
+      rclcpp::get_logger("debug"), "pass_judge_line_distance: " << pass_judge_line_distance);
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "stoppable: " << stoppable);
+    RCLCPP_WARN_STREAM(rclcpp::get_logger("debug"), "is_prev_state_stop_: " << is_prev_state_stop_);
+  }
 
   if (enable_pass_judge && !stoppable && !is_prev_state_stop_) {
     // Cannot stop under acceleration and jerk limits.
