@@ -3,7 +3,7 @@
   <arg name="input/objects" default="/perception/object_recognition/detection/clustering/objects_with_feature"/>
   <arg name="output/objects" default="/perception/object_recognition/detection/clustering/validated_objects_with_feature"/>
 
-  <arg name="intensity_based_validator_param_path" default="$(find-pkg-share detected_object_validation)/config/intensity_based_validator.param.yaml"/>
+  <arg name="intensity_based_validator_param_path" default="$(find-pkg-share detected_object_validation)/config/pointcloud_intensity_based_validator.param.yaml"/>
 
   <node pkg="detected_object_validation" exec="intensity_based_validator_node" name="intensity_based_validator_node" output="screen">
     <remap from="input/objects" to="$(var input/objects)"/>

@@ -70,7 +70,7 @@ ament_auto_add_library(intensity_based_validator SHARED
 )
 
 rclcpp_components_register_node(intensity_based_validator
-  PLUGIN "pointcloud_intensity_based_validator::IntensityBasedValidator"
+  PLUGIN "intensity_based_validator::IntensityBasedValidator"
   EXECUTABLE intensity_based_validator_node)
 
 
