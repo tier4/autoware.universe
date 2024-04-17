@@ -180,6 +180,25 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
       ip.collision_detection.velocity_profile.minimum_default_velocity =
         getOrDeclareParameter<double>(
           node, ns + ".collision_detection.velocity_profile.minimum_default_velocity");
+      const auto ego_ttc_method = getOrDeclareParameter<std::string>(
+        node, ns + ".collision_detection.velocity_profile.ego_ttc_method");
+      if (ego_ttc_method == "1st_order_forward_velocity") {
+        ip.collision_detection.velocity_profile.ego_ttc_method =
+          IntersectionModule::PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_VELOCITY;
+      } else if (ego_ttc_method == "1st_order_central_velocity") {
+        ip.collision_detection.velocity_profile.ego_ttc_method =
+          IntersectionModule::PlannerParam::EgoTTCMethod::FIRST_ORDER_CENTRAL_VELOCITY;
+      } else if (ego_ttc_method == "1st_order_forward_acceleration") {
+        ip.collision_detection.velocity_profile.ego_ttc_method =
+          IntersectionModule::PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_ACCELERATION;
+      } else if (ego_ttc_method == "1st_order_central_acceleration") {
+        ip.collision_detection.velocity_profile.ego_ttc_method =
+          IntersectionModule::PlannerParam::EgoTTCMethod::FIRST_ORDER_CENTRAL_ACCELERATION;
+      } else {
+        ip.collision_detection.velocity_profile.ego_ttc_method =
+          IntersectionModule::PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_VELOCITY;
+      }
+      RCLCPP_INFO(logger_, "using %s ttc method", ego_ttc_method.c_str());
     }
 
     // fully_prioritized
@@ -210,6 +229,11 @@ IntersectionModuleManager::IntersectionModuleManager(rclcpp::Node & node)
       ip.collision_detection.not_prioritized.collision_end_margin_time =
         getOrDeclareParameter<double>(
           node, ns + ".collision_detection.not_prioritized.collision_end_margin_time");
+      ip.collision_detection.not_prioritized
+        .passthrough_distance_margin_for_preemptive_start = getOrDeclareParameter<double>(
+        node,
+        ns +
+          ".collision_detection.not_prioritized.passthrough_distance_margin_for_preemptive_start");
     }
 
     // yield_on_green_traffic_light

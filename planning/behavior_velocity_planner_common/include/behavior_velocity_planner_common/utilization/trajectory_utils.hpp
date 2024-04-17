@@ -40,6 +40,10 @@ bool smoothPath(
   const PathWithLaneId & in_path, PathWithLaneId & out_path,
   const std::shared_ptr<const PlannerData> & planner_data);
 
+bool smoothPathWithAcceleration(
+  const PathWithLaneId & in_path, PathWithLaneId & out_path, std::vector<double> & out_acceleration,
+  const std::shared_ptr<const PlannerData> & planner_data);
+
 }  // namespace behavior_velocity_planner
 
 #endif  // BEHAVIOR_VELOCITY_PLANNER_COMMON__UTILIZATION__TRAJECTORY_UTILS_HPP_

@@ -90,4 +90,56 @@ bool smoothPath(
   return true;
 }
 
+//! smooth path point with lane id starts from ego position on path to the path end
+bool smoothPathWithAcceleration(
+  const PathWithLaneId & in_path, PathWithLaneId & out_path, std::vector<double> & out_acceleration,
+  const std::shared_ptr<const PlannerData> & planner_data)
+{
+  const geometry_msgs::msg::Pose current_pose = planner_data->current_odometry->pose;
+  const double v0 = planner_data->current_velocity->twist.linear.x;
+  const double a0 = planner_data->current_acceleration->accel.accel.linear.x;
+  const auto & external_v_limit = planner_data->external_velocity_limit;
+  const auto & smoother = planner_data->velocity_smoother_;
+
+  auto trajectory =
+    motion_utils::convertToTrajectoryPoints<autoware_auto_planning_msgs::msg::PathWithLaneId>(
+      in_path);
+  const auto traj_lateral_acc_filtered = smoother->applyLateralAccelerationFilter(trajectory);
+
+  const auto traj_steering_rate_limited =
+    smoother->applySteeringRateLimit(traj_lateral_acc_filtered, false);
+
+  // Resample trajectory with ego-velocity based interval distances
+  auto traj_resampled = smoother->resampleTrajectory(
+    traj_steering_rate_limited, v0, current_pose, planner_data->ego_nearest_dist_threshold,
+    planner_data->ego_nearest_yaw_threshold);
+  const size_t traj_resampled_closest = motion_utils::findFirstNearestIndexWithSoftConstraints(
+    traj_resampled, current_pose, planner_data->ego_nearest_dist_threshold,
+    planner_data->ego_nearest_yaw_threshold);
+  std::vector<TrajectoryPoints> debug_trajectories;
+  // Clip trajectory from closest point
+  TrajectoryPoints clipped;
+  TrajectoryPoints traj_smoothed;
+  clipped.insert(
+    clipped.end(), traj_resampled.begin() + traj_resampled_closest, traj_resampled.end());
+  if (!smoother->apply(v0, a0, clipped, traj_smoothed, debug_trajectories)) {
+    std::cerr << "[behavior_velocity][trajectory_utils]: failed to smooth" << std::endl;
+    return false;
+  }
+  traj_smoothed.insert(
+    traj_smoothed.begin(), traj_resampled.begin(), traj_resampled.begin() + traj_resampled_closest);
+
+  if (external_v_limit) {
+    motion_velocity_smoother::trajectory_utils::applyMaximumVelocityLimit(
+      traj_resampled_closest, traj_smoothed.size(), external_v_limit->max_velocity, traj_smoothed);
+  }
+  out_path = motion_utils::convertToPathWithLaneId<TrajectoryPoints>(traj_smoothed);
+  std::vector<double> acceleration;
+  for (const auto & traj_point : traj_smoothed) {
+    acceleration.push_back(traj_point.acceleration_mps2);
+  }
+  out_acceleration = acceleration;
+  return true;
+}
+
 }  // namespace behavior_velocity_planner

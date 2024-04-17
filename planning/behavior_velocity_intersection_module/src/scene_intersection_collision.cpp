@@ -917,8 +917,19 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
 
   // apply smoother to reference velocity
   PathWithLaneId smoothed_reference_path = reference_path;
-  if (!smoothPath(reference_path, smoothed_reference_path, planner_data_)) {
+  std::vector<double> acceleration{};
+  if (!smoothPathWithAcceleration(
+        reference_path, smoothed_reference_path, acceleration, planner_data_)) {
     smoothed_reference_path = reference_path;
+    acceleration.resize(smoothed_reference_path.points.size());
+    std::fill(acceleration.begin(), acceleration.end(), 0.0);
+  }
+  if (acceleration.size() != smoothed_reference_path.points.size()) {
+    RCLCPP_ERROR(
+      logger_,
+      "smoothed_reference_path.points/acceleration size differs, resetting acceleration to zero");
+    acceleration.resize(smoothed_reference_path.points.size());
+    std::fill(acceleration.begin(), acceleration.end(), 0.0);
   }
 
   // calculate when ego is going to reach each (interpolated) points on the path
@@ -952,10 +963,55 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
     const double dist = tier4_autoware_utils::calcDistance2d(p1, p2);
     dist_sum += dist;
 
-    // use average velocity between p1 and p2
-    const double average_velocity =
-      (p1.point.longitudinal_velocity_mps + p2.point.longitudinal_velocity_mps) / 2.0;
-    const double passing_velocity = [=]() {
+    const auto average_velocity = [&]() {
+      /*
+        use
+              ds
+        dt = ----
+              v0
+
+        , which is based on the approximation a = 0. If a > 0.0( < 0.0), dt is over-estimated
+        (under-estimated)
+       */
+      /*
+        use the optimized acceleration profile as well to precisely obtain time to travel p1-p2.
+        Suppose the acceleration is constant between p1-p2 and pickup some representative value a.
+        Then by solving
+
+        v1 * dt + (a/2) * dt^2 = ds = |p2 - p1|
+
+        for dt, we can calculate precise time to travel between p1-p2. The solution is
+
+                         2ds
+        dt = ---------------------------
+              sqrt(v0^2 + 2a * ds) + v0
+
+       */
+      const double v0 = p1.point.longitudinal_velocity_mps;
+      const double v_mid =
+        (p1.point.longitudinal_velocity_mps + p2.point.longitudinal_velocity_mps) / 2.0;
+      const double a0 = acceleration.at(i);
+      const double a_mid = (acceleration.at(i) + acceleration.at(i + 1)) / 2.0;
+      if (
+        planner_param_.collision_detection.velocity_profile.ego_ttc_method ==
+        PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_VELOCITY) {
+        return v0;
+      } else if (
+        planner_param_.collision_detection.velocity_profile.ego_ttc_method ==
+        PlannerParam::EgoTTCMethod::FIRST_ORDER_CENTRAL_VELOCITY) {
+        return v_mid;
+      } else if (
+        planner_param_.collision_detection.velocity_profile.ego_ttc_method ==
+        PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_ACCELERATION) {
+        return (std::sqrt(std::max(0.0, v0 * v0 + 2 * a0 * dist)) + v0) / 2.0;
+      } else if (
+        planner_param_.collision_detection.velocity_profile.ego_ttc_method ==
+        PlannerParam::EgoTTCMethod::FIRST_ORDER_CENTRAL_ACCELERATION) {
+        return (std::sqrt(std::max(0.0, v0 * v0 + 2 * a_mid * dist)) + v0) / 2.0;
+      }
+      return v0;
+    }();
+    const auto passing_velocity = [&]() {
       if (use_upstream_velocity) {
         if (upstream_stopline_idx_opt && i > upstream_stopline_idx_opt.value()) {
           return minimum_upstream_velocity;

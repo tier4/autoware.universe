@@ -101,6 +101,13 @@ public:
       double distance_threshold;
     } yield_stuck;
 
+    enum class EgoTTCMethod {
+      FIRST_ORDER_FORWARD_VELOCITY,
+      FIRST_ORDER_CENTRAL_VELOCITY,
+      FIRST_ORDER_FORWARD_ACCELERATION,
+      FIRST_ORDER_CENTRAL_ACCELERATION,
+    };
+
     struct CollisionDetection
     {
       bool consider_wrong_direction_vehicle;
@@ -113,6 +120,7 @@ public:
         double minimum_upstream_velocity;
         double default_velocity;
         double minimum_default_velocity;
+        EgoTTCMethod ego_ttc_method{EgoTTCMethod::FIRST_ORDER_FORWARD_VELOCITY};
       } velocity_profile;
       struct FullyPrioritized
       {

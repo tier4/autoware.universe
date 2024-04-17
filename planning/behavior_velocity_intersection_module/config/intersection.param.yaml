@@ -63,6 +63,7 @@
           bicycle: true
           unknown: false
         velocity_profile:
+          ego_ttc_method: "1st_order_forward_acceleration" # 1st_order_forward_velocity(default), 1st_order_central_velocity, 1st_order_central_acceleration
           use_upstream: true
           minimum_upstream_velocity: 0.01
           default_velocity: 2.778
@@ -76,7 +77,7 @@
         not_prioritized:
           collision_start_margin_time: 3.0
           collision_end_margin_time: 2.0
-          passthrough_distance_margin_for_preemptive_start: 10
+          passthrough_distance_margin_for_preemptive_start: 10.0
         yield_on_green_traffic_light:
           distance_to_assigned_lanelet_start: 10.0
           duration: 3.0
