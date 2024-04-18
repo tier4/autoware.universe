@@ -50,7 +50,7 @@ private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
   double intensity_threshold_;
-  double existance_probability_threshold_;
+  double existence_probability_threshold_;
   double max_x_;
   double min_x_;
   double max_y_;

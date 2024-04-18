@@ -1,7 +1,7 @@
 /**:
   ros__parameters:
     intensity_threshold: 1.0
-    existance_probability_threshold: 0.2
+    existence_probability_threshold: 0.2
     max_x: 60.0
     min_x: -20.0
     max_y: 20.0

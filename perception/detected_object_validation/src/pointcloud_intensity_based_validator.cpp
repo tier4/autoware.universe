@@ -26,7 +26,7 @@ IntensityBasedValidator::IntensityBasedValidator(const rclcpp::NodeOptions & nod
   tf_listener_(tf_buffer_)
 {
   intensity_threshold_ = declare_parameter<double>("intensity_threshold");
-  existance_probability_threshold_ = declare_parameter<double>("existance_probability_threshold");
+  existence_probability_threshold_ = declare_parameter<double>("existence_probability_threshold");
   max_x_ = declare_parameter<double>("max_x");
   min_x_ = declare_parameter<double>("min_x");
   max_y_ = declare_parameter<double>("max_y");
@@ -92,7 +92,7 @@ void IntensityBasedValidator::objectCallback(
       (min_y_ < pose_transformed.position.y && pose_transformed.position.y < max_y_);
     if (
       filter_target_.isTarget(label) && is_inside_validation_range &&
-      !isValidatedCluster(cluster) && existance_probability < existance_probability_threshold_) {
+      !isValidatedCluster(cluster) && existance_probability < existence_probability_threshold_) {
       continue;
     }
     output_object_msg.feature_objects.emplace_back(feature_object);
