@@ -122,6 +122,10 @@ class TTCVisualizer(Node):
         n_ttc_data = int(self.ego_ttc_data.layout.dim[1].size)
         ego_ttc_time = self.ego_ttc_data.data[n_ttc_data : 2 * n_ttc_data]
         ego_ttc_dist = self.ego_ttc_data.data[2 * n_ttc_data : 3 * n_ttc_data]
+        first_fwd_vel = self.ego_ttc_data.data[3 * n_ttc_data : 4 * n_ttc_data]
+        first_center_vel = self.ego_ttc_data.data[4 * n_ttc_data : 5 * n_ttc_data]
+        first_fwd_acc = self.ego_ttc_data.data[5 * n_ttc_data : 6 * n_ttc_data]
+        first_center_acc = self.ego_ttc_data.data[6 * n_ttc_data : 7 * n_ttc_data]
 
         self.ttc_ax.grid()
         self.ttc_ax.set_xlabel("ego time")
@@ -148,7 +152,42 @@ class TTCVisualizer(Node):
         self.ttc_vel_ax.set_ylabel("ego velocity")
         # self.ttc_vel_ax.set_ylim(0.0, max(v) + 1.0)
         time_velocity_plot = self.ttc_vel_ax.plot(ego_ttc_time[1:], v, label="time-v", c="red")
-        lines = time_dist_plot + time_velocity_plot
+        time_first_fwd_vel_plot = self.ttc_vel_ax.plot(
+            ego_ttc_time,
+            first_fwd_vel,
+            label="time-v(1st-order forward vel)",
+            c="green",
+            linestyle="dotted",
+        )
+        time_first_center_vel_plot = self.ttc_vel_ax.plot(
+            ego_ttc_time,
+            first_center_vel,
+            label="time-v(1st-order center vel)",
+            c="blue",
+            linestyle="dotted",
+        )
+        time_first_fwd_acc_plot = self.ttc_vel_ax.plot(
+            ego_ttc_time,
+            first_fwd_acc,
+            label="time-v(1st-order forward acc)",
+            c="orange",
+            linestyle="dotted",
+        )
+        time_first_center_acc_plot = self.ttc_vel_ax.plot(
+            ego_ttc_time,
+            first_center_acc,
+            label="time-v(1st-order center acc)",
+            c="red",
+            linestyle="dotted",
+        )
+        lines = (
+            time_dist_plot
+            + time_velocity_plot
+            + time_first_fwd_vel_plot
+            + time_first_center_vel_plot
+            + time_first_fwd_acc_plot
+            + time_first_center_acc_plot
+        )
         labels = [line.get_label() for line in lines]
         self.ttc_ax.legend(lines, labels, loc="upper left")
 
@@ -156,8 +195,8 @@ class TTCVisualizer(Node):
         detect_range = self.args.range
         self.world_ax.cla()
         n_ttc_data = int(self.ego_ttc_data.layout.dim[1].size)
-        ego_path_x = self.ego_ttc_data.data[3 * n_ttc_data : 4 * n_ttc_data]
-        ego_path_y = self.ego_ttc_data.data[4 * n_ttc_data : 5 * n_ttc_data]
+        ego_path_x = self.ego_ttc_data.data[7 * n_ttc_data : 8 * n_ttc_data]
+        ego_path_y = self.ego_ttc_data.data[8 * n_ttc_data : 9 * n_ttc_data]
         self.world_ax.set_aspect("equal")
         self.world_ax.scatter(ego_path_x[0], ego_path_y[0], marker="x", c="red", s=15)
         min_x, max_x = min(ego_path_x), max(ego_path_x)

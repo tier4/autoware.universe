@@ -956,6 +956,7 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
     }
   }();
 
+  std::vector<double> fwd_vel{0.0}, center_vel{0.0}, fwd_acc{0.0}, center_acc{0.0};
   for (size_t i = smoothed_path_closest_idx; i + 1 < smoothed_reference_path.points.size(); ++i) {
     const auto & p1 = smoothed_reference_path.points.at(i);
     const auto & p2 = smoothed_reference_path.points.at(i + 1);
@@ -992,6 +993,10 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
         (p1.point.longitudinal_velocity_mps + p2.point.longitudinal_velocity_mps) / 2.0;
       const double a0 = acceleration.at(i);
       const double a_mid = (acceleration.at(i) + acceleration.at(i + 1)) / 2.0;
+      fwd_vel.push_back(v0);
+      center_vel.push_back(v_mid);
+      fwd_acc.push_back((std::sqrt(std::max(0.0, v0 * v0 + 2 * a0 * dist)) + v0) / 2.0);
+      center_acc.push_back((std::sqrt(std::max(0.0, v0 * v0 + 2 * a_mid * dist)) + v0) / 2.0);
       if (
         planner_param_.collision_detection.velocity_profile.ego_ttc_method ==
         PlannerParam::EgoTTCMethod::FIRST_ORDER_FORWARD_VELOCITY) {
@@ -1027,8 +1032,10 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
   }
   ego_ttc_array->stamp = clock_->now();
   ego_ttc_array->layout.dim.resize(3);
-  ego_ttc_array->layout.dim.at(0).label = "lane_id_@[0][0], ttc_time, ttc_dist, path_x, path_y";
-  constexpr size_t ego_debug_size = 5;
+  ego_ttc_array->layout.dim.at(0).label =
+    "lane_id_@[0][0], ttc_time, 1st_fwd_vel, 1st_center_vel, 1st_fwd_acc, 1st_center_acc, "
+    "ttc_dist, path_x, path_y";
+  constexpr size_t ego_debug_size = 9;
   ego_ttc_array->layout.dim.at(0).size = ego_debug_size;
   ego_ttc_array->layout.dim.at(1).label = "values";
   ego_ttc_array->layout.dim.at(1).size = time_distance_array.size();
@@ -1041,6 +1048,18 @@ IntersectionModule::TimeDistanceArray IntersectionModule::calcIntersectionPassin
   }
   for (const auto & [t, d] : time_distance_array) {
     ego_ttc_array->data.push_back(d);
+  }
+  for (const auto & v : fwd_vel) {
+    ego_ttc_array->data.push_back(v);
+  }
+  for (const auto & v : center_vel) {
+    ego_ttc_array->data.push_back(v);
+  }
+  for (const auto & v : fwd_acc) {
+    ego_ttc_array->data.push_back(v);
+  }
+  for (const auto & v : center_acc) {
+    ego_ttc_array->data.push_back(v);
   }
   for (size_t i = smoothed_path_closest_idx; i < smoothed_reference_path.points.size(); ++i) {
     const auto & p = smoothed_reference_path.points.at(i).point.pose.position;
