@@ -96,7 +96,7 @@ struct SceneModuleStatus
 class PlannerManager
 {
 public:
-  PlannerManager(rclcpp::Node & node, const size_t max_iteration_num, const bool verbose);
+  PlannerManager(rclcpp::Node & node, const size_t max_iteration_num);
 
   /**
    * @brief run all candidate and approved modules.
@@ -474,8 +474,6 @@ private:
   mutable std::shared_ptr<SceneModuleVisitor> debug_msg_ptr_;
 
   size_t max_iteration_num_{100};
-
-  bool verbose_{false};
 };
 }  // namespace behavior_path_planner
 
