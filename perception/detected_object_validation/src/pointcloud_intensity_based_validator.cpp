@@ -70,26 +70,30 @@ void IntensityBasedValidator::objectCallback(
   geometry_msgs::msg::TransformStamped transform_stamp;
   try {
     transform_stamp = tf_buffer_.lookupTransform(
-      base_link_frame_id_, input_msg->header.frame_id, tf2_ros::fromMsg(input_msg->header.stamp));
-    // Eigen::Matrix4f affine_matrix =
-    // tf2::transformToEigen(transform_stamp.transform).matrix().cast<float>();
+      input_msg->header.frame_id, base_link_frame_id_, tf2_ros::fromMsg(input_msg->header.stamp));
   } catch (tf2::TransformException & ex) {
     RCLCPP_ERROR(get_logger(), "Failed to lookup transform: %s", ex.what());
     return;
   }
-  // TODO(badai-nguyen): transform validation range to map frame and use it to validate object
-
+  geometry_msgs::msg::Pose min_range;
+  min_range.position.x = min_x_;
+  min_range.position.y = min_y_;
+  geometry_msgs::msg::Pose max_pose;
+  max_pose.position.x = max_x_;
+  max_pose.position.y = max_y_;
+  auto min_ranged_transformed = tier4_autoware_utils::transformPose(min_range, transform_stamp);
+  auto max_range_transformed = tier4_autoware_utils::transformPose(max_pose, transform_stamp);
   for (const auto & feature_object : input_msg->feature_objects) {
-    auto const & object = feature_object.object;
-    auto const & label = object.classification.front().label;
-    auto const & feature = feature_object.feature;
-    auto const & cluster = feature.cluster;
-    auto existance_probability = object.existence_probability;
-    auto pose = object.kinematics.pose_with_covariance.pose;
-    auto pose_transformed = tier4_autoware_utils::transformPose(pose, transform_stamp);
-    bool is_inside_validation_range =
-      (min_x_ < pose_transformed.position.x && pose_transformed.position.x < max_x_) &&
-      (min_y_ < pose_transformed.position.y && pose_transformed.position.y < max_y_);
+    const auto & object = feature_object.object;
+    const auto & label = object.classification.front().label;
+    const auto & feature = feature_object.feature;
+    const auto & cluster = feature.cluster;
+    const auto existance_probability = object.existence_probability;
+    const auto & position = object.kinematics.pose_with_covariance.pose.position;
+    bool is_inside_validation_range = min_ranged_transformed.position.x < position.x &&
+                                      position.x < max_range_transformed.position.x &&
+                                      min_ranged_transformed.position.y < position.x &&
+                                      position.y < max_range_transformed.position.y;
     if (
       filter_target_.isTarget(label) && is_inside_validation_range &&
       !isValidatedCluster(cluster) && existance_probability < existence_probability_threshold_) {
@@ -112,7 +116,7 @@ bool IntensityBasedValidator::isValidatedCluster(const sensor_msgs::msg::PointCl
   double mean_intensity = 0.0;
   if (cluster.point_step < 16) {
     RCLCPP_WARN(get_logger(), "Invalid point cloud data. point_step is less than 16.");
-    return false;
+    return true;
   }
   for (sensor_msgs::PointCloud2ConstIterator<float> iter(cluster, "intensity"); iter != iter.end();
        ++iter) {
