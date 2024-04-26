@@ -112,7 +112,7 @@ PointCloudConcatenateDataSynchronizerComponent::PointCloudConcatenateDataSynchro
     // Check if publish synchronized pointcloud
     publish_synchronized_pointcloud_ = declare_parameter("publish_synchronized_pointcloud", false);
 
-    for_eval_ = declare_parameter("eval", true);
+    for_eval_ = declare_parameter("eval", false);
   }
 
   // Initialize not_subscribed_topic_names_
