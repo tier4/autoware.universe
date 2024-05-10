@@ -926,7 +926,7 @@ void PlannerManager::resetRootLanelet(const std::shared_ptr<PlannerData> & data)
 
   root_lanelet_ = root_lanelet;
 
-  RCLCPP_INFO_EXPRESSION(logger_, verbose_, "change ego's following lane. reset.");
+  RCLCPP_DEBUG(logger_, "change ego's following lane. reset.");
 }
 
 void PlannerManager::print() const
