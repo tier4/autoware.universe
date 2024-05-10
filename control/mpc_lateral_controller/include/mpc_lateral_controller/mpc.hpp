@@ -405,6 +405,7 @@ private:
   }
 
 public:
+  bool m_MPC_failed = false;  // Flag indicating if the MPC calculation (solver) failed.
   MPCTrajectory m_reference_trajectory;  // Reference trajectory to be followed.
   MPCParam m_param;                      // MPC design parameters.
   std::deque<double> m_input_buffer;     // MPC output buffer for delay time compensation.

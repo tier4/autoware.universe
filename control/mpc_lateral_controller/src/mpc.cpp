@@ -81,6 +81,7 @@ bool MPC::calculateMPC(
     mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
     current_kinematics.twist.twist.linear.x);
   if (!success_opt) {
+    m_MPC_failed = true;
     return fail_warn_throttle("optimization failed. Stop MPC.");
   }
 
