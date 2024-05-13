@@ -359,9 +359,9 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
   }
 
   // if not driving, disable aeb
-  if (autoware_state_->state != AutowareState::DRIVING) {
-    return false;
-  }
+  // if (autoware_state_->state != AutowareState::DRIVING) {
+  //   return false;
+  // }
 
   // step2. create velocity data check if the vehicle stops or not
   const double current_v = current_velocity_ptr_->longitudinal_velocity;
@@ -465,6 +465,7 @@ bool AEB::hasCollision(const double current_v, const ObjectData & closest_object
   const double & t = t_response_;
   const double rss_dist = current_v * t + (current_v * current_v) / (2 * std::fabs(a_ego_min_)) -
                           obj_v * obj_v / (2 * std::fabs(a_obj_min_)) + longitudinal_offset_;
+
   if (closest_object.distance_to_object < rss_dist) {
     // collision happens
     ObjectData collision_data = closest_object;
