@@ -29,10 +29,34 @@ using tier4_autoware_utils::calcDistance2d;
 using tier4_autoware_utils::normalizeRadian;
 using tier4_autoware_utils::rad2deg;
 
+void MPC::setStatus(
+  DiagnosticStatusWrapper & stat, const bool & m_MPC_failed)
+{
+  if (!m_MPC_failed) {
+    stat.summary(DiagnosticStatus::OK, "MPC succeeded.");
+  } else {
+    const std::string & error_msg = "The MPC solver failed. Call MRM to stop the car.";
+    stat.summary(DiagnosticStatus::ERROR, msg);
+  }
+}
+
+void MPC::setupDiag()
+{
+  auto & d = diag_updater_;
+  d.setHardwareID("mpc_lateral_controller");
+
+  d.add(ns + "MPC_solver_failed", [&](auto & stat) {
+    setStatus(
+      stat, m_MPC_failed);
+  });
+}
+
 MPC::MPC(rclcpp::Node & node)
 {
   m_debug_frenet_predicted_trajectory_pub = node.create_publisher<Trajectory>(
     "~/debug/predicted_trajectory_in_frenet_coordinate", rclcpp::QoS(1));
+  
+  setupDiag();
 }
 
 bool MPC::calculateMPC(
@@ -82,7 +106,11 @@ bool MPC::calculateMPC(
     current_kinematics.twist.twist.linear.x);
   if (!success_opt) {
     m_MPC_failed = true;
+    diag_updater_.force_update();
     return fail_warn_throttle("optimization failed. Stop MPC.");
+  } else {
+    m_MPC_failed = false;
+    diag_updater_.force_update();
   }
 
   // apply filters for the input limitation and low pass filter

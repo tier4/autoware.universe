@@ -221,6 +221,8 @@ private:
 
   double m_min_prediction_length = 5.0;  // Minimum prediction distance.
 
+  Updater diag_updater_{this};  // Diagnostic updater for publishing diagnostic data.
+
   rclcpp::Publisher<Trajectory>::SharedPtr m_debug_frenet_predicted_trajectory_pub;
   /**
    * @brief Get variables for MPC calculation.
@@ -431,6 +433,10 @@ public:
 
   //!< Constructor.
   explicit MPC(rclcpp::Node & node);
+
+  void setStatus(DiagnosticStatusWrapper & stat, const bool & m_MPC_failed);
+
+  void setupDiag();
 
   /**
    * @brief Calculate control command using the MPC algorithm.
