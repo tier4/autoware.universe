@@ -108,7 +108,8 @@ void AvoidanceByLaneChange::updateSpecialData()
                    : Direction::RIGHT;
   }
 
-  utils::avoidance::updateRegisteredObject(registered_objects_, avoidance_data_.target_objects, p);
+  utils::avoidance::updateRegisteredObject(
+    registered_objects_, avoidance_data_.target_objects, avoidance_data_.other_objects, p);
   utils::avoidance::compensateDetectionLost(
     registered_objects_, avoidance_data_.target_objects, avoidance_data_.other_objects);
 

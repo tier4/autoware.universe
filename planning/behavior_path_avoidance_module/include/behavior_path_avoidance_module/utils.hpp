@@ -118,7 +118,7 @@ void fillObjectStoppableJudge(
 
 void updateRegisteredObject(
   ObjectDataArray & registered_objects, const ObjectDataArray & now_objects,
-  const std::shared_ptr<AvoidanceParameters> & parameters);
+  const ObjectDataArray & other_objects, const std::shared_ptr<AvoidanceParameters> & parameters);
 
 void compensateDetectionLost(
   const ObjectDataArray & registered_objects, ObjectDataArray & now_objects,

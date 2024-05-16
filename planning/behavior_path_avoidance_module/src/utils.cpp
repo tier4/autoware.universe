@@ -1533,7 +1533,7 @@ void fillObjectStoppableJudge(
 
 void updateRegisteredObject(
   ObjectDataArray & registered_objects, const ObjectDataArray & now_objects,
-  const std::shared_ptr<AvoidanceParameters> & parameters)
+  const ObjectDataArray & other_objects, const std::shared_ptr<AvoidanceParameters> & parameters)
 {
   const auto updateIfDetectedNow = [&now_objects](auto & registered_object) {
     const auto & n = now_objects;
@@ -1563,25 +1563,38 @@ void updateRegisteredObject(
     return false;
   };
 
+  const auto isIgnoreObject = [&](const auto & r_id) {
+    const auto & n = other_objects;
+    return std::any_of(
+      n.begin(), n.end(), [&r_id](const auto & o) { return o.object.object_id == r_id; });
+  };
+
   const rclcpp::Time now = rclcpp::Clock(RCL_ROS_TIME).now();
 
   // -- check registered_objects, remove if lost_count exceeds limit. --
-  for (int i = static_cast<int>(registered_objects.size()) - 1; i >= 0; --i) {
-    auto & r = registered_objects.at(i);
-
-    // registered object is not detected this time. lost count up.
-    if (!updateIfDetectedNow(r)) {
-      r.lost_time = (now - r.last_seen).seconds();
+  const auto remove_old_object = [&](auto & object) {
+    if (!updateIfDetectedNow(object)) {
+      object.lost_time = (now - object.last_seen).seconds();
     } else {
-      r.last_seen = now;
-      r.lost_time = 0.0;
+      object.last_seen = now;
+      object.lost_time = 0.0;
     }
 
     // lost count exceeds threshold. remove object from register.
-    if (r.lost_time > parameters->object_last_seen_threshold) {
-      registered_objects.erase(registered_objects.begin() + i);
+    if (object.lost_time > parameters->object_last_seen_threshold) {
+      return true;
     }
-  }
+
+    if (isIgnoreObject(object.object.object_id)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  registered_objects.erase(
+    std::remove_if(registered_objects.begin(), registered_objects.end(), remove_old_object),
+    registered_objects.end());
 
   const auto isAlreadyRegistered = [&](const auto & n_id) {
     const auto & r = registered_objects;
