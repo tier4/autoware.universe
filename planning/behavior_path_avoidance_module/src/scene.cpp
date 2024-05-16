@@ -275,7 +275,8 @@ void AvoidanceModule::fillFundamentalData(AvoidancePlanningData & data, DebugDat
   fillAvoidanceTargetObjects(data, debug);
 
   // lost object compensation
-  utils::avoidance::updateRegisteredObject(registered_objects_, data.target_objects, parameters_);
+  utils::avoidance::updateRegisteredObject(
+    registered_objects_, data.target_objects, data.other_objects, parameters_);
   utils::avoidance::compensateDetectionLost(
     registered_objects_, data.target_objects, data.other_objects);
 
