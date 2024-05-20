@@ -16,6 +16,7 @@
 #define BEHAVIOR_PATH_AVOIDANCE_MODULE__UTILS_HPP_
 
 #include "behavior_path_avoidance_module/data_structs.hpp"
+#include "behavior_path_avoidance_module/type_alias.hpp"
 #include "behavior_path_planner_common/data_manager.hpp"
 #include "behavior_path_planner_common/utils/path_safety_checker/path_safety_checker_parameters.hpp"
 

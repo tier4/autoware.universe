@@ -2448,7 +2448,7 @@ TurnSignalInfo calcTurnSignalInfo(
   const auto signal_prepare_distance =
     std::max(ego_speed * p.turn_signal_search_time, p.turn_signal_minimum_search_distance);
   const auto ego_front_to_shift_start =
-    calcSignedArcLength(path.path.points, ego_pose.position, shift_line.start_idx) -
+    motion_utils::calcSignedArcLength(path.path.points, ego_pose.position, shift_line.start_idx) -
     p.vehicle_info.max_longitudinal_offset_m;
 
   if (signal_prepare_distance < ego_front_to_shift_start) {
