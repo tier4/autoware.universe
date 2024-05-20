@@ -2441,7 +2441,7 @@ double calcDistanceToReturnDeadLine(
 
   // dead line stop factor(traffic jam)
   if (parameters->enable_dead_line_for_traffic_jam && !other_objects.empty()) {
-    if (filtering_utils::isOnEgoLane(other_objects.front())) {
+    if (filtering_utils::isOnEgoLane(other_objects.front(), planner_data->route_handler)) {
       distance_to_return_dead_line = std::min(
         distance_to_return_dead_line,
         other_objects.front().longitudinal - parameters->dead_line_buffer_for_traffic_jam);
