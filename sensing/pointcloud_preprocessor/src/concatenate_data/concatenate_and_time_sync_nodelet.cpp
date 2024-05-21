@@ -691,10 +691,15 @@ void PointCloudConcatenateDataSynchronizerComponent::checkConcatStatus(
     const std::string subscribe_status = not_subscribed_topic_names_.count(e) ? "NG" : "OK";
     stat.add(e, subscribe_status);
   }
+  // RCLCPP_INFO(this->get_logger(), "The size of not_subscribed_topic_names is: %ld", not_subscribed_topic_names_.size());
 
-  const int8_t level = not_subscribed_topic_names_.empty()
-                         ? diagnostic_msgs::msg::DiagnosticStatus::OK
-                         : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+  // const int8_t level = not_subscribed_topic_names_.empty()
+  //                        ? diagnostic_msgs::msg::DiagnosticStatus::OK
+  //                        : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+  const int8_t level = not_subscribed_topic_names_.size() < 7
+    ? diagnostic_msgs::msg::DiagnosticStatus::OK
+    : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+
   const std::string message = not_subscribed_topic_names_.empty()
                                 ? "Concatenate all topics"
                                 : "Some topics are not concatenated";
