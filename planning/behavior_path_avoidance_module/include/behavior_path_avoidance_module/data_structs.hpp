@@ -42,6 +42,7 @@ enum class ObjectInfo {
   NONE = 0,
   // ignore reasons
   OUT_OF_TARGET_AREA,
+  HUGE_COVARIANCE,
   FURTHER_THAN_THRESHOLD,
   FURTHER_THAN_GOAL,
   IS_NOT_TARGET_OBJECT,
@@ -220,6 +221,9 @@ struct AvoidanceParameters
 
   // parameters for collision check.
   bool check_all_predicted_path{false};
+
+  // filtering unstable detection result
+  double th_error_eclipse_long_radius{0.0};
 
   // find adjacent lane vehicles
   double safety_check_backward_distance{0.0};

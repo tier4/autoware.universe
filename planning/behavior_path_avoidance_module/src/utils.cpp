@@ -21,6 +21,7 @@
 #include "behavior_path_planner_common/utils/path_utils.hpp"
 #include "behavior_path_planner_common/utils/traffic_light_utils.hpp"
 
+#include <Eigen/Dense>
 #include <lanelet2_extension/utility/message_conversion.hpp>
 
 #include <boost/geometry/algorithms/buffer.hpp>
@@ -429,6 +430,24 @@ bool isWithinIntersection(
     object_polygon, utils::toPolygon2d(lanelet::utils::to2D(polygon.basicPolygon())));
 }
 
+bool hasHugePoseCovariance(
+  const PoseWithCovariance & pose, const std::shared_ptr<AvoidanceParameters> & parameters)
+{
+  // create xy covariance (2x2 matrix)
+  // input geometry_msgs::PoseWithCovariance contain 6x6 matrix
+  Eigen::Matrix2d xy_covariance;
+  const auto cov = pose.covariance;
+  xy_covariance(0, 0) = cov[0 * 6 + 0];
+  xy_covariance(0, 1) = cov[0 * 6 + 1];
+  xy_covariance(1, 0) = cov[1 * 6 + 0];
+  xy_covariance(1, 1) = cov[1 * 6 + 1];
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigensolver(xy_covariance);
+
+  // eigen values and vectors are sorted in ascending order
+  return std::sqrt(eigensolver.eigenvalues()(1)) > parameters->th_error_eclipse_long_radius;
+}
+
 bool isOnEgoLane(const ObjectData & object, const std::shared_ptr<RouteHandler> & route_handler)
 {
   const auto & object_pos = object.object.kinematics.initial_pose_with_covariance.pose.position;
@@ -826,6 +845,12 @@ bool isSatisfiedWithCommonCondition(
   // Step2. filtered stopped objects.
   if (filtering_utils::isMovingObject(object, parameters)) {
     object.info = ObjectInfo::MOVING_OBJECT;
+    return false;
+  }
+
+  if (filtering_utils::hasHugePoseCovariance(
+        object.object.kinematics.initial_pose_with_covariance, parameters)) {
+    object.info = ObjectInfo::HUGE_COVARIANCE;
     return false;
   }
 

@@ -103,6 +103,8 @@ void AvoidanceModuleManager::updateModuleParams(const std::vector<rclcpp::Parame
     updateParam<double>(
       parameters, ns + "object_check_return_pose_distance", p->object_check_return_pose_distance);
     updateParam<double>(parameters, ns + "max_compensation_time", p->object_last_seen_threshold);
+    updateParam<double>(
+      parameters, ns + "th_error_eclipse_long_radius", p->th_error_eclipse_long_radius);
   }
 
   {

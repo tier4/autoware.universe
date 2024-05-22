@@ -118,6 +118,8 @@
         object_check_return_pose_distance: 20.0         # [m]
         # lost object compensation
         max_compensation_time: 2.0
+        # filtering unstable detection result
+        th_error_eclipse_long_radius: 2.0               # [m]
 
         # detection area generation parameters
         detection_area:
