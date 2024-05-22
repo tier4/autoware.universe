@@ -119,6 +119,8 @@ AvoidanceParameters getParameter(rclcpp::Node * node)
       getOrDeclareParameter<double>(*node, ns + "intersection.yaw_deviation");
     p.object_last_seen_threshold =
       getOrDeclareParameter<double>(*node, ns + "max_compensation_time");
+    p.th_error_eclipse_long_radius =
+      getOrDeclareParameter<double>(*node, ns + "th_error_eclipse_long_radius");
   }
 
   {
