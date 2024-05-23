@@ -34,7 +34,7 @@ class DiagnosticPublisher(Node):
         self.key_thread.daemon = True
         self.key_thread.start()
 
-        timer_period = 1.0  # seconds
+        timer_period = 0.1  # seconds
         self.timer = self.create_timer(timer_period, self.publish_diagnostics)
 
     def key_listener(self):
