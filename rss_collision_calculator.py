@@ -26,12 +26,12 @@ def calculate_collision_with_rss(ego_params: Params, front_vehicle_params: Param
 
 
 # Set the parameters for front and rear vehicles
-front_vehicle_params = Params(pos=30, speed=10, reaction_time=1.5, accel=-2.0)
-rear_vehicle_params = Params(pos=-30, speed=10, reaction_time=1.5, accel=-2.0)
+front_vehicle_params = Params(pos=30, speed=10, reaction_time=1.0, accel=-3.0)
+rear_vehicle_params = Params(pos=-30, speed=10, reaction_time=1.0, accel=-3.0)
 
 # Generate the data for the table
 speeds = np.arange(1, 31)  # 1 m/s to 30 m/s
-accelerations = np.linspace(-0.5, -10, 20)  # -0.5 m/s² to -10 m/s²
+accelerations = np.linspace(-1.0, -10, 19)  # -1.0 m/s² to -10 m/s²
 
 collision_table = pd.DataFrame(index=accelerations, columns=speeds)
 
