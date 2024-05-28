@@ -82,10 +82,10 @@ def save_to_excel_with_colors_and_params(collision_table, file_name, ego_params,
 
 
 def main(args):
-    front_vehicle_params = Params(pos=30, speed=args.speed if args.use_same_speed else 10,
-                                  reaction_time=1.0, accel=args.acceleration if args.use_same_acceleration else -3.0, length=5)
-    rear_vehicle_params = Params(pos=-30, speed=args.speed if args.use_same_speed else 10,
-                                 reaction_time=1.0, accel=args.acceleration if args.use_same_acceleration else -3.0, length=5)
+    front_vehicle_params = Params(pos=30, speed=10,
+                                  reaction_time=1.0, accel=-3.0, length=5)
+    rear_vehicle_params = Params(pos=-30, speed=10,
+                                 reaction_time=1.0, accel=-3.0, length=5)
 
     speeds = np.arange(1, 31)  # 1 m/s to 30 m/s
     accelerations = np.linspace(-1.0, -10, 19)  # -1.0 m/s² to -10 m/s²
@@ -95,6 +95,14 @@ def main(args):
 
     for speed in speeds:
         for accel in accelerations:
+            if args.use_same_speed:
+                front_vehicle_params.speed = speed
+                rear_vehicle_params.speed = speed
+
+            if args.use_same_acceleration:
+                front_vehicle_params.accel = accel
+                rear_vehicle_params.accel = accel
+
             ego_params = Params(pos=0, speed=speed, reaction_time=1.5, accel=accel, length=5)
             is_front_collision, is_rear_collision = calculate_collision_with_rss(
                 ego_params, front_vehicle_params, rear_vehicle_params)
