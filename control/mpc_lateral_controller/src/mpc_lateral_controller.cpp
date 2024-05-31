@@ -242,6 +242,7 @@ trajectory_follower::LateralOutput MpcLateralController::run(
   const bool is_under_control = input_data.current_operation_mode.is_autoware_control_enabled &&
                                 input_data.current_operation_mode.mode ==
                                   autoware_adapi_v1_msgs::msg::OperationModeState::AUTONOMOUS;
+  RCLCPP_INFO(logger_, "is_under_control: %s", is_under_control ? "True" : "False");
 
   if (!m_is_ctrl_cmd_prev_initialized || !is_under_control) {
     m_ctrl_cmd_prev = getInitialControlCommand();
@@ -271,7 +272,7 @@ trajectory_follower::LateralOutput MpcLateralController::run(
 
   publishPredictedTraj(predicted_traj);
   publishDebugValues(debug_values);
-
+  RCLCPP_INFO_STREAM(logger_, __func__);
   const auto createLateralOutput = [this](const auto & cmd, const bool is_mpc_solved) {
     trajectory_follower::LateralOutput output;
     output.control_cmd = createCtrlCmdMsg(cmd);
@@ -280,13 +281,15 @@ trajectory_follower::LateralOutput MpcLateralController::run(
     // 1. At the last loop, mpc should be solved because command should be optimized output.
     // 2. The mpc should be converged.
     // 3. The steer angle should be converged.
+
     output.sync_data.is_steer_converged =
       is_mpc_solved && isMpcConverged() && isSteerConverged(cmd);
-
+    RCLCPP_INFO(logger_, "is_steer_converged: %s", output.sync_data.is_steer_converged ? "True" : "False");
     return output;
   };
 
   if (isStoppedState()) {
+    RCLCPP_INFO(logger_, "isStoppedState is True");
     // Reset input buffer
     for (auto & value : m_mpc.m_input_buffer) {
       value = m_ctrl_cmd_prev.steering_tire_angle;
@@ -302,6 +305,7 @@ trajectory_follower::LateralOutput MpcLateralController::run(
   }
 
   m_ctrl_cmd_prev = ctrl_cmd;
+  RCLCPP_INFO(logger_, "return");
   return createLateralOutput(ctrl_cmd, is_mpc_solved);
 }
 
@@ -314,9 +318,13 @@ bool MpcLateralController::isSteerConverged(const AckermannLateralCommand & cmd)
     return false;
   }
 
+  const auto dt = std::abs(cmd.steering_tire_angle - m_current_steering.steering_tire_angle);
+
   const bool is_converged =
-    std::abs(cmd.steering_tire_angle - m_current_steering.steering_tire_angle) <
+    dt <
     static_cast<float>(m_converged_steer_rad);
+
+  RCLCPP_INFO(logger_, "diff: %lf, thresh: %lf", dt, m_converged_steer_rad);
 
   return is_converged;
 }
@@ -412,6 +420,7 @@ bool MpcLateralController::isStoppedState() const
   const double target_vel = m_current_trajectory.points.at(nearest).longitudinal_velocity_mps;
 
   const auto latest_published_cmd = m_ctrl_cmd_prev;  // use prev_cmd as a latest published command
+  RCLCPP_INFO_STREAM(logger_, __func__);
   if (m_keep_steer_control_until_converged && !isSteerConverged(latest_published_cmd)) {
     return false;  // not stopState: keep control
   }
