@@ -317,10 +317,10 @@ bool AEB::fetchLatestData()
     return missing("control predicted trajectory");
   }
 
-  autoware_state_ = sub_autoware_state_.takeData();
-  if (!autoware_state_) {
-    return missing("autoware_state");
-  }
+  // autoware_state_ = sub_autoware_state_.takeData();
+  // if (!autoware_state_) {
+  //   return missing("autoware_state");
+  // }
 
   return true;
 }
