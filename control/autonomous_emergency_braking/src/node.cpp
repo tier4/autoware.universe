@@ -329,9 +329,9 @@ bool AEB::isDataReady()
     return missing("control predicted trajectory");
   }
 
-  if (!autoware_state_) {
-    return missing("autoware_state");
-  }
+  // if (!autoware_state_) {
+  //   return missing("autoware_state");
+  // }
 
   return true;
 }
@@ -370,9 +370,9 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
   }
 
   // if not driving, disable aeb
-  if (autoware_state_->state != AutowareState::DRIVING) {
-    return false;
-  }
+  // if (autoware_state_->state != AutowareState::DRIVING) {
+  //   return false;
+  // }
 
   // step2. create velocity data check if the vehicle stops or not
   const double current_v = current_velocity_ptr_->longitudinal_velocity;
