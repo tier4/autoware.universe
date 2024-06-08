@@ -16,11 +16,11 @@
 
     # filtering
     ## 1. distance based filtering: remove closer objects than this threshold
-    use_distance_based_noise_filtering: true
+    use_distance_based_noise_filtering: false
     minimum_range_threshold: 60.0 # [m]
 
     ## 2. lanelet map based filtering
-    use_map_based_noise_filtering: true
+    use_map_based_noise_filtering: false
     max_distance_from_lane: 5.0 # [m]
     max_angle_diff_from_lane: 0.785398 # [rad] (45 deg)
     max_lateral_velocity: 7.0 # [m/s]

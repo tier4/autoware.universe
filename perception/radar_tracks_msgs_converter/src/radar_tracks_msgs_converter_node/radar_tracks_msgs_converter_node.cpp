@@ -200,6 +200,12 @@ TrackedObjects RadarTracksMsgsConverterNode::convertRadarTrackToTrackedObjects()
   using POSE_IDX = tier4_autoware_utils::xyzrpy_covariance_index::XYZRPY_COV_IDX;
   using RADAR_IDX = tier4_autoware_utils::xyz_upper_covariance_index::XYZ_UPPER_COV_IDX;
 
+    if (transform_ == nullptr) {
+      RCLCPP_ERROR_THROTTLE(
+        get_logger(), *get_clock(), 5000, "getTransform failed. radar output will be empty.");
+      return tracked_objects;
+    }
+
   for (auto & radar_track : radar_data_->tracks) {
     TrackedObject tracked_object;
 

@@ -32,7 +32,7 @@
 
 namespace centerpoint
 {
-static constexpr size_t CAPACITY_POINT = 1000000;
+static constexpr size_t CAPACITY_POINT = 3000000; // Increased to avoid out of range exception
 
 class NetworkParam
 {
