@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "autoware_autonomous_emergency_braking/node.hpp"
+#include "node.hpp"
 
 #include <pcl_ros/transforms.hpp>
 #include <tier4_autoware_utils/geometry/boost_geometry.hpp>
@@ -35,6 +35,8 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/convex_hull.h>
 #include <tf2/utils.h>
+
+#include <tuple>
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
