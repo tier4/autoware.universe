@@ -33,7 +33,7 @@
 namespace control_diagnostics
 {
 
-using autoware_planning_msgs::msg::Trajectory;
+using autoware_auto_planning_msgs::msg::Trajectory;
 using diagnostic_msgs::msg::DiagnosticArray;
 using diagnostic_msgs::msg::DiagnosticStatus;
 using geometry_msgs::msg::Point;

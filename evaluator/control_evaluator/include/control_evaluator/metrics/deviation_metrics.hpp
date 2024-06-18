@@ -15,14 +15,14 @@
 #ifndef CONTROL_EVALUATOR__METRICS__DEVIATION_METRICS_HPP_
 #define CONTROL_EVALUATOR__METRICS__DEVIATION_METRICS_HPP_
 
-#include <autoware_planning_msgs/msg/trajectory.hpp>
-#include <autoware_planning_msgs/msg/trajectory_point.hpp>
+#include <autoware_auto_planning_msgs/msg/trajectory.hpp>
+#include <autoware_auto_planning_msgs/msg/trajectory_point.hpp>
 
 namespace control_diagnostics
 {
 namespace metrics
 {
-using autoware_planning_msgs::msg::Trajectory;
+using autoware_auto_planning_msgs::msg::Trajectory;
 using geometry_msgs::msg::Point;
 using geometry_msgs::msg::Pose;
 

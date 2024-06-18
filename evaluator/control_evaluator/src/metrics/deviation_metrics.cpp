@@ -22,7 +22,7 @@ namespace control_diagnostics
 {
 namespace metrics
 {
-using autoware_planning_msgs::msg::Trajectory;
+using autoware_auto_planning_msgs::msg::Trajectory;
 
 double calcLateralDeviation(const Trajectory & traj, const Point & point)
 {
