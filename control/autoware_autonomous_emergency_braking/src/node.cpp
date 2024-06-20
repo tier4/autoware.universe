@@ -357,10 +357,10 @@ bool AEB::fetchLatestData()
     return missing("control predicted trajectory");
   }
 
-  autoware_state_ = sub_autoware_state_.takeData();
-  if (!autoware_state_) {
-    return missing("autoware_state");
-  }
+  // autoware_state_ = sub_autoware_state_.takeData();
+  // if (!autoware_state_) {
+  //   return missing("autoware_state");
+  // }
 
   return true;
 }
@@ -399,9 +399,9 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
   }
 
   // if not driving, disable aeb
-  if (autoware_state_->state != AutowareState::DRIVING) {
-    return false;
-  }
+  // if (autoware_state_->state != AutowareState::DRIVING) {
+  //   return false;
+  // }
 
   // step2. create velocity data check if the vehicle stops or not
   constexpr double min_moving_velocity_th{0.1};
