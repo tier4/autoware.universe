@@ -85,6 +85,8 @@ MpcLateralController::MpcLateralController(rclcpp::Node & node)
       steer_rate_lim_dps_list_by_curvature.at(i) * deg2rad);
   }
 
+  m_mpc->m_physical_steer_rate_lim = dp_double("physical_steer_rate_lim");
+
   // steer rate limit depending on velocity
   const auto steer_rate_lim_dps_list_by_velocity =
     node.declare_parameter<std::vector<double>>("steer_rate_lim_dps_list_by_velocity");
