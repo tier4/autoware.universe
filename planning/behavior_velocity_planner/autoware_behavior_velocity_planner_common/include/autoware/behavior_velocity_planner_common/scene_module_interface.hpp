@@ -106,7 +106,7 @@ public:
     infrastructure_command_ = command;
   }
 
-  std::optional<int> getFirstStopPathPointIndex() { return first_stop_path_point_index_; }
+  std::optional<PathPointWithLaneId> getFirstStopPathPointIndex() { return first_stop_path_point_; }
 
   void setActivation(const bool activated) { activated_ = activated; }
   void setRTCEnabled(const bool enable_rtc) { rtc_enabled_ = enable_rtc; }
@@ -129,7 +129,7 @@ protected:
   rclcpp::Clock::SharedPtr clock_;
   std::shared_ptr<const PlannerData> planner_data_;
   std::optional<tier4_v2x_msgs::msg::InfrastructureCommand> infrastructure_command_;
-  std::optional<int> first_stop_path_point_index_;
+  std::optional<PathPointWithLaneId> first_stop_path_point_;
   autoware_motion_utils::VelocityFactorInterface velocity_factor_;
   std::vector<ObjectOfInterest> objects_of_interest_;
 

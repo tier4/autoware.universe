@@ -107,7 +107,9 @@ void SceneModuleManagerInterface::modifyPathVelocity(
   tier4_v2x_msgs::msg::InfrastructureCommandArray infrastructure_command_array;
   infrastructure_command_array.stamp = clock_->now();
 
-  first_stop_path_point_index_ = static_cast<int>(path->points.size()) - 1;
+  first_stop_path_point_ = path->points.back();
+  double min_stop_path_point_length =
+    autoware_motion_utils::calcSignedArcLength(path->points, first_stop_path_point_.point.pose);
   for (const auto & scene_module : scene_modules_) {
     tier4_planning_msgs::msg::StopReason stop_reason;
     scene_module->resetVelocityFactor();
@@ -127,8 +129,13 @@ void SceneModuleManagerInterface::modifyPathVelocity(
       infrastructure_command_array.commands.push_back(*command);
     }
 
-    if (scene_module->getFirstStopPathPointIndex() < first_stop_path_point_index_) {
-      first_stop_path_point_index_ = scene_module->getFirstStopPathPointIndex();
+    if (scene_module->getFirstStopPathPoint()) {
+      const auto stop_path_point_length = autoware_motion_utils::calcSignedArcLength(
+        path->points, scene_module->getFirstStopPathPoint().value());
+      if (stop_path_point_length < min_stop_path_point_length) {
+        first_stop_path_point_ = scene_module->getFirstStopPathPoint().value();
+        min_stop_path_point_length = stop_path_point_length;
+      }
     }
 
     for (const auto & marker : scene_module->createDebugMarkerArray().markers) {
