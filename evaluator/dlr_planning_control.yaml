@@ -10,12 +10,12 @@ name: aeb  # crosswalk, obstacle_cruise_planner....
 
 name: crosswalk
   - key: decision
-    value: 'none' # or条件。いずれかのcrosswalkが'deceleration'の場合は'deceleration'。すべてnoneならnone。
+    value: 'none' # 複数ある場合は一番近いの計算して送る
 
 name: ... # その他色んなモジュールがdecisionを出す。
 
 # 現在のvel, acc, jerkもだす
-# planning/control evaluatorどちらから出すべき?planning/controlをまとめて評価してもらうとしてcontrol_evaluatorから出す?
+# planning/control evaluatorどちらから出すべき
 name: kinematic_state
   - key: vel
     value:
