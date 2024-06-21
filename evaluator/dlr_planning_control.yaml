@@ -92,9 +92,14 @@ name: kinematic_state
           jerk_max: -0
 #----------
 
+# 室岡初期案
+#https://github.com/tier4/driving_log_replayer/commit/89b0e3441211f6777c44d43604cfc08b75f2c80d
 
-
-# https://github.com/tier4/driving_log_replayer/pull/464/files 現状仕様
+# 現実装
+# https://github.com/tier4/driving_log_replayer/pull/464/files
+  Conditions:
+    Hertz: 10.0 # metricsが何Hzで来るか。 (現在時刻-評価開始時刻)* Hertz * AllowableRate(=0.95)以上条件に合致するtopicが出力される必要がある。低レートは弾かれる。AllowableRateは一旦固定
+    ControlConditions:
       - TimeRange: { start: 1709009638.3, end: 1709009639.3 } # 評価開始時間と終了時刻、endは省略可能で省略した場合はsys.float_info.max
         Module: "autonomous_emergency_braking: aeb_emergency_stop" # 評価対象のモジュール
         Value0Key: decision # 評価対象のキー
