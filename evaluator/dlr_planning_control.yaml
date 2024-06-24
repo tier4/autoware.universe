@@ -23,6 +23,12 @@ name: kinematic_state
     value:
   - key: jerk
     value:
+  - key: lane_id
+    value:
+  - key: s
+    value:
+  - key: t
+    value:
 #----------
 
 #----------
