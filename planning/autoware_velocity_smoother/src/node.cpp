@@ -62,9 +62,9 @@ VelocitySmootherNode::VelocitySmootherNode(const rclcpp::NodeOptions & node_opti
 
   srv_force_acceleration_ = create_service<SetBool>(
     "~/adjust_common_param",
-    std::bind(&MotionVelocitySmootherNode::onForceAcceleration, this, _1, _2));
+    std::bind(&VelocitySmootherNode::onForceAcceleration, this, _1, _2));
   srv_slow_driving_ = create_service<SetBool>(
-    "~/slow_driving", std::bind(&MotionVelocitySmootherNode::onSlowDriving, this, _1, _2));
+    "~/slow_driving", std::bind(&VelocitySmootherNode::onSlowDriving, this, _1, _2));
   force_acceleration_mode_ = false;
 
   // parameter update
@@ -1116,7 +1116,7 @@ TrajectoryPoint VelocitySmootherNode::calcProjectedTrajectoryPointFromEgo(
 }
 
 
-void MotionVelocitySmootherNode::onForceAcceleration(
+void VelocitySmootherNode::onForceAcceleration(
   const std::shared_ptr<SetBool::Request> request, std::shared_ptr<SetBool::Response> response)
 {
   std::string message = "default";
@@ -1148,7 +1148,7 @@ void MotionVelocitySmootherNode::onForceAcceleration(
   response->success = true;
 }
 
-void MotionVelocitySmootherNode::onSlowDriving(
+void VelocitySmootherNode::onSlowDriving(
   const std::shared_ptr<SetBool::Request> request, std::shared_ptr<SetBool::Response> response)
 {
   const std::string message = request->data ? "Slow driving" : "Default";
