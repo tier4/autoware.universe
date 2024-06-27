@@ -678,7 +678,8 @@ bool NormalLaneChange::hasFinishedLaneChange() const
     const auto lanes_polygon = utils::lane_change::createPolygon(
       status_.target_lanes, 0.0, std::numeric_limits<double>::max());
     return !boost::geometry::disjoint(
-      lanes_polygon, lanelet::utils::conversion::toLaneletPoint(current_pose.position));
+      utils::toPolygon2d(lanes_polygon.value()),
+      lanelet::utils::to2D(lanelet::utils::conversion::toLaneletPoint(current_pose.position)));
   }
 
   const auto arc_length = lanelet::utils::getArcCoordinates(status_.target_lanes, current_pose);
