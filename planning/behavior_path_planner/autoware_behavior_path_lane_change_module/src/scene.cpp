@@ -36,6 +36,52 @@
 #include <utility>
 #include <vector>
 
+// clang-format off
+namespace {
+std::vector<std::string> split(const std::string &s, char delimiter) {
+  std::vector<std::string> tokens; std::string token; int p = 0;
+  for (char c : s) {
+    if (c == '(') p++; else if (c == ')') p--;
+    if (c == delimiter && p == 0) { tokens.push_back(token); token.clear(); } else token += c;
+  }
+  if (!token.empty()) tokens.push_back(token);
+  return tokens;
+}
+
+template <typename T> void view(const std::string &n, T e) { std::cerr << n << ": " << e << ", "; }
+template <typename T> void view(const std::string &n, const std::vector<T> &v) { std::cerr << n << ":"; for (const auto &e : v) std::cerr << " " << e; std::cerr << ", "; }
+template <typename First, typename... Rest> void view_multi(const std::vector<std::string> &n, First f, Rest... r) { view(n[0], f); if constexpr (sizeof...(r) > 0) view_multi(std::vector<std::string>(n.begin() + 1, n.end()), r...); }
+
+template <typename... Args> void debug_helper(
+  const char *file, const char *func, int line, const char *n, Args... a) {
+  std::cerr << file << " " << func << ": " << line << ", "; auto nl = split(n, ',');
+  for (auto &nn : nl) { nn.erase(nn.begin(), std::find_if(nn.begin(), nn.end(), [](int ch) { return !std::isspace(ch); })); nn.erase(std::find_if(nn.rbegin(), nn.rend(), [](int ch) { return !std::isspace(ch); }).base(), nn.end()); }
+  view_multi(nl, a...); std::cerr << std::endl;
+}
+
+#define debug(...) debug_helper(__FILE__, __func__, __LINE__, #__VA_ARGS__, __VA_ARGS__)
+#define line() { std::cerr << "(" << __FILE__ << ") " << __func__ << ": " << __LINE__ << std::endl; }
+
+bool hasStopPoint(const tier4_planning_msgs::msg::PathWithLaneId &path) {
+  constexpr double stop_point_threshold = 0.01;
+  const size_t num_points = path.points.size();
+  for (size_t i = 0; i < num_points-1; ++i) {
+    if (path.points[i].point.longitudinal_velocity_mps < stop_point_threshold){
+      std::cerr << __FILE__ << " stop point found at " << i << " / " << num_points << std::endl;
+    return true;
+    }
+  }
+  if(path.points[num_points-1].point.longitudinal_velocity_mps < stop_point_threshold){
+    std::cerr << __FILE__ << " stop point found at terminal point " << num_points << std::endl;
+    return false;
+  }
+  return false;
+}
+
+}// namespace
+// clang-format on
+
+
 namespace autoware::behavior_path_planner
 {
 using autoware::motion_utils::calcSignedArcLength;
@@ -271,14 +317,11 @@ BehaviorModuleOutput NormalLaneChange::generateOutput()
   auto output = prev_module_output_;
   if (isAbortState() && abort_path_) {
     output.path = abort_path_->path;
+    line();
     insertStopPoint(status_.current_lanes, output.path);
   } else {
     output.path = getLaneChangePath().path;
 
-    const auto found_extended_path = extendPath();
-    if (found_extended_path) {
-      output.path = utils::combinePath(output.path, *found_extended_path);
-    }
     output.reference_path = getReferencePath();
     output.turn_signal_info = updateOutputTurnSignal();
 
@@ -288,13 +331,20 @@ BehaviorModuleOutput NormalLaneChange::generateOutput()
         output.path.points, output.path.points.front().point.pose.position, getEgoPosition());
       const auto stop_dist =
         -(current_velocity * current_velocity / (2.0 * planner_data_->parameters.min_acc));
+      debug(stop_dist, current_dist);
       const auto stop_point = utils::insertStopPoint(stop_dist + current_dist, output.path);
       setStopPose(stop_point.point.pose);
     } else {
+      line();
       insertStopPoint(status_.target_lanes, output.path);
     }
   }
 
+  const auto found_extended_path = extendPath();
+  if (found_extended_path) {
+    line();
+    output.path = utils::combinePath(output.path, *found_extended_path);
+  }
   extendOutputDrivableArea(output);
 
   const auto current_seg_idx = planner_data_->findEgoSegmentIndex(output.path.points);
@@ -351,8 +401,10 @@ void NormalLaneChange::insertStopPoint(
   if (route_handler->isInGoalRouteSection(lanelets.back())) {
     const auto goal = route_handler->getGoalPose();
     distance_to_terminal = getDistanceAlongLanelet(goal);
+    debug(distance_to_terminal);
   } else {
     distance_to_terminal = utils::getDistanceToEndOfLane(path.points.front().point.pose, lanelets);
+    debug(distance_to_terminal);
   }
 
   const double stop_point_buffer = lane_change_parameters_->backward_length_buffer_for_end_of_lane;
@@ -370,6 +422,7 @@ void NormalLaneChange::insertStopPoint(
   });
 
   if (!is_valid_start_point) {
+    debug(stopping_distance);
     const auto stop_point = utils::insertStopPoint(stopping_distance, path);
     setStopPose(stop_point.point.pose);
 
@@ -411,6 +464,8 @@ void NormalLaneChange::insertStopPoint(
     }
     return distance_to_obj;
   }();
+
+  debug(distance_to_ego_lane_obj);
 
   // Need to stop before blocking obstacle
   if (distance_to_ego_lane_obj < distance_to_terminal) {
@@ -461,6 +516,7 @@ void NormalLaneChange::insertStopPoint(
   }
 
   if (stopping_distance > 0.0) {
+    debug(stopping_distance);
     const auto stop_point = utils::insertStopPoint(stopping_distance, path);
     setStopPose(stop_point.point.pose);
   }

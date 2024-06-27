@@ -34,6 +34,51 @@
 #include <string>
 #include <vector>
 
+// clang-format off
+namespace {
+std::vector<std::string> split(const std::string &s, char delimiter) {
+  std::vector<std::string> tokens; std::string token; int p = 0;
+  for (char c : s) {
+    if (c == '(') p++; else if (c == ')') p--;
+    if (c == delimiter && p == 0) { tokens.push_back(token); token.clear(); } else token += c;
+  }
+  if (!token.empty()) tokens.push_back(token);
+  return tokens;
+}
+
+template <typename T> void view(const std::string &n, T e) { std::cerr << n << ": " << e << ", "; }
+template <typename T> void view(const std::string &n, const std::vector<T> &v) { std::cerr << n << ":"; for (const auto &e : v) std::cerr << " " << e; std::cerr << ", "; }
+template <typename First, typename... Rest> void view_multi(const std::vector<std::string> &n, First f, Rest... r) { view(n[0], f); if constexpr (sizeof...(r) > 0) view_multi(std::vector<std::string>(n.begin() + 1, n.end()), r...); }
+
+template <typename... Args> void debug_helper(
+  const char *file, const char *func, int line, const char *n, Args... a) {
+  std::cerr << file << " " << func << ": " << line << ", "; auto nl = split(n, ',');
+  for (auto &nn : nl) { nn.erase(nn.begin(), std::find_if(nn.begin(), nn.end(), [](int ch) { return !std::isspace(ch); })); nn.erase(std::find_if(nn.rbegin(), nn.rend(), [](int ch) { return !std::isspace(ch); }).base(), nn.end()); }
+  view_multi(nl, a...); std::cerr << std::endl;
+}
+
+#define debug(...) debug_helper(__FILE__, __func__, __LINE__, #__VA_ARGS__, __VA_ARGS__)
+#define line() { std::cerr << "(" << __FILE__ << ") " << __func__ << ": " << __LINE__ << std::endl; }
+
+bool hasStopPoint(const tier4_planning_msgs::msg::PathWithLaneId &path) {
+  constexpr double stop_point_threshold = 0.01;
+  const size_t num_points = path.points.size();
+  for (size_t i = 0; i < num_points-1; ++i) {
+    if (path.points[i].point.longitudinal_velocity_mps < stop_point_threshold){
+      std::cerr << __FILE__ << " stop point found at " << i << " / " << num_points << std::endl;
+    return true;
+    }
+  }
+  if(path.points[num_points-1].point.longitudinal_velocity_mps < stop_point_threshold){
+    std::cerr << __FILE__ << " stop point found at terminal point " << num_points << std::endl;
+    return false;
+  }
+  return false;
+}
+
+}// namespace
+
+
 namespace autoware::behavior_path_planner
 {
 namespace
