@@ -314,6 +314,10 @@ trajectory_follower::LateralOutput MpcLateralController::run(
     output.sync_data.is_steer_converged =
       is_mpc_solved && isMpcConverged() && isSteerConverged(cmd);
 
+      std::cerr << "is_mpc_solved: " << is_mpc_solved << std::endl;
+      std::cerr << "isMpcConverged: " << isMpcConverged() << std::endl;
+      std::cerr << "isSteerConverged: " << isSteerConverged(cmd) << std::endl;
+
     return output;
   };
 
