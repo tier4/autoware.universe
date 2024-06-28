@@ -662,6 +662,8 @@ void PidLongitudinalController::updateControlState(const ControlData & control_d
     return;
   };
 
+  std::cerr << "current state: " << toStr(m_control_state) << std::endl;
+
   const auto debug_msg_once = [this](const auto & s) { RCLCPP_DEBUG_ONCE(logger_, "%s", s); };
 
   const bool is_under_control = m_current_operation_mode.is_autoware_control_enabled &&
@@ -681,6 +683,7 @@ void PidLongitudinalController::updateControlState(const ControlData & control_d
     if (!is_under_control && stopped_condition && keep_stopped_condition) {
       // NOTE: When the ego is stopped on manual driving, since the driving state may transit to
       //       autonomous, keep_stopped_condition should be checked.
+      std::cerr << "DRIVE --> STOPPED" << std::endl;
       return changeState(ControlState::STOPPED);
     }
 
@@ -733,6 +736,7 @@ void PidLongitudinalController::updateControlState(const ControlData & control_d
     // ---------------
 
     if (keep_stopped_condition) {
+      std::cerr << "STOPPED --> STOPPED" << std::endl;
       return changeState(ControlState::STOPPED);
     }
     if (departure_condition_from_stopped) {
