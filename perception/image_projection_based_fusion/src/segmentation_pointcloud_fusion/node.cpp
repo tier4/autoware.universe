@@ -70,6 +70,10 @@ void SegmentPointCloudFusionNode::fuseOnSingleImage(
     camera_info.p.at(4), camera_info.p.at(5), camera_info.p.at(6), camera_info.p.at(7),
     camera_info.p.at(8), camera_info.p.at(9), camera_info.p.at(10), camera_info.p.at(11), 0.0, 0.0,
     0.0, 1.0;
+  const int orig_width = camera_info.width;
+  const int orig_height = camera_info.height;
+  // resize mask to the same size as the camera image
+  cv::resize(mask, mask, cv::Size(orig_width, orig_height), 0, 0, cv::INTER_NEAREST);
   geometry_msgs::msg::TransformStamped transform_stamped;
   // transform pointcloud from frame id to camera optical frame id
   {
