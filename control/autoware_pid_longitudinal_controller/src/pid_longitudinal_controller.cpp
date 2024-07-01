@@ -603,7 +603,7 @@ void PidLongitudinalController::updateControlState(const ControlData & control_d
   const bool keep_stopped_condition = std::fabs(current_vel) < vel_epsilon &&
                                       m_enable_keep_stopped_until_steer_convergence &&
                                       !lateral_sync_data_.is_steer_converged;
-  std::cerr << "zero velocity (detecter in PID): " << std::fabs(current_vel) < vel_epsilon << std::endl;
+  std::cerr << "zero velocity (detecter in PID): " << (std::fabs(current_vel) < vel_epsilon) << std::endl;
   std::cerr << "m_enable_keep_stopped_until_steer_convergence: " << m_enable_keep_stopped_until_steer_convergence << std::endl;
   std::cerr << "keep_stopped_condition: " << keep_stopped_condition << std::endl;
 
