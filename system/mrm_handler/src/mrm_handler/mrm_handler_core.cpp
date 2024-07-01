@@ -397,7 +397,7 @@ void MrmHandler::updateMrmState()
 
   // Get mode
   const bool is_auto_mode = isAutonomous();
-
+  
   // State Machine
   switch (mrm_state_.state) {
     case MrmState::NORMAL:
@@ -542,7 +542,10 @@ bool MrmHandler::isAutonomous()
   using autoware_vehicle_msgs::msg::ControlModeReport;
   auto mode = sub_control_mode_.takeData();
   if (mode == nullptr) return false;
-  return mode->mode == ControlModeReport::AUTONOMOUS;
+  using autoware_adapi_v1_msgs::msg::OperationModeState;
+  auto state = sub_operation_mode_state_.takeData();
+  if (state == nullptr) return false;
+  return mode->mode == ControlModeReport::AUTONOMOUS && state->mode == OperationModeState::AUTONOMOUS;
 }
 
 bool MrmHandler::isPullOverStatusAvailable()
