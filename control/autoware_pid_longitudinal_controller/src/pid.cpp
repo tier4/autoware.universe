@@ -24,7 +24,6 @@ namespace autoware::motion::control::pid_longitudinal_controller
 {
 PIDController::PIDController()
 : m_prev_error(0.0),
-  m_is_first_time(true),
   m_is_gains_set(false),
   m_is_limits_set(false)
 {
@@ -52,17 +51,8 @@ double PIDController::calculate(
 
   const double ret_i = enable_integration ? p.ki * virtual_displacement_error_integral : 0.0;
 
-  double error_differential;
-
-  m_is_first_time = false;
-
-  if (m_is_first_time) {
-    error_differential = 0;
-    m_is_first_time = false;
-  } else {
-    error_differential = error;
-  }
-  double ret_d = p.kd * error_differential;
+  double velocity_error = error; // error used to calculate virtual displacement error
+  double ret_d = p.kd * velocity_error;
   ret_d = std::min(std::max(ret_d, p.min_ret_d), p.max_ret_d);
 
   m_prev_error = error;
@@ -104,6 +94,5 @@ void PIDController::setLimits(
 void PIDController::reset()
 {
   m_prev_error = 0.0;
-  m_is_first_time = true;
 }
 }  // namespace autoware::motion::control::pid_longitudinal_controller
