@@ -41,21 +41,26 @@ double PIDController::calculate(
 
   const auto & p = m_params;
 
-  double ret_p = p.kp * error;
+  static double virtual_displacement_error {0.0};
+  virtual_displacement_error += error * dt ;
+
+  double ret_p = p.kp * virtual_displacement_error;
   ret_p = std::min(std::max(ret_p, p.min_ret_p), p.max_ret_p);
 
-  if (enable_integration) {
-    m_error_integral += error * dt;
-    m_error_integral = std::min(std::max(m_error_integral, p.min_ret_i / p.ki), p.max_ret_i / p.ki);
-  }
-  const double ret_i = p.ki * m_error_integral;
+  m_error_integral += virtual_displacement_error * dt;
+  m_error_integral = std::min(std::max(m_error_integral, p.min_ret_i / p.ki), p.max_ret_i / p.ki);
+
+  const double ret_i = enable_integration ? p.ki * m_error_integral : 0.0;
 
   double error_differential;
+
+  m_is_first_time = false;
+
   if (m_is_first_time) {
     error_differential = 0;
     m_is_first_time = false;
   } else {
-    error_differential = (error - m_prev_error) / dt;
+    error_differential = error;
   }
   double ret_d = p.kd * error_differential;
   ret_d = std::min(std::max(ret_d, p.min_ret_d), p.max_ret_d);
@@ -67,10 +72,7 @@ double PIDController::calculate(
   pid_contributions.at(1) = ret_i;
   pid_contributions.at(2) = ret_d;
 
-  double ret_before_integration = ret_p + ret_i + ret_d;
-
-  static double ret {0.0};
-  ret += ret_before_integration * dt;
+  double ret = ret_p + ret_i + ret_d;
   ret = std::min(std::max(ret, p.min_ret), p.max_ret);
 
   return ret;
