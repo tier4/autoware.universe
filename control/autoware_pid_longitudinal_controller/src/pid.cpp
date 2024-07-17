@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "autoware/pid_longitudinal_controller/pid.hpp"
-
+#include <iostream>
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
@@ -44,16 +44,19 @@ double PIDController::calculate(
 
   double ret_p = p.kp * virtual_displacement_error;
   ret_p = std::min(std::max(ret_p, p.min_ret_p), p.max_ret_p);
+  std::cerr << "ret_p: " << ret_p << ", max: " << p.max_ret_p << ", min: " << p.min_ret_p << std::endl;
 
   static double virtual_displacement_error_integral {0.0};
   virtual_displacement_error_integral += virtual_displacement_error * dt;
-  virtual_displacement_error_integral = std::min(std::max(virtual_displacement_error_integral, p.min_ret_i / p.ki), p.max_ret_i / p.ki);
+  virtual_displacement_error_integral = std::min(std::max(virtual_displacement_error_integral, p.min_ret_i), p.max_ret_i);
+  std::cerr << "virtual_displacement_error_integral: " << virtual_displacement_error_integral << ", max: " << p.max_ret_i << ", min: " << p.min_ret_i << std::endl;
 
   const double ret_i = enable_integration ? p.ki * virtual_displacement_error_integral : 0.0;
 
   double velocity_error = error; // error used to calculate virtual displacement error
   double ret_d = p.kd * velocity_error;
   ret_d = std::min(std::max(ret_d, p.min_ret_d), p.max_ret_d);
+  std::cerr << "ret_d: " << ret_d << ", max: " << p.max_ret_d << ", min: " << p.min_ret_d << std::endl;
 
   m_prev_error = error;
 
