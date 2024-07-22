@@ -1,0 +1,27 @@
+<launch>
+  <arg name="bag_path" description="bagfile path"/>
+  <arg name="use_sim_time" default="false" description="use_sim_time"/>
+  <arg name="vehicle_model" default="sample_vehicle" description="vehicle model name"/>
+
+  <arg name="input/odometry" default="/localization/kinematic_state"/>
+  <arg name="input/acceleration" default="/localization/acceleration"/>
+  <arg name="input/trajectory" default="/planning/scenario_planning/trajectory"/>
+  <arg name="input/objects" default="/perception/object_recognition/objects"/>
+  <arg name="input/map_topic" default="/map/vector_map"/>
+  <arg name="input/route_topic" default="/planning/mission_planning/route"/>
+
+  <group scoped="false">
+    <include file="$(find-pkg-share global_parameter_loader)/launch/global_params.launch.py">
+      <arg name="use_sim_time" value="$(var use_sim_time)"/>
+      <arg name="vehicle_model" value="$(var vehicle_model)"/>
+    </include>
+  </group>
+
+  <node_container pkg="rclcpp_components" exec="component_container" name="path_selector_container" namespace="" output="screen">
+    <composable_node pkg="autoware_path_selector" plugin="autoware::path_selector::PathSelectorNode" name="path_selector">
+      <param name="bag_path" value="$(var bag_path)"/>
+    </composable_node>
+
+    <composable_node pkg="glog_component" plugin="GlogComponent" name="glog_component" namespace=""/>
+  </node_container>
+</launch>
