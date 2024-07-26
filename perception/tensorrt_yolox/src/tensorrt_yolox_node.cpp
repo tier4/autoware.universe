@@ -15,6 +15,7 @@
 #include "tensorrt_yolox/tensorrt_yolox_node.hpp"
 
 #include "object_recognition_utils/object_classification.hpp"
+#include "tensorrt_yolox/utils.hpp"
 
 #include <autoware_auto_perception_msgs/msg/object_classification.hpp>
 
@@ -165,25 +166,6 @@ void TrtYoloXNode::onConnect()
   }
 }
 
-std::vector<std::pair<uint8_t, int>> TrtYoloXNode::rle_compress(const cv::Mat & image)
-{
-  std::vector<std::pair<uint8_t, int>> compressed_data;
-  const int rows = image.rows;
-  const int cols = image.cols;
-  compressed_data.emplace_back(image.at<uint8_t>(0, 0), 0);
-  for (int i = 0; i < rows; ++i) {
-    for (int j = 0; j < cols; ++j) {
-      uint8_t current_value = image.at<uint8_t>(i, j);
-      if (compressed_data.back().first == current_value) {
-        ++compressed_data.back().second;
-      } else {
-        compressed_data.emplace_back(current_value, 1);
-      }
-    }
-  }
-  return compressed_data;
-}
-
 void TrtYoloXNode::onImage(const sensor_msgs::msg::Image::ConstSharedPtr msg)
 {
   stop_watch_ptr_->toc("processing_time", true);
@@ -242,7 +224,7 @@ void TrtYoloXNode::onImage(const sensor_msgs::msg::Image::ConstSharedPtr msg)
         .toImageMsg();
     out_mask_msg->header = msg->header;
 
-    std::vector<std::pair<uint8_t, int>> compressed_data = TrtYoloXNode::rle_compress(mask);
+    std::vector<std::pair<uint8_t, int>> compressed_data = runLengthEncoder(mask);
     int step = sizeof(uint8_t) + sizeof(int);
     out_mask_msg->data.resize(static_cast<int>(compressed_data.size()) * step);
     for (size_t i = 0; i < compressed_data.size(); ++i) {
