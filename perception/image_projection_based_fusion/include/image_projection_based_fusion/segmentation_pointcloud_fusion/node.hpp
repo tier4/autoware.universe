@@ -44,11 +44,13 @@ private:
     {"BIKE", false},          {"ROAD", false},         {"SIDEWALK", false},   {"ROAD_PAINT", false},
     {"CURBSTONE", false},     {"CROSSWALK", false},    {"VEGETATION", false}, {"SKY", false}};
 
+  image_transport::Publisher pub_debug_mask_ptr_;
+  bool is_publish_debug_mask_;
+
 public:
   explicit SegmentPointCloudFusionNode(const rclcpp::NodeOptions & options);
 
 protected:
-  cv::Mat rle_decompress(const std::vector<uint8_t> & rle_data, const int rows, const int cols);
   void preprocess(PointCloud2 & pointcloud_msg) override;
 
   void postprocess(PointCloud2 & pointcloud_msg) override;
