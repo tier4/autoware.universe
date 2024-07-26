@@ -16,6 +16,7 @@
 #define IMAGE_PROJECTION_BASED_FUSION__SEGMENTATION_POINTCLOUD_FUSION__NODE_HPP_
 
 #include "image_projection_based_fusion/fusion_node.hpp"
+#include "image_transport/image_transport.hpp"
 
 #include <string>
 #include <utility>
@@ -42,12 +43,12 @@ private:
     {"BIKE", false},          {"ROAD", false},         {"SIDEWALK", false},   {"ROADPAINT", false},
     {"CURBSTONE", false},     {"CROSSWALK", false},    {"VEGETATION", false}, {"SKY", false}};
 
+  image_transport::Publisher pub_debug_mask_ptr_;
+  bool is_publish_debug_mask_;
 public:
   explicit SegmentPointCloudFusionNode(const rclcpp::NodeOptions & options);
 
 protected:
-
-  cv::Mat rle_decompress(const std::vector<uint8_t> & rle_data, const int rows, const int cols);
   void preprocess(PointCloud2 & pointcloud_msg) override;
 
   void postprocess(PointCloud2 & pointcloud_msg) override;
