@@ -5,7 +5,7 @@
   <arg name="longitudinal_controller_mode"/>
   <arg name="enable_autonomous_emergency_braking"/>
   <arg name="check_external_emergency_heartbeat"/>
-  <arg name="trajectory_follower_mode" default="trajectory_follower_node"/>
+  <arg name="trajectory_follower_mode" default="smart_mpc_trajectory_follower"/>
 
   <!-- common param path -->
   <arg name="vehicle_param_file"/>
