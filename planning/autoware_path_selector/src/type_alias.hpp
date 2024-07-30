@@ -30,6 +30,7 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 #include <std_srvs/srv/set_bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
 namespace autoware::path_selector
@@ -55,6 +56,7 @@ using geometry_msgs::msg::Point;
 using geometry_msgs::msg::Pose;
 using nav_msgs::msg::Odometry;
 using std_srvs::srv::SetBool;
+using std_srvs::srv::Trigger;
 using tf2_msgs::msg::TFMessage;
 using tier4_debug_msgs::msg::Float32MultiArrayStamped;
 using visualization_msgs::msg::Marker;

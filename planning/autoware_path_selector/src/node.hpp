@@ -281,6 +281,8 @@ private:
 
   void play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res);
 
+  void rewind(const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res);
+
   auto all_ttc(const Data & data) const -> std::vector<double>;
 
   double lateral_accel(const Data & data) const;
@@ -289,6 +291,14 @@ private:
 
   double travel_distance(const Data & front_data, const Data & back_data) const;
 
+  double longitudinal_comfortability(const std::vector<Data> & extract_data) const;
+
+  double lateral_comfortability(const std::vector<Data> & extract_data) const;
+
+  double efficiency(const std::vector<Data> & extract_data) const;
+
+  double safety(const std::vector<Data> & extract_data) const;
+
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<MarkerArray>::SharedPtr pub_marker_;
   rclcpp::Publisher<Odometry>::SharedPtr pub_odometry_;
@@ -296,7 +306,9 @@ private:
   rclcpp::Publisher<Trajectory>::SharedPtr pub_trajectory_;
   rclcpp::Publisher<TFMessage>::SharedPtr pub_tf_;
   rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_metrics_;
-  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_bag_;
+  rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_cost_;
+  rclcpp::Service<SetBool>::SharedPtr srv_play_;
+  rclcpp::Service<Trigger>::SharedPtr srv_rewind_;
 
   vehicle_info_utils::VehicleInfo vehicle_info_;
 

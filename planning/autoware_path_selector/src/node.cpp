@@ -80,16 +80,21 @@ PathSelectorNode::PathSelectorNode(const rclcpp::NodeOptions & node_options)
   pub_tf_ = create_publisher<TFMessage>("/tf", rclcpp::QoS(1));
 
   pub_metrics_ = create_publisher<Float32MultiArrayStamped>("~/metrics", rclcpp::QoS{1});
+  pub_cost_ = create_publisher<Float32MultiArrayStamped>("~/cost", rclcpp::QoS{1});
 
-  srv_bag_ = this->create_service<std_srvs::srv::SetBool>(
+  srv_play_ = this->create_service<SetBool>(
     "play", std::bind(&PathSelectorNode::play, this, std::placeholders::_1, std::placeholders::_2),
+    rclcpp::ServicesQoS().get_rmw_qos_profile());
+
+  srv_rewind_ = this->create_service<Trigger>(
+    "rewind",
+    std::bind(&PathSelectorNode::rewind, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   reader_.open(declare_parameter<std::string>("bag_path"));
 
-  const auto metadata = reader_.get_metadata();
   data_set_ = std::make_shared<DataSet>(
-    duration_cast<nanoseconds>(metadata.starting_time.time_since_epoch()).count());
+    duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
 }
 
 void PathSelectorNode::update(std::shared_ptr<DataSet> & data_set) const
@@ -169,6 +174,18 @@ void PathSelectorNode::play(const SetBool::Request::SharedPtr req, SetBool::Resp
   } else {
     RCLCPP_INFO(get_logger(), "stop evaluation.");
   }
+  res->success = true;
+}
+
+void PathSelectorNode::rewind(
+  [[maybe_unused]] const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res)
+{
+  reader_.seek(0);
+
+  data_set_.reset();
+  data_set_ = std::make_shared<DataSet>(
+    duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
+
   res->success = true;
 }
 
@@ -296,6 +313,7 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
 
   constexpr size_t METRICS_NUM = 5;
 
+  metrics.stamp = now();
   metrics.data.resize(METRICS_NUM * extract_data.size());
   metrics.layout.dim.resize(METRICS_NUM);
 
@@ -342,6 +360,18 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
     }
   }
 
+  Float32MultiArrayStamped cost{};
+
+  constexpr size_t COST_NUM = 4;
+
+  cost.stamp = now();
+  cost.data.resize(COST_NUM);
+
+  cost.data.at(0) = longitudinal_comfortability(extract_data);
+  cost.data.at(1) = lateral_comfortability(extract_data);
+  cost.data.at(2) = efficiency(extract_data);
+  cost.data.at(3) = safety(extract_data);
+
   pub_tf_->publish(extract_data.front().tf);
 
   pub_objects_->publish(extract_data.front().objects);
@@ -350,7 +380,96 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
 
   pub_metrics_->publish(metrics);
 
+  pub_cost_->publish(cost);
+
   visualize(extract_data);
+}
+
+double PathSelectorNode::safety(const std::vector<Data> & extract_data) const
+{
+  constexpr double TIME_FACTOR = 0.8;
+
+  double cost = 0.0;
+
+  const auto min = 0.0;
+  const auto max = 5.0;
+  const auto normalize = [&min, &max](const double value) {
+    return std::clamp(value, min, max) / (max - min);
+  };
+
+  for (size_t i = 0; i < extract_data.size(); i++) {
+    if (extract_data.at(i).metrics.count("ttc_min") != 0) {
+      cost += normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("ttc_min"));
+    }
+  }
+
+  return cost / extract_data.size();
+}
+
+double PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
+{
+  constexpr double TIME_FACTOR = 0.8;
+
+  double cost = 0.0;
+
+  const auto min = 0.0;
+  const auto max = 0.5;
+  const auto normalize = [&min, &max](const double value) {
+    return (max - std::clamp(value, min, max)) / (max - min);
+  };
+
+  for (size_t i = 0; i < extract_data.size(); i++) {
+    if (extract_data.at(i).metrics.count("lon_jerk") != 0) {
+      cost +=
+        normalize(std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("lon_jerk")));
+    }
+  }
+
+  return cost / extract_data.size();
+}
+
+double PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_data) const
+{
+  constexpr double TIME_FACTOR = 0.8;
+
+  double cost = 0.0;
+
+  const auto min = 0.0;
+  const auto max = 0.5;
+  const auto normalize = [&min, &max](const double value) {
+    return (max - std::clamp(value, min, max)) / (max - min);
+  };
+
+  for (size_t i = 0; i < extract_data.size(); i++) {
+    if (extract_data.at(i).metrics.count("lat_accel") != 0) {
+      cost +=
+        normalize(std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("lat_accel")));
+    }
+  }
+
+  return cost / extract_data.size();
+}
+
+double PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
+{
+  constexpr double TIME_FACTOR = 0.8;
+
+  double reward = 0.0;
+
+  const auto min = 0.0;
+  const auto max = 20.0;
+  const auto normalize = [&min, &max](const double value) {
+    return std::clamp(value, min, max) / (max - min);
+  };
+
+  for (size_t i = 0; i < extract_data.size(); i++) {
+    if (extract_data.at(i).metrics.count("travel_distance") != 0) {
+      reward += normalize(
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("travel_distance") / 0.5);
+    }
+  }
+
+  return reward / extract_data.size();
 }
 
 void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
