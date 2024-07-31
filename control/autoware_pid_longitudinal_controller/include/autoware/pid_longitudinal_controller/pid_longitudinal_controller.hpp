@@ -168,7 +168,7 @@ private:
 
   // drive
   PIDController m_pid_vel;
-  std::shared_ptr<LowpassFilter1d> m_lpf_vel_error{nullptr};
+  std::unique_ptr<LowpassFilter1d> m_lpf_vel_error{nullptr};
   bool m_enable_integration_at_low_speed;
   double m_current_vel_threshold_pid_integrate;
   double m_time_threshold_before_pid_integrate;
@@ -195,6 +195,10 @@ private:
   };
   EmergencyStateParams m_emergency_state_params;
 
+  // acc feedback
+  double m_acc_feedback_gain;
+  std::unique_ptr<LowpassFilter1d> m_lpf_acc_error{nullptr};
+
   // acceleration limit
   double m_max_acc;
   double m_min_acc;
@@ -208,7 +212,7 @@ private:
   enum class SlopeSource { RAW_PITCH = 0, TRAJECTORY_PITCH, TRAJECTORY_ADAPTIVE };
   SlopeSource m_slope_source{SlopeSource::RAW_PITCH};
   double m_adaptive_trajectory_velocity_th;
-  std::shared_ptr<LowpassFilter1d> m_lpf_pitch{nullptr};
+  std::unique_ptr<LowpassFilter1d> m_lpf_pitch{nullptr};
   double m_max_pitch_rad;
   double m_min_pitch_rad;
 
