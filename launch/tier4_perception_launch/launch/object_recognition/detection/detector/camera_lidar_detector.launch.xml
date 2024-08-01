@@ -9,7 +9,8 @@
   <arg name="lidar_detection_model" default="centerpoint" description="options: `centerpoint`, `apollo`, `pointpainting`, `clustering`"/>
   <arg name="use_roi_based_cluster" default="false"/>
   <arg name="use_low_intensity_cluster_filter" default="false"/>
-  <arg name="use_image_segmentation_based_filter"/>
+  <arg name="use_image_segmentation_based_filter" default="false"/>
+  <arg name="input/pointcloud_map/pointcloud" default="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
 
   <!-- Camera parameters -->
   <arg name="image_raw0" default="/image_raw" description="image raw topic name"/>
@@ -105,7 +106,7 @@
     </include>
   </group>
 
-  <!-- Image_segmentation based filter, apply for camera0 only-->
+  <!-- Image_segmentation based filter, apply for camera0 only--> 
   <group>
     <include file="$(find-pkg-share image_projection_based_fusion)/launch/segmentation_pointcloud_fusion.launch.xml" if="$(var use_image_segmentation_based_filter)">
       <arg name="input/pointcloud" value="$(var input/pointcloud_map/pointcloud)"/>
