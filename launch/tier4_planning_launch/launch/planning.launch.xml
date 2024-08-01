@@ -14,12 +14,12 @@
   <group>
     <push-ros-namespace namespace="planning"/>
     <!-- mission planning module -->
-    <group>
+    <!-- <group>
       <push-ros-namespace namespace="mission_planning"/>
       <include file="$(find-pkg-share tier4_planning_launch)/launch/mission_planning/mission_planning.launch.xml">
         <arg name="mission_planner_param_path" value="$(var mission_planner_param_path)"/>
       </include>
-    </group>
+    </group> -->
 
     <!-- scenario planning module -->
     <group>
@@ -31,22 +31,22 @@
     </group>
 
     <!-- planning validator -->
-    <group>
+    <!-- <group>
       <include file="$(find-pkg-share autoware_planning_validator)/launch/planning_validator.launch.xml">
         <arg name="input_trajectory" value="/planning/scenario_planning/velocity_smoother/trajectory"/>
         <arg name="output_trajectory" value="/planning/scenario_planning/trajectory"/>
         <arg name="planning_validator_param_path" value="$(var planning_validator_param_path)"/>
       </include>
-    </group>
+    </group> -->
 
     <!-- planning evaluator -->
-    <group>
+    <!-- <group>
       <include file="$(find-pkg-share autoware_planning_evaluator)/launch/planning_evaluator.launch.xml"/>
-    </group>
+    </group> -->
 
     <!-- mission remaining distance and time calculator -->
-    <group>
+    <!-- <group>
       <include file="$(find-pkg-share autoware_remaining_distance_time_calculator)/launch/remaining_distance_time_calculator.launch.xml"/>
-    </group>
+    </group> -->
   </group>
 </launch>

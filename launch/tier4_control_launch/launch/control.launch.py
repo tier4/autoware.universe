@@ -360,7 +360,7 @@ def launch_setup(context, *args, **kwargs):
             package="rclcpp_components",
             executable=LaunchConfiguration("container_executable"),
             composable_node_descriptions=[
-                lane_departure_component,
+                # lane_departure_component,
                 shift_decider_component,
                 vehicle_cmd_gate_component,
                 autoware_operation_mode_transition_manager_component,
@@ -414,8 +414,8 @@ def launch_setup(context, *args, **kwargs):
             external_cmd_selector_loader,
             external_cmd_converter_loader,
             obstacle_collision_checker_loader,
-            autonomous_emergency_braking_loader,
-            predicted_path_checker_loader,
+            # autonomous_emergency_braking_loader,
+            # predicted_path_checker_loader,
             control_evaluator_loader,
         ]
     )

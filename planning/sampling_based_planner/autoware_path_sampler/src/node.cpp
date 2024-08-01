@@ -203,6 +203,7 @@ rcl_interfaces::msg::SetParametersResult PathSampler::onParam(
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
   result.reason = "success";
+  resetPreviousData();
   return result;
 }
 
@@ -433,7 +434,10 @@ std::vector<autoware::sampler_common::Path> PathSampler::generateCandidatesFromP
       reuse_state.heading = reused_path.yaws.back();
       reuse_state.frenet = path_spline.frenet(reuse_state.pose);
       auto paths = generateCandidatePaths(reuse_state, path_spline, reuse_length, params_);
-      for (auto & p : paths) candidates.push_back(reused_path.extend(p));
+      for (auto & p : paths) {
+        p.cost = -100.0;
+        candidates.push_back(reused_path.extend(p));
+      }
     }
   }
   return candidates;
