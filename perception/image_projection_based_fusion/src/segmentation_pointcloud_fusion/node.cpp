@@ -16,6 +16,7 @@
 
 #include "image_projection_based_fusion/utils/geometry.hpp"
 #include "image_projection_based_fusion/utils/utils.hpp"
+#include "tensorrt_yolox/utils.hpp"
 
 #ifdef ROS_DISTRO_GALACTIC
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -62,7 +63,7 @@ void SegmentPointCloudFusionNode::fuseOnSingleImage(
   if (input_mask.height == 0 || input_mask.width == 0) {
     return;
   }
-  cv::Mat mask = autoware::tensorrt_yolox::runLengthDecoder(
+  cv::Mat mask = tensorrt_yolox::runLengthDecoder(
     input_mask.data, input_mask.height, input_mask.width);
   // publish debug mask
   if (is_publish_debug_mask_) {
