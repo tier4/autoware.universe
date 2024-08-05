@@ -176,8 +176,50 @@ struct Data
   AccelWithCovarianceStamped accel;
   SteeringReport steer;
   Trajectory trajectory;
+  Pose predicted_pose;
 
   std::unordered_map<std::string, double> metrics;
+};
+
+struct FrenetPoint
+{
+  double length{0.0};    // longitudinal
+  double distance{0.0};  // lateral
+};
+
+// data conversions
+template <class T>
+FrenetPoint convertToFrenetPoint(
+  const T & points, const Point & search_point_geom, const size_t seg_idx)
+{
+  FrenetPoint frenet_point;
+
+  const double longitudinal_length =
+    autoware::motion_utils::calcLongitudinalOffsetToSegment(points, seg_idx, search_point_geom);
+  frenet_point.length =
+    autoware::motion_utils::calcSignedArcLength(points, 0, seg_idx) + longitudinal_length;
+  frenet_point.distance =
+    autoware::motion_utils::calcLateralOffset(points, search_point_geom, seg_idx);
+
+  return frenet_point;
+}
+
+struct PoseWithVelocity
+{
+  Pose pose;
+  double velocity{0.0};
+
+  PoseWithVelocity(const Pose & pose, const double velocity) : pose(pose), velocity(velocity) {}
+};
+
+struct PoseWithVelocityStamped : public PoseWithVelocity
+{
+  double time{0.0};
+
+  PoseWithVelocityStamped(const double time, const Pose & pose, const double velocity)
+  : PoseWithVelocity(pose, velocity), time(time)
+  {
+  }
 };
 
 struct DataSet
@@ -192,6 +234,58 @@ struct DataSet
   Buffer<Trajectory> buf_trajectory;
 
   rcutils_time_point_value_t timestamp;
+
+  std::vector<PoseWithVelocityStamped> predict()
+  {
+    if (!buf_trajectory.is_ready()) {
+      return {};
+    }
+
+    if (buf_trajectory.get().points.empty()) {
+      return {};
+    }
+
+    const double min_velocity = 0.0;
+    const double max_velocity = 20.0;
+    const double time_horizon = 10.0;
+    const double time_resolution = 0.5;
+    const double delay_until_departure = 0.0;
+
+    const double acceleration = buf_accel.get().accel.accel.linear.x;
+    const auto current_velocity = buf_odometry.get().twist.twist.linear.x;
+    const auto current_pose = buf_odometry.get().pose.pose;
+
+    const auto points = buf_trajectory.get().points;
+
+    const auto ego_seg_idx =
+      autoware::motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
+        points, current_pose, 1.0, M_PI_2);
+
+    std::vector<PoseWithVelocityStamped> predicted_path;
+    const auto vehicle_pose_frenet =
+      convertToFrenetPoint(points, current_pose.position, ego_seg_idx);
+
+    for (double t = 0.0; t < time_horizon; t += time_resolution) {
+      double velocity = 0.0;
+      double length = 0.0;
+
+      // If t < delay_until_departure, it means ego have not depart yet, therefore the velocity is
+      // 0 and there's no change in position.
+      if (t >= delay_until_departure) {
+        // Adjust time to consider the delay.
+        double t_with_delay = t - delay_until_departure;
+        velocity =
+          std::clamp(current_velocity + acceleration * t_with_delay, min_velocity, max_velocity);
+        length = current_velocity * t_with_delay + 0.5 * acceleration * t_with_delay * t_with_delay;
+      }
+
+      const auto pose =
+        autoware::motion_utils::calcInterpolatedPose(points, vehicle_pose_frenet.length + length);
+      predicted_path.emplace_back(t, pose, velocity);
+    }
+
+    return predicted_path;
+  }
 
   std::vector<Data> extract(const double time_horizon, const double time_resolution)
   {
@@ -237,6 +331,15 @@ struct DataSet
       data.trajectory = trajectory.value();
 
       extract_data.push_back(data);
+    }
+
+    const auto predicted_poses = predict();
+    if (predicted_poses.size() != extract_data.size()) {
+      throw std::logic_error("there is an inconsistency among data.");
+    }
+
+    for (size_t i = 0; i < extract_data.size(); ++i) {
+      extract_data.at(i).predicted_pose = predicted_poses.at(i).pose;
     }
 
     return extract_data;

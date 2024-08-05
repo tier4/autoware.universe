@@ -486,6 +486,14 @@ void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
       msg.markers.push_back(marker);
     }
 
+    {
+      Marker marker = createDefaultMarker(
+        "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "predicted_poses", i++, Marker::ARROW,
+        createMarkerScale(0.7, 0.3, 0.3), createMarkerColor(1.0, 1.0, 0.0, 0.999));
+      marker.pose = data.predicted_pose;
+      msg.markers.push_back(marker);
+    }
+
     if (data.metrics.count("ttc_min") != 0) {
       Marker marker = createDefaultMarker(
         "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "ttc", i++, Marker::TEXT_VIEW_FACING,
