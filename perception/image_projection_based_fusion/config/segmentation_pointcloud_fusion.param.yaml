@@ -12,7 +12,7 @@
       PERSON: false
       VEHICLE: false
       BIKE: false
-      ROAD: true
+      ROAD: false
       SIDEWALK: false
       ROAD_PAINT: false
       CURBSTONE: false
