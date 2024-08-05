@@ -67,10 +67,12 @@ void SegmentPointCloudFusionNode::fuseOnSingleImage(
     input_mask.data, input_mask.height, input_mask.width);
   // publish debug mask
   if (is_publish_debug_mask_) {
-    sensor_msgs::msg::Image::SharedPtr debug_mask_msg =
-      cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", mask).toImageMsg();
-    debug_mask_msg->header = input_mask.header;
-    pub_debug_mask_ptr_.publish(debug_mask_msg);
+    cv::Mat colorized_mask;
+    cv::applyColorMap(mask * 8, colorized_mask, cv::COLORMAP_JET);
+    sensor_msgs::msg::Image::SharedPtr colorized_mask_msg =
+      cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", colorized_mask).toImageMsg();
+    colorized_mask_msg->header = input_mask.header;
+    pub_debug_mask_ptr_.publish(colorized_mask_msg);
   }
   Eigen::Matrix4d projection;
   projection << camera_info.p.at(0), camera_info.p.at(1), camera_info.p.at(2), camera_info.p.at(3),
