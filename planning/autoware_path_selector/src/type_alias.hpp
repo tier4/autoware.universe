@@ -54,6 +54,8 @@ using route_handler::RouteHandler;
 using geometry_msgs::msg::AccelWithCovarianceStamped;
 using geometry_msgs::msg::Point;
 using geometry_msgs::msg::Pose;
+using geometry_msgs::msg::Twist;
+using geometry_msgs::msg::Vector3;
 using nav_msgs::msg::Odometry;
 using std_srvs::srv::SetBool;
 using std_srvs::srv::Trigger;

@@ -176,7 +176,7 @@ struct Data
   AccelWithCovarianceStamped accel;
   SteeringReport steer;
   Trajectory trajectory;
-  Pose predicted_pose;
+  TrajectoryPoint predicted_point;
 
   std::unordered_map<std::string, double> metrics;
 };
@@ -204,24 +204,6 @@ FrenetPoint convertToFrenetPoint(
   return frenet_point;
 }
 
-struct PoseWithVelocity
-{
-  Pose pose;
-  double velocity{0.0};
-
-  PoseWithVelocity(const Pose & pose, const double velocity) : pose(pose), velocity(velocity) {}
-};
-
-struct PoseWithVelocityStamped : public PoseWithVelocity
-{
-  double time{0.0};
-
-  PoseWithVelocityStamped(const double time, const Pose & pose, const double velocity)
-  : PoseWithVelocity(pose, velocity), time(time)
-  {
-  }
-};
-
 struct DataSet
 {
   explicit DataSet(const rcutils_time_point_value_t timestamp) : timestamp{timestamp} {}
@@ -235,7 +217,7 @@ struct DataSet
 
   rcutils_time_point_value_t timestamp;
 
-  std::vector<PoseWithVelocityStamped> predict()
+  std::vector<TrajectoryPoint> predict()
   {
     if (!buf_trajectory.is_ready()) {
       return {};
@@ -245,8 +227,6 @@ struct DataSet
       return {};
     }
 
-    const double min_velocity = 0.0;
-    const double max_velocity = 20.0;
     const double time_horizon = 10.0;
     const double time_resolution = 0.5;
     const double delay_until_departure = 0.0;
@@ -261,12 +241,11 @@ struct DataSet
       autoware::motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
         points, current_pose, 1.0, M_PI_2);
 
-    std::vector<PoseWithVelocityStamped> predicted_path;
+    std::vector<TrajectoryPoint> predicted_path;
     const auto vehicle_pose_frenet =
       convertToFrenetPoint(points, current_pose.position, ego_seg_idx);
 
     for (double t = 0.0; t < time_horizon; t += time_resolution) {
-      double velocity = 0.0;
       double length = 0.0;
 
       // If t < delay_until_departure, it means ego have not depart yet, therefore the velocity is
@@ -274,14 +253,14 @@ struct DataSet
       if (t >= delay_until_departure) {
         // Adjust time to consider the delay.
         double t_with_delay = t - delay_until_departure;
-        velocity =
-          std::clamp(current_velocity + acceleration * t_with_delay, min_velocity, max_velocity);
         length = current_velocity * t_with_delay + 0.5 * acceleration * t_with_delay * t_with_delay;
       }
 
       const auto pose =
         autoware::motion_utils::calcInterpolatedPose(points, vehicle_pose_frenet.length + length);
-      predicted_path.emplace_back(t, pose, velocity);
+      const auto p_trajectory =
+        autoware::motion_utils::calcInterpolatedPoint(buf_trajectory.get(), pose);
+      predicted_path.push_back(p_trajectory);
     }
 
     return predicted_path;
@@ -333,13 +312,13 @@ struct DataSet
       extract_data.push_back(data);
     }
 
-    const auto predicted_poses = predict();
-    if (predicted_poses.size() != extract_data.size()) {
+    const auto trajectory_points = predict();
+    if (trajectory_points.size() != extract_data.size()) {
       throw std::logic_error("there is an inconsistency among data.");
     }
 
     for (size_t i = 0; i < extract_data.size(); ++i) {
-      extract_data.at(i).predicted_pose = predicted_poses.at(i).pose;
+      extract_data.at(i).predicted_point = trajectory_points.at(i);
     }
 
     return extract_data;
@@ -386,13 +365,21 @@ private:
 
   void rewind(const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res);
 
-  auto all_ttc(const Data & data) const -> std::vector<double>;
+  auto manual_all_ttc(const Data & data) const -> std::vector<double>;
 
-  double lateral_accel(const Data & data) const;
+  auto system_all_ttc(const Data & data) const -> std::vector<double>;
 
-  double longitudinal_jerk(const Data & front_data, const Data & back_data) const;
+  double manual_lateral_accel(const Data & data) const;
 
-  double travel_distance(const Data & front_data, const Data & back_data) const;
+  double system_lateral_accel(const Data & data) const;
+
+  double manual_longitudinal_jerk(const Data & front_data, const Data & back_data) const;
+
+  double system_longitudinal_jerk(const Data & front_data, const Data & back_data) const;
+
+  double manual_travel_distance(const Data & front_data, const Data & back_data) const;
+
+  double system_travel_distance(const Data & front_data, const Data & back_data) const;
 
   double longitudinal_comfortability(const std::vector<Data> & extract_data) const;
 
