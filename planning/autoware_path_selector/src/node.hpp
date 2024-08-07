@@ -381,13 +381,15 @@ private:
 
   double system_travel_distance(const Data & front_data, const Data & back_data) const;
 
-  double longitudinal_comfortability(const std::vector<Data> & extract_data) const;
+  auto longitudinal_comfortability(const std::vector<Data> & extract_data) const
+    -> std::pair<double, double>;
 
-  double lateral_comfortability(const std::vector<Data> & extract_data) const;
+  auto lateral_comfortability(const std::vector<Data> & extract_data) const
+    -> std::pair<double, double>;
 
-  double efficiency(const std::vector<Data> & extract_data) const;
+  auto efficiency(const std::vector<Data> & extract_data) const -> std::pair<double, double>;
 
-  double safety(const std::vector<Data> & extract_data) const;
+  auto safety(const std::vector<Data> & extract_data) const -> std::pair<double, double>;
 
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<MarkerArray>::SharedPtr pub_marker_;

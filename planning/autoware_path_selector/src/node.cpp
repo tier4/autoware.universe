@@ -482,15 +482,34 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
 
   Float32MultiArrayStamped cost{};
 
-  constexpr size_t COST_NUM = 4;
+  constexpr size_t COST_NUM = 8;
 
   cost.stamp = now();
   cost.data.resize(COST_NUM);
 
-  cost.data.at(0) = longitudinal_comfortability(extract_data);
-  cost.data.at(1) = lateral_comfortability(extract_data);
-  cost.data.at(2) = efficiency(extract_data);
-  cost.data.at(3) = safety(extract_data);
+  {
+    const auto [manual, system] = longitudinal_comfortability(extract_data);
+    cost.data.at(0) = manual;
+    cost.data.at(4) = system;
+  }
+
+  {
+    const auto [manual, system] = lateral_comfortability(extract_data);
+    cost.data.at(1) = manual;
+    cost.data.at(5) = system;
+  }
+
+  {
+    const auto [manual, system] = efficiency(extract_data);
+    cost.data.at(2) = manual;
+    cost.data.at(6) = system;
+  }
+
+  {
+    const auto [manual, system] = safety(extract_data);
+    cost.data.at(3) = manual;
+    cost.data.at(7) = system;
+  }
 
   pub_tf_->publish(extract_data.front().tf);
 
@@ -505,11 +524,13 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
   visualize(extract_data);
 }
 
-double PathSelectorNode::safety(const std::vector<Data> & extract_data) const
+auto PathSelectorNode::safety(const std::vector<Data> & extract_data) const
+  -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
 
-  double cost = 0.0;
+  double manual_cost = 0.0;
+  double system_cost = 0.0;
 
   const auto min = 0.0;
   const auto max = 5.0;
@@ -519,18 +540,25 @@ double PathSelectorNode::safety(const std::vector<Data> & extract_data) const
 
   for (size_t i = 0; i < extract_data.size(); i++) {
     if (extract_data.at(i).metrics.count("manual_ttc_min") != 0) {
-      cost += normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("manual_ttc_min"));
+      manual_cost +=
+        normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("manual_ttc_min"));
+    }
+    if (extract_data.at(i).metrics.count("system_ttc_min") != 0) {
+      system_cost +=
+        normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("system_ttc_min"));
     }
   }
 
-  return cost / extract_data.size();
+  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-double PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
+auto PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
+  -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
 
-  double cost = 0.0;
+  double manual_cost = 0.0;
+  double system_cost = 0.0;
 
   const auto min = 0.0;
   const auto max = 0.5;
@@ -540,19 +568,25 @@ double PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & e
 
   for (size_t i = 0; i < extract_data.size(); i++) {
     if (extract_data.at(i).metrics.count("manual_lon_jerk") != 0) {
-      cost += normalize(
+      manual_cost += normalize(
         std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("manual_lon_jerk")));
+    }
+    if (extract_data.at(i).metrics.count("system_lon_jerk") != 0) {
+      system_cost += normalize(
+        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("system_lon_jerk")));
     }
   }
 
-  return cost / extract_data.size();
+  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-double PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_data) const
+auto PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_data) const
+  -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
 
-  double cost = 0.0;
+  double manual_cost = 0.0;
+  double system_cost = 0.0;
 
   const auto min = 0.0;
   const auto max = 0.5;
@@ -562,19 +596,25 @@ double PathSelectorNode::lateral_comfortability(const std::vector<Data> & extrac
 
   for (size_t i = 0; i < extract_data.size(); i++) {
     if (extract_data.at(i).metrics.count("manual_lat_accel") != 0) {
-      cost += normalize(
+      manual_cost += normalize(
         std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("manual_lat_accel")));
+    }
+    if (extract_data.at(i).metrics.count("system_lat_accel") != 0) {
+      system_cost += normalize(
+        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("system_lat_accel")));
     }
   }
 
-  return cost / extract_data.size();
+  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-double PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
+auto PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
+  -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
 
-  double reward = 0.0;
+  double manual_reward = 0.0;
+  double system_reward = 0.0;
 
   const auto min = 0.0;
   const auto max = 20.0;
@@ -584,12 +624,16 @@ double PathSelectorNode::efficiency(const std::vector<Data> & extract_data) cons
 
   for (size_t i = 0; i < extract_data.size(); i++) {
     if (extract_data.at(i).metrics.count("maunal_travel_distance") != 0) {
-      reward += normalize(
+      manual_reward += normalize(
         std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("maunal_travel_distance") / 0.5);
+    }
+    if (extract_data.at(i).metrics.count("system_travel_distance") != 0) {
+      system_reward += normalize(
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("system_travel_distance") / 0.5);
     }
   }
 
-  return reward / extract_data.size();
+  return {manual_reward / extract_data.size(), system_reward / extract_data.size()};
 }
 
 void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
