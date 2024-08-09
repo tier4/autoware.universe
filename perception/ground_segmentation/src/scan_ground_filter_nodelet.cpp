@@ -86,6 +86,15 @@ ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions &
     stop_watch_ptr_->tic("cyclic_time");
     stop_watch_ptr_->tic("processing_time");
   }
+
+  // time keeper
+  {
+    debug_processing_time_detail_pub_ =
+      create_publisher<autoware::universe_utils::ProcessingTimeDetail>(
+        "~/debug/processing_time_detail_ms", 1);
+    time_keeper_ =
+      std::make_shared<autoware::universe_utils::TimeKeeper>(debug_processing_time_detail_pub_);
+  }
 }
 
 inline void ScanGroundFilterComponent::set_field_offsets(const PointCloud2ConstPtr & input)
@@ -113,6 +122,8 @@ inline void ScanGroundFilterComponent::get_point_from_global_offset(
 void ScanGroundFilterComponent::convertPointcloudGridScan(
   const PointCloud2ConstPtr & in_cloud, std::vector<PointCloudVector> & out_radial_ordered_points)
 {
+  autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+
   out_radial_ordered_points.resize(radial_dividers_num_);
   PointData current_point;
 
@@ -127,6 +138,7 @@ void ScanGroundFilterComponent::convertPointcloudGridScan(
   const size_t in_cloud_data_size = in_cloud->data.size();
   const size_t in_cloud_point_step = in_cloud->point_step;
 
+  time_keeper_->start_track("hoge");
   size_t point_index = 0;
   pcl::PointXYZ input_point;
   for (size_t global_offset = 0; global_offset + in_cloud_point_step <= in_cloud_data_size;
@@ -155,12 +167,16 @@ void ScanGroundFilterComponent::convertPointcloudGridScan(
     out_radial_ordered_points[radial_div].emplace_back(current_point);
     ++point_index;
   }
+  time_keeper_->end_track("hoge");
 
   // sort by distance
-  for (size_t i = 0; i < radial_dividers_num_; ++i) {
-    std::sort(
-      out_radial_ordered_points[i].begin(), out_radial_ordered_points[i].end(),
-      [](const PointData & a, const PointData & b) { return a.radius < b.radius; });
+  {
+    autoware::universe_utils::ScopedTimeTrack st("sort_by_distance", *time_keeper_);
+    for (size_t i = 0; i < radial_dividers_num_; ++i) {
+      std::sort(
+        out_radial_ordered_points[i].begin(), out_radial_ordered_points[i].end(),
+        [](const PointData & a, const PointData & b) { return a.radius < b.radius; });
+    }
   }
 }
 
@@ -335,6 +351,8 @@ void ScanGroundFilterComponent::classifyPointCloudGridScan(
   const PointCloud2ConstPtr & in_cloud, std::vector<PointCloudVector> & in_radial_ordered_clouds,
   pcl::PointIndices & out_no_ground_indices)
 {
+  autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+
   out_no_ground_indices.indices.clear();
   for (size_t i = 0; i < in_radial_ordered_clouds.size(); ++i) {
     PointsCentroid ground_cluster;
@@ -582,6 +600,8 @@ void ScanGroundFilterComponent::faster_filter(
   PointCloud2 & output,
   [[maybe_unused]] const pointcloud_preprocessor::TransformInfo & transform_info)
 {
+  autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+
   std::scoped_lock lock(mutex_);
   stop_watch_ptr_->toc("processing_time", true);
 

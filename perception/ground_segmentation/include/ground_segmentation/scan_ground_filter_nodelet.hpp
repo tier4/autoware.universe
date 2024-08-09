@@ -15,6 +15,7 @@
 #ifndef GROUND_SEGMENTATION__SCAN_GROUND_FILTER_NODELET_HPP_
 #define GROUND_SEGMENTATION__SCAN_GROUND_FILTER_NODELET_HPP_
 
+#include "autoware/universe_utils/system/time_keeper.hpp"
 #include "pointcloud_preprocessor/filter.hpp"
 #include "pointcloud_preprocessor/transform_info.hpp"
 
@@ -283,6 +284,11 @@ private:
   std::unique_ptr<autoware::universe_utils::StopWatch<std::chrono::milliseconds>> stop_watch_ptr_{
     nullptr};
   std::unique_ptr<autoware::universe_utils::DebugPublisher> debug_publisher_ptr_{nullptr};
+
+  // time keeper
+  mutable std::shared_ptr<autoware::universe_utils::TimeKeeper> time_keeper_{nullptr};
+  rclcpp::Publisher<autoware::universe_utils::ProcessingTimeDetail>::SharedPtr
+    debug_processing_time_detail_pub_;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
