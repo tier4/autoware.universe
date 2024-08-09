@@ -231,8 +231,6 @@ struct DataSet
     const double time_resolution = 0.5;
     const double delay_until_departure = 0.0;
 
-    const double acceleration = buf_accel.get().accel.accel.linear.x;
-    const auto current_velocity = buf_odometry.get().twist.twist.linear.x;
     const auto current_pose = buf_odometry.get().pose.pose;
 
     const auto points = buf_trajectory.get().points;
@@ -240,6 +238,9 @@ struct DataSet
     const auto ego_seg_idx =
       autoware::motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
         points, current_pose, 1.0, M_PI_2);
+
+    auto pred_accel = points.at(ego_seg_idx).acceleration_mps2;
+    auto pred_velocity = points.at(ego_seg_idx).longitudinal_velocity_mps;
 
     std::vector<TrajectoryPoint> predicted_path;
     const auto vehicle_pose_frenet =
@@ -253,7 +254,7 @@ struct DataSet
       if (t >= delay_until_departure) {
         // Adjust time to consider the delay.
         double t_with_delay = t - delay_until_departure;
-        length = current_velocity * t_with_delay + 0.5 * acceleration * t_with_delay * t_with_delay;
+        length = pred_velocity * t_with_delay + 0.5 * pred_accel * t_with_delay * t_with_delay;
       }
 
       const auto pose =
@@ -261,6 +262,9 @@ struct DataSet
       const auto p_trajectory =
         autoware::motion_utils::calcInterpolatedPoint(buf_trajectory.get(), pose);
       predicted_path.push_back(p_trajectory);
+
+      pred_accel = p_trajectory.acceleration_mps2;
+      pred_velocity = p_trajectory.longitudinal_velocity_mps;
     }
 
     return predicted_path;
