@@ -769,12 +769,12 @@ std::pair<TurnSignalInfo, bool> TurnSignalDecider::getBehaviorTurnSignalInfo(
   const auto has_right_lane =
     right_same_direction_lane.has_value() || !right_opposite_lanes.empty();
 
-  if (
-    !is_pull_out && !existShiftSideLane(
-                      start_shift_length, end_shift_length, !has_left_lane, !has_right_lane,
-                      p.turn_signal_shift_length_threshold)) {
-    return std::make_pair(TurnSignalInfo(p_path_start, p_path_end), true);
-  }
+  // if (
+  //   !is_pull_out && !existShiftSideLane(
+  //                     start_shift_length, end_shift_length, !has_left_lane, !has_right_lane,
+  //                     p.turn_signal_shift_length_threshold)) {
+  //   return std::make_pair(TurnSignalInfo(p_path_start, p_path_end), true);
+  // }
 
   // Check if the ego will cross lane bounds.
   // Note that pull out requires blinkers, even if the ego does not cross lane bounds
