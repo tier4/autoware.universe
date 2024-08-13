@@ -217,54 +217,36 @@ struct DataSet
 
   rcutils_time_point_value_t timestamp;
 
-  std::vector<TrajectoryPoint> predict()
+  std::vector<TrajectoryPoint> predict(const Data & data)
   {
-    if (!buf_trajectory.is_ready()) {
-      return {};
-    }
-
-    if (buf_trajectory.get().points.empty()) {
-      return {};
-    }
-
     const double time_horizon = 10.0;
     const double time_resolution = 0.5;
-    const double delay_until_departure = 0.0;
 
-    const auto current_pose = buf_odometry.get().pose.pose;
+    const auto current_pose = data.odometry.pose.pose;
 
-    const auto points = buf_trajectory.get().points;
+    const auto points = data.trajectory.points;
 
     const auto ego_seg_idx =
       autoware::motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
-        points, current_pose, 1.0, M_PI_2);
-
-    auto pred_accel = points.at(ego_seg_idx).acceleration_mps2;
-    auto pred_velocity = points.at(ego_seg_idx).longitudinal_velocity_mps;
+        points, current_pose, 10.0, M_PI_2);
 
     std::vector<TrajectoryPoint> predicted_path;
     const auto vehicle_pose_frenet =
       convertToFrenetPoint(points, current_pose.position, ego_seg_idx);
 
+    double length = 0.0;
     for (double t = 0.0; t < time_horizon; t += time_resolution) {
-      double length = 0.0;
-
-      // If t < delay_until_departure, it means ego have not depart yet, therefore the velocity is
-      // 0 and there's no change in position.
-      if (t >= delay_until_departure) {
-        // Adjust time to consider the delay.
-        double t_with_delay = t - delay_until_departure;
-        length = pred_velocity * t_with_delay + 0.5 * pred_accel * t_with_delay * t_with_delay;
-      }
-
       const auto pose =
         autoware::motion_utils::calcInterpolatedPose(points, vehicle_pose_frenet.length + length);
       const auto p_trajectory =
-        autoware::motion_utils::calcInterpolatedPoint(buf_trajectory.get(), pose);
+        autoware::motion_utils::calcInterpolatedPoint(data.trajectory, pose);
       predicted_path.push_back(p_trajectory);
 
-      pred_accel = p_trajectory.acceleration_mps2;
-      pred_velocity = p_trajectory.longitudinal_velocity_mps;
+      const auto pred_accel = p_trajectory.acceleration_mps2;
+      const auto pred_velocity = p_trajectory.longitudinal_velocity_mps;
+
+      length +=
+        pred_velocity * time_resolution + 0.5 * pred_accel * time_resolution * time_resolution;
     }
 
     return predicted_path;
@@ -316,7 +298,7 @@ struct DataSet
       extract_data.push_back(data);
     }
 
-    const auto trajectory_points = predict();
+    const auto trajectory_points = predict(extract_data.front());
     if (trajectory_points.size() != extract_data.size()) {
       throw std::logic_error("there is an inconsistency among data.");
     }
