@@ -18,6 +18,9 @@
 #include "autoware/motion_utils/trajectory/interpolation.hpp"
 #include "autoware/motion_utils/trajectory/trajectory.hpp"
 #include "autoware/universe_utils/ros/polling_subscriber.hpp"
+#include "autoware_frenet_planner/frenet_planner.hpp"
+#include "autoware_path_sampler/prepare_inputs.hpp"
+#include "autoware_path_sampler/utils/trajectory_utils.hpp"
 #include "rosbag2_cpp/reader.hpp"
 #include "type_alias.hpp"
 
@@ -205,6 +208,8 @@ struct Data
   Trajectory trajectory;
   TrajectoryPoint predicted_point;
 
+  std::vector<std::vector<TrajectoryPoint>> candidate_trajectories;
+
   std::unordered_map<METRICS, double> values;
 };
 
@@ -229,6 +234,42 @@ FrenetPoint convertToFrenetPoint(
     autoware::motion_utils::calcLateralOffset(points, search_point_geom, seg_idx);
 
   return frenet_point;
+}
+
+autoware::frenet_planner::SamplingParameters prepareSamplingParameters(
+  const autoware::sampler_common::State & initial_state, const double base_length,
+  const autoware::sampler_common::transform::Spline2D & path_spline, const double trajectory_length)
+{
+  autoware::frenet_planner::SamplingParameters sampling_parameters;
+
+  // calculate target lateral positions
+  std::vector<double> target_lateral_positions = {-4.5, -2.5, 0.0, 2.5, 4.5};
+  sampling_parameters.resolution = 0.5;
+  const auto max_s = path_spline.lastS();
+  autoware::frenet_planner::SamplingParameter p;
+  p.target_duration = 10.0;
+  for (const auto target_length : {trajectory_length}) {
+    p.target_state.position.s = std::min(
+      max_s, path_spline.frenet(initial_state.pose).s + std::max(0.0, target_length - base_length));
+    for (const auto target_longitudinal_velocity : {5.56, 11.1}) {
+      p.target_state.longitudinal_velocity = target_longitudinal_velocity;
+      for (const auto target_longitudinal_acceleration : {0.0}) {
+        p.target_state.longitudinal_acceleration = target_longitudinal_acceleration;
+        for (const auto target_lateral_position : target_lateral_positions) {
+          p.target_state.position.d = target_lateral_position;
+          for (const auto target_lat_vel : {0.0}) {
+            p.target_state.lateral_velocity = target_lat_vel;
+            for (const auto target_lat_acc : {-0.2, -0.1, 0.0, 0.1, 0.2}) {
+              p.target_state.lateral_acceleration = target_lat_acc;
+              sampling_parameters.parameters.push_back(p);
+            }
+          }
+        }
+      }
+    }
+    if (p.target_state.position.s == max_s) break;
+  }
+  return sampling_parameters;
 }
 
 struct DataSet
@@ -277,6 +318,54 @@ struct DataSet
     }
 
     return predicted_path;
+  }
+
+  std::vector<autoware::frenet_planner::Trajectory> sampling(const Data & data)
+  {
+    const auto reference_trajectory =
+      autoware::path_sampler::preparePathSpline(data.trajectory.points, true);
+
+    autoware::sampler_common::State current_state;
+    current_state.pose = {data.odometry.pose.pose.position.x, data.odometry.pose.pose.position.y};
+    current_state.heading = tf2::getYaw(data.odometry.pose.pose.orientation);
+
+    current_state.frenet = reference_trajectory.frenet(current_state.pose);
+    current_state.pose = reference_trajectory.cartesian(current_state.frenet.s);
+    current_state.heading = reference_trajectory.yaw(current_state.frenet.s);
+    current_state.curvature = reference_trajectory.curvature(current_state.frenet.s);
+
+    const auto trajectory_length = autoware::motion_utils::calcArcLength(data.trajectory.points);
+    const auto sampling_parameters =
+      prepareSamplingParameters(current_state, 0.0, reference_trajectory, trajectory_length);
+
+    autoware::frenet_planner::FrenetState initial_frenet_state;
+    initial_frenet_state.position = reference_trajectory.frenet(current_state.pose);
+    initial_frenet_state.longitudinal_velocity = data.odometry.twist.twist.linear.x;
+    initial_frenet_state.longitudinal_acceleration = data.accel.accel.accel.linear.x;
+    const auto s = initial_frenet_state.position.s;
+    const auto d = initial_frenet_state.position.d;
+    // Calculate Velocity and acceleration parametrized over arc length
+    // From appendix I of Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet
+    // Frame
+    const auto frenet_yaw = current_state.heading - reference_trajectory.yaw(s);
+    const auto path_curvature = reference_trajectory.curvature(s);
+    const auto delta_s = 0.001;
+    initial_frenet_state.lateral_velocity = (1 - path_curvature * d) * std::tan(frenet_yaw);
+    const auto path_curvature_deriv =
+      (reference_trajectory.curvature(s + delta_s) - path_curvature) / delta_s;
+    const auto cos_yaw = std::cos(frenet_yaw);
+    if (cos_yaw == 0.0) {
+      initial_frenet_state.lateral_acceleration = 0.0;
+    } else {
+      initial_frenet_state.lateral_acceleration =
+        -(path_curvature_deriv * d + path_curvature * initial_frenet_state.lateral_velocity) *
+          std::tan(frenet_yaw) +
+        ((1 - path_curvature * d) / (cos_yaw * cos_yaw)) *
+          (current_state.curvature * ((1 - path_curvature * d) / cos_yaw) - path_curvature);
+    }
+
+    return autoware::frenet_planner::generateTrajectories(
+      reference_trajectory, initial_frenet_state, sampling_parameters);
   }
 
   std::vector<Data> extract(const double time_horizon, const double time_resolution)
@@ -328,6 +417,12 @@ struct DataSet
     const auto trajectory_points = predict(extract_data.front());
     if (trajectory_points.size() != extract_data.size()) {
       throw std::logic_error("there is an inconsistency among data.");
+    }
+
+    const auto candidate_frenet_trajectories = sampling(extract_data.front());
+    for (const auto & frenet_trajectory : candidate_frenet_trajectories) {
+      extract_data.front().candidate_trajectories.push_back(
+        autoware::path_sampler::trajectory_utils::convertToTrajectoryPoints(frenet_trajectory));
     }
 
     for (size_t i = 0; i < extract_data.size(); ++i) {

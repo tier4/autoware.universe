@@ -76,8 +76,8 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
 : Node("path_selector_node", node_options)
 {
   using namespace std::literals::chrono_literals;
-  timer_ =
-    rclcpp::create_timer(this, get_clock(), 100ms, std::bind(&BehaviorAnalyzerNode::on_timer, this));
+  timer_ = rclcpp::create_timer(
+    this, get_clock(), 100ms, std::bind(&BehaviorAnalyzerNode::on_timer, this));
 
   vehicle_info_ = autoware::vehicle_info_utils::VehicleInfoUtils(*this).getVehicleInfo();
 
@@ -93,7 +93,8 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
   pub_cost_ = create_publisher<Float32MultiArrayStamped>("~/cost", rclcpp::QoS{1});
 
   srv_play_ = this->create_service<SetBool>(
-    "play", std::bind(&BehaviorAnalyzerNode::play, this, std::placeholders::_1, std::placeholders::_2),
+    "play",
+    std::bind(&BehaviorAnalyzerNode::play, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   srv_rewind_ = this->create_service<Trigger>(
@@ -176,7 +177,8 @@ void BehaviorAnalyzerNode::update(std::shared_ptr<DataSet> & data_set) const
   }
 }
 
-void BehaviorAnalyzerNode::play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res)
+void BehaviorAnalyzerNode::play(
+  const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res)
 {
   is_ready_ = req->data;
   if (is_ready_) {
@@ -648,18 +650,16 @@ void BehaviorAnalyzerNode::visualize(const std::vector<Data> & extract_data) con
       marker.pose = data.predicted_point.pose;
       msg.markers.push_back(marker);
     }
+  }
 
-    if (data.values.count(METRICS::MANUAL_MINIMUM_TTC) != 0) {
-      Marker marker = createDefaultMarker(
-        "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "ttc", i++, Marker::TEXT_VIEW_FACING,
-        createMarkerScale(1.0, 1.0, 1.0), createMarkerColor(1.0, 1.0, 1.0, 1.0));
-      marker.pose = data.odometry.pose.pose;
-
-      std::ostringstream string_stream;
-      string_stream << data.values.at(METRICS::MANUAL_MINIMUM_TTC) << "[s]";
-      marker.text = string_stream.str();
-      msg.markers.push_back(marker);
+  for (const auto & points : extract_data.front().candidate_trajectories) {
+    Marker marker = createDefaultMarker(
+      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "candidate_poses", i++, Marker::LINE_STRIP,
+      createMarkerScale(0.05, 0.0, 0.0), createMarkerColor(0.0, 0.0, 1.0, 0.999));
+    for (const auto & point : points) {
+      marker.points.push_back(point.pose.position);
     }
+    msg.markers.push_back(marker);
   }
 
   pub_marker_->publish(msg);
