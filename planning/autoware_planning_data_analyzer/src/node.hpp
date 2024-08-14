@@ -33,7 +33,7 @@
 #include <utility>
 #include <vector>
 
-namespace autoware::path_selector
+namespace autoware::behavior_analyzer
 {
 
 enum class METRICS {
@@ -360,10 +360,10 @@ struct DataSet
   }
 };
 
-class PathSelectorNode : public rclcpp::Node
+class BehaviorAnalyzerNode : public rclcpp::Node
 {
 public:
-  explicit PathSelectorNode(const rclcpp::NodeOptions & node_options);
+  explicit BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_options);
 
 private:
   void on_timer();
@@ -377,6 +377,8 @@ private:
   void play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res);
 
   void rewind(const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res);
+
+  void fill(std::vector<Data> & extract_data) const;
 
   auto manual_all_ttc(const Data & data) const -> std::vector<double>;
 
@@ -427,6 +429,6 @@ private:
 
   bool is_ready_{false};
 };
-}  // namespace autoware::path_selector
+}  // namespace autoware::behavior_analyzer
 
 #endif  // NODE_HPP_

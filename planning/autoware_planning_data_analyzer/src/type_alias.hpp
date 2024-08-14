@@ -33,7 +33,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
-namespace autoware::path_selector
+namespace autoware::behavior_analyzer
 {
 // std
 using std::chrono::duration_cast;
@@ -63,6 +63,6 @@ using tf2_msgs::msg::TFMessage;
 using tier4_debug_msgs::msg::Float32MultiArrayStamped;
 using visualization_msgs::msg::Marker;
 using visualization_msgs::msg::MarkerArray;
-}  // namespace autoware::path_selector
+}  // namespace autoware::behavior_analyzer
 
 #endif  // TYPE_ALIAS_HPP_

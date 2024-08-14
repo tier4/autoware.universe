@@ -18,7 +18,7 @@
   </group>
 
   <node_container pkg="rclcpp_components" exec="component_container" name="path_selector_container" namespace="" output="screen">
-    <composable_node pkg="autoware_path_selector" plugin="autoware::path_selector::PathSelectorNode" name="path_selector">
+    <composable_node pkg="autoware_planning_data_analyzer" plugin="autoware::behavior_analyzer::BehaviorAnalyzerNode" name="behavior_analyzer">
       <param name="bag_path" value="$(var bag_path)"/>
     </composable_node>
 

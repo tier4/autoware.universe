@@ -23,7 +23,7 @@
 #include <boost/geometry/algorithms/correct.hpp>
 #include <boost/geometry/algorithms/union.hpp>
 
-namespace autoware::path_selector
+namespace autoware::behavior_analyzer
 {
 using autoware::universe_utils::createDefaultMarker;
 using autoware::universe_utils::createMarkerColor;
@@ -72,12 +72,12 @@ tf2::Vector3 get_velocity_in_world_coordinate(const TrajectoryPoint & point)
 }
 }  // namespace
 
-PathSelectorNode::PathSelectorNode(const rclcpp::NodeOptions & node_options)
+BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_options)
 : Node("path_selector_node", node_options)
 {
   using namespace std::literals::chrono_literals;
   timer_ =
-    rclcpp::create_timer(this, get_clock(), 100ms, std::bind(&PathSelectorNode::on_timer, this));
+    rclcpp::create_timer(this, get_clock(), 100ms, std::bind(&BehaviorAnalyzerNode::on_timer, this));
 
   vehicle_info_ = autoware::vehicle_info_utils::VehicleInfoUtils(*this).getVehicleInfo();
 
@@ -93,12 +93,12 @@ PathSelectorNode::PathSelectorNode(const rclcpp::NodeOptions & node_options)
   pub_cost_ = create_publisher<Float32MultiArrayStamped>("~/cost", rclcpp::QoS{1});
 
   srv_play_ = this->create_service<SetBool>(
-    "play", std::bind(&PathSelectorNode::play, this, std::placeholders::_1, std::placeholders::_2),
+    "play", std::bind(&BehaviorAnalyzerNode::play, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   srv_rewind_ = this->create_service<Trigger>(
     "rewind",
-    std::bind(&PathSelectorNode::rewind, this, std::placeholders::_1, std::placeholders::_2),
+    std::bind(&BehaviorAnalyzerNode::rewind, this, std::placeholders::_1, std::placeholders::_2),
     rclcpp::ServicesQoS().get_rmw_qos_profile());
 
   reader_.open(declare_parameter<std::string>("bag_path"));
@@ -107,7 +107,7 @@ PathSelectorNode::PathSelectorNode(const rclcpp::NodeOptions & node_options)
     duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
 }
 
-void PathSelectorNode::update(std::shared_ptr<DataSet> & data_set) const
+void BehaviorAnalyzerNode::update(std::shared_ptr<DataSet> & data_set) const
 {
   rosbag2_storage::StorageFilter filter;
   filter.topics.emplace_back("/tf");
@@ -176,7 +176,7 @@ void PathSelectorNode::update(std::shared_ptr<DataSet> & data_set) const
   }
 }
 
-void PathSelectorNode::play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res)
+void BehaviorAnalyzerNode::play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res)
 {
   is_ready_ = req->data;
   if (is_ready_) {
@@ -187,7 +187,7 @@ void PathSelectorNode::play(const SetBool::Request::SharedPtr req, SetBool::Resp
   res->success = true;
 }
 
-void PathSelectorNode::rewind(
+void BehaviorAnalyzerNode::rewind(
   [[maybe_unused]] const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res)
 {
   reader_.seek(0);
@@ -199,7 +199,7 @@ void PathSelectorNode::rewind(
   res->success = true;
 }
 
-auto PathSelectorNode::manual_all_ttc(const Data & data) const -> std::vector<double>
+auto BehaviorAnalyzerNode::manual_all_ttc(const Data & data) const -> std::vector<double>
 {
   if (data.objects.objects.empty()) {
     return {};
@@ -229,7 +229,7 @@ auto PathSelectorNode::manual_all_ttc(const Data & data) const -> std::vector<do
   return ttc;
 }
 
-auto PathSelectorNode::system_all_ttc(const Data & data) const -> std::vector<double>
+auto BehaviorAnalyzerNode::system_all_ttc(const Data & data) const -> std::vector<double>
 {
   if (data.objects.objects.empty()) {
     return {};
@@ -259,14 +259,14 @@ auto PathSelectorNode::system_all_ttc(const Data & data) const -> std::vector<do
   return ttc;
 }
 
-double PathSelectorNode::manual_lateral_accel(const Data & data) const
+double BehaviorAnalyzerNode::manual_lateral_accel(const Data & data) const
 {
   const auto radius = vehicle_info_.wheel_base_m / std::tan(data.steer.steering_tire_angle);
   const auto speed = data.odometry.twist.twist.linear.x;
   return speed * speed / radius;
 }
 
-double PathSelectorNode::system_lateral_accel(const Data & data) const
+double BehaviorAnalyzerNode::system_lateral_accel(const Data & data) const
 {
   const auto radius =
     vehicle_info_.wheel_base_m / std::tan(data.predicted_point.front_wheel_angle_rad);
@@ -274,7 +274,7 @@ double PathSelectorNode::system_lateral_accel(const Data & data) const
   return speed * speed / radius;
 }
 
-double PathSelectorNode::manual_longitudinal_jerk(
+double BehaviorAnalyzerNode::manual_longitudinal_jerk(
   const Data & front_data, const Data & back_data) const
 {
   const auto & front_accel = front_data.accel;
@@ -286,7 +286,7 @@ double PathSelectorNode::manual_longitudinal_jerk(
   return 1e9 * (back_accel.accel.accel.linear.x - front_accel.accel.accel.linear.x) / dt;
 }
 
-double PathSelectorNode::system_longitudinal_jerk(
+double BehaviorAnalyzerNode::system_longitudinal_jerk(
   const Data & front_data, const Data & back_data) const
 {
   return (back_data.predicted_point.acceleration_mps2 -
@@ -294,7 +294,7 @@ double PathSelectorNode::system_longitudinal_jerk(
          0.5;
 }
 
-double PathSelectorNode::manual_travel_distance(
+double BehaviorAnalyzerNode::manual_travel_distance(
   const Data & front_data, const Data & back_data) const
 {
   const auto travel_distance = autoware::universe_utils::calcDistance3d(
@@ -302,7 +302,7 @@ double PathSelectorNode::manual_travel_distance(
   return travel_distance + front_data.values.at(METRICS::MANUAL_TRAVEL_DISTANCE);
 }
 
-double PathSelectorNode::system_travel_distance(
+double BehaviorAnalyzerNode::system_travel_distance(
   const Data & front_data, const Data & back_data) const
 {
   const auto travel_distance = autoware::universe_utils::calcDistance3d(
@@ -310,12 +310,29 @@ double PathSelectorNode::system_travel_distance(
   return travel_distance + front_data.values.at(METRICS::SYSTEM_TRAVEL_DISTANCE);
 }
 
-void PathSelectorNode::process(std::vector<Data> & extract_data) const
+void BehaviorAnalyzerNode::process(std::vector<Data> & extract_data) const
 {
   if (extract_data.empty()) {
     return;
   }
 
+  fill(extract_data);
+
+  pub_tf_->publish(extract_data.front().tf);
+
+  pub_objects_->publish(extract_data.front().objects);
+
+  pub_trajectory_->publish(extract_data.front().trajectory);
+
+  pub_metrics_->publish(metrics(extract_data));
+
+  pub_cost_->publish(reward(extract_data));
+
+  visualize(extract_data);
+}
+
+void BehaviorAnalyzerNode::fill(std::vector<Data> & extract_data) const
+{
   {
     // travel distance
     {
@@ -413,21 +430,9 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
       extract_data.back().values.emplace(METRICS::SYSTEM_LONGITUDINAL_JERK, 0.0);
     }
   }
-
-  pub_tf_->publish(extract_data.front().tf);
-
-  pub_objects_->publish(extract_data.front().objects);
-
-  pub_trajectory_->publish(extract_data.front().trajectory);
-
-  pub_metrics_->publish(metrics(extract_data));
-
-  pub_cost_->publish(reward(extract_data));
-
-  visualize(extract_data);
 }
 
-auto PathSelectorNode::metrics(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::metrics(const std::vector<Data> & extract_data) const
   -> Float32MultiArrayStamped
 {
   Float32MultiArrayStamped msg{};
@@ -465,7 +470,7 @@ auto PathSelectorNode::metrics(const std::vector<Data> & extract_data) const
   return msg;
 }
 
-auto PathSelectorNode::reward(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::reward(const std::vector<Data> & extract_data) const
   -> Float32MultiArrayStamped
 {
   Float32MultiArrayStamped msg{};
@@ -504,7 +509,7 @@ auto PathSelectorNode::reward(const std::vector<Data> & extract_data) const
   return msg;
 }
 
-auto PathSelectorNode::safety(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::safety(const std::vector<Data> & extract_data) const
   -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
@@ -532,7 +537,7 @@ auto PathSelectorNode::safety(const std::vector<Data> & extract_data) const
   return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-auto PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
   -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
@@ -562,7 +567,7 @@ auto PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & ext
   return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-auto PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::lateral_comfortability(const std::vector<Data> & extract_data) const
   -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
@@ -592,7 +597,7 @@ auto PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_
   return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
 }
 
-auto PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
+auto BehaviorAnalyzerNode::efficiency(const std::vector<Data> & extract_data) const
   -> std::pair<double, double>
 {
   constexpr double TIME_FACTOR = 0.8;
@@ -622,7 +627,7 @@ auto PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
   return {manual_reward / extract_data.size(), system_reward / extract_data.size()};
 }
 
-void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
+void BehaviorAnalyzerNode::visualize(const std::vector<Data> & extract_data) const
 {
   MarkerArray msg;
 
@@ -660,7 +665,7 @@ void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
   pub_marker_->publish(msg);
 }
 
-void PathSelectorNode::on_timer()
+void BehaviorAnalyzerNode::on_timer()
 {
   if (!is_ready_) {
     return;
@@ -672,7 +677,7 @@ void PathSelectorNode::on_timer()
 
   process(extract_data);
 }
-}  // namespace autoware::path_selector
+}  // namespace autoware::behavior_analyzer
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(autoware::path_selector::PathSelectorNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(autoware::behavior_analyzer::BehaviorAnalyzerNode)
