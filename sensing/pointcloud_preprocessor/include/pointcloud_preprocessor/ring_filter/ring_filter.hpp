@@ -29,6 +29,7 @@ private:
 
   // parameter
   uint32_t ring_interval_;
+  bool remove_interval_ring_;
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW

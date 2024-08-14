@@ -16,7 +16,7 @@
 
 namespace
 {
-sensor_msgs::msg::PointCloud2 filterPointCloudByRing(const sensor_msgs::msg::PointCloud2& input_cloud, int ring_interval) {
+sensor_msgs::msg::PointCloud2 filterPointCloudByRing(const sensor_msgs::msg::PointCloud2& input_cloud, int ring_interval, bool remove_interval_ring) {
     // Prepare new pointcloud2 message
     sensor_msgs::msg::PointCloud2 output_cloud;
     output_cloud.header = input_cloud.header;
@@ -35,7 +35,8 @@ sensor_msgs::msg::PointCloud2 filterPointCloudByRing(const sensor_msgs::msg::Poi
     sensor_msgs::PointCloud2ConstIterator<uint16_t> ring_iter(input_cloud, "ring");
 
     for (sensor_msgs::PointCloud2ConstIterator<uint8_t> iter(input_cloud, "x"); iter != iter.end(); ++iter, ++ring_iter) {
-        if ((*ring_iter % ring_interval) == 0) {
+      const bool remove_condition = remove_interval_ring ? (*ring_iter % ring_interval) == 0 : (*ring_iter % ring_interval) != 0;
+        if (!remove_condition) {
             // Add points according to the ring interval
             const uint8_t* point_ptr = &(*iter);
             output_data.insert(output_data.end(), point_ptr, point_ptr + input_cloud.point_step);
@@ -57,6 +58,7 @@ RingFilterComponent::RingFilterComponent(
 : Filter("RingFilter", node_options)
 {
   ring_interval_ = static_cast<uint32_t>(declare_parameter("ring_interval", 2));
+  remove_interval_ring_ = static_cast<bool>(declare_parameter("remove_interval_ring", true));
 }
 
 void RingFilterComponent::filter(
@@ -66,7 +68,7 @@ void RingFilterComponent::filter(
     RCLCPP_WARN(get_logger(), "Indices are not supported and will be ignored");
   }
 
-  output = filterPointCloudByRing(*input, ring_interval_);
+  output = filterPointCloudByRing(*input, ring_interval_, remove_interval_ring_);
 }
 
 }  // namespace pointcloud_preprocessor
