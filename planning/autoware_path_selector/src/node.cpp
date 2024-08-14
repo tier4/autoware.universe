@@ -381,6 +381,14 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
         "manual_lon_accel", extract_data.back().accel.accel.accel.linear.x);
     }
 
+    // lateral acceleration
+    {
+      extract_data.back().metrics.emplace(
+        "manual_lat_accel", manual_lateral_accel(extract_data.back()));
+      extract_data.back().metrics.emplace(
+        "system_lat_accel", system_lateral_accel(extract_data.back()));
+    }
+
     // minimum ttc
     {
       std::vector<double> ttc = manual_all_ttc(extract_data.back());
