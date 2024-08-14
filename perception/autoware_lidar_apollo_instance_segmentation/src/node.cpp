@@ -53,6 +53,8 @@ void LidarInstanceSegmentationNode::pointCloudCallback(
   stop_watch_ptr_->toc("processing_time", true);
   tier4_perception_msgs::msg::DetectedObjectsWithFeature output_msg;
   detector_ptr_->detectDynamicObjects(*msg, output_msg);
+  RCLCPP_ERROR(get_logger(), "Output msgs: %ld", (output_msg.feature_objects).size());
+  std::cerr << "Output msgs stdcerr: " << (output_msg.feature_objects).size() << std::endl;
   dynamic_objects_pub_->publish(output_msg);
   debugger_ptr_->publishColoredPointCloud(output_msg);
 

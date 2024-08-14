@@ -155,6 +155,9 @@ bool LidarApolloInstanceSegmentation::detectDynamicObjects(
     point.intensity = static_cast<float>(*it_intensity);
     pcl_pointcloud_raw.emplace_back(std::move(point));
   }
+  // RCLCPP_ERROR(get_logger(), "[detectDynamicObjects 1] pcl_pointcloud_raw_ptr->" << (output_msg.feature_objects).size());
+  RCLCPP_ERROR(node_->get_logger(), "[detectDynamicObjects 1] pcl_pointcloud_raw_ptr->: %ld", (pcl_pointcloud_raw_ptr->points).size());
+  std::cerr << "[detectDynamicObjects 1] pcl_pointcloud_raw_ptr->: " << (pcl_pointcloud_raw_ptr->points).size() << std::endl;
 
   // generate feature map
   std::shared_ptr<FeatureMapInterface> feature_map_ptr =
