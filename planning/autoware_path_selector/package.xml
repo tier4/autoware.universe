@@ -23,6 +23,7 @@
   <depend>autoware_vehicle_info_utils</depend>
   <depend>autoware_vehicle_msgs</depend>
   <depend>diagnostic_msgs</depend>
+  <depend>magic_enum</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>rosbag2_cpp</depend>

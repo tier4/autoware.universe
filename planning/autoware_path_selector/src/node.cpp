@@ -299,7 +299,7 @@ double PathSelectorNode::manual_travel_distance(
 {
   const auto travel_distance = autoware::universe_utils::calcDistance3d(
     front_data.odometry.pose.pose, back_data.odometry.pose.pose);
-  return travel_distance + front_data.metrics.at("maunal_travel_distance");
+  return travel_distance + front_data.values.at(METRICS::MANUAL_TRAVEL_DISTANCE);
 }
 
 double PathSelectorNode::system_travel_distance(
@@ -307,7 +307,7 @@ double PathSelectorNode::system_travel_distance(
 {
   const auto travel_distance = autoware::universe_utils::calcDistance3d(
     front_data.predicted_point.pose, back_data.predicted_point.pose);
-  return travel_distance + front_data.metrics.at("system_travel_distance");
+  return travel_distance + front_data.values.at(METRICS::SYSTEM_TRAVEL_DISTANCE);
 }
 
 void PathSelectorNode::process(std::vector<Data> & extract_data) const
@@ -319,24 +319,24 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
   {
     // travel distance
     {
-      extract_data.front().metrics.emplace("maunal_travel_distance", 0.0);
-      extract_data.front().metrics.emplace("system_travel_distance", 0.0);
+      extract_data.front().values.emplace(METRICS::MANUAL_TRAVEL_DISTANCE, 0.0);
+      extract_data.front().values.emplace(METRICS::SYSTEM_TRAVEL_DISTANCE, 0.0);
     }
   }
 
   for (size_t i = 0; i < extract_data.size() - 1; i++) {
     // longitudinal acceleration
     {
-      extract_data.at(i).metrics.emplace(
-        "manual_lon_accel", extract_data.at(i).accel.accel.accel.linear.x);
+      extract_data.at(i).values.emplace(
+        METRICS::MANUAL_LONGITUDINAL_ACCEL, extract_data.at(i).accel.accel.accel.linear.x);
     }
 
     // lateral acceleration
     {
-      extract_data.at(i).metrics.emplace(
-        "manual_lat_accel", manual_lateral_accel(extract_data.at(i)));
-      extract_data.at(i).metrics.emplace(
-        "system_lat_accel", system_lateral_accel(extract_data.at(i)));
+      extract_data.at(i).values.emplace(
+        METRICS::MANUAL_LATERAL_ACCEL, manual_lateral_accel(extract_data.at(i)));
+      extract_data.at(i).values.emplace(
+        METRICS::SYSTEM_LATERAL_ACCEL, system_lateral_accel(extract_data.at(i)));
     }
 
     // minimum ttc
@@ -344,32 +344,34 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
       std::vector<double> ttc = manual_all_ttc(extract_data.at(i));
       std::sort(ttc.begin(), ttc.end());
       if (!ttc.empty()) {
-        extract_data.at(i).metrics.emplace("manual_ttc_min", ttc.front());
+        extract_data.at(i).values.emplace(METRICS::MANUAL_MINIMUM_TTC, ttc.front());
       }
     }
     {
       std::vector<double> ttc = system_all_ttc(extract_data.at(i));
       std::sort(ttc.begin(), ttc.end());
       if (!ttc.empty()) {
-        extract_data.at(i).metrics.emplace("system_ttc_min", ttc.front());
+        extract_data.at(i).values.emplace(METRICS::SYSTEM_MINIMUM_TTC, ttc.front());
       }
     }
 
     // longitudinal jerk
     {
-      extract_data.at(i).metrics.emplace(
-        "manual_lon_jerk", manual_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
-      extract_data.at(i).metrics.emplace(
-        "system_lon_jerk", system_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
+      extract_data.at(i).values.emplace(
+        METRICS::MANUAL_LONGITUDINAL_JERK,
+        manual_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
+      extract_data.at(i).values.emplace(
+        METRICS::SYSTEM_LONGITUDINAL_JERK,
+        system_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
     }
 
     // travel distance
     {
-      extract_data.at(i + 1).metrics.emplace(
-        "maunal_travel_distance",
+      extract_data.at(i + 1).values.emplace(
+        METRICS::MANUAL_TRAVEL_DISTANCE,
         manual_travel_distance(extract_data.at(i), extract_data.at(i + 1)));
-      extract_data.at(i + 1).metrics.emplace(
-        "system_travel_distance",
+      extract_data.at(i + 1).values.emplace(
+        METRICS::SYSTEM_TRAVEL_DISTANCE,
         system_travel_distance(extract_data.at(i), extract_data.at(i + 1)));
     }
   }
@@ -377,16 +379,16 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
   {
     // acceleration
     {
-      extract_data.back().metrics.emplace(
-        "manual_lon_accel", extract_data.back().accel.accel.accel.linear.x);
+      extract_data.back().values.emplace(
+        METRICS::MANUAL_LONGITUDINAL_ACCEL, extract_data.back().accel.accel.accel.linear.x);
     }
 
     // lateral acceleration
     {
-      extract_data.back().metrics.emplace(
-        "manual_lat_accel", manual_lateral_accel(extract_data.back()));
-      extract_data.back().metrics.emplace(
-        "system_lat_accel", system_lateral_accel(extract_data.back()));
+      extract_data.back().values.emplace(
+        METRICS::MANUAL_LATERAL_ACCEL, manual_lateral_accel(extract_data.back()));
+      extract_data.back().values.emplace(
+        METRICS::SYSTEM_LATERAL_ACCEL, system_lateral_accel(extract_data.back()));
     }
 
     // minimum ttc
@@ -394,129 +396,22 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
       std::vector<double> ttc = manual_all_ttc(extract_data.back());
       std::sort(ttc.begin(), ttc.end());
       if (!ttc.empty()) {
-        extract_data.back().metrics.emplace("manual_ttc_min", ttc.front());
+        extract_data.back().values.emplace(METRICS::MANUAL_MINIMUM_TTC, ttc.front());
       }
     }
     {
       std::vector<double> ttc = system_all_ttc(extract_data.back());
       std::sort(ttc.begin(), ttc.end());
       if (!ttc.empty()) {
-        extract_data.back().metrics.emplace("system_ttc_min", ttc.front());
+        extract_data.back().values.emplace(METRICS::SYSTEM_MINIMUM_TTC, ttc.front());
       }
     }
 
     // longitudinal jerk
     {
-      extract_data.back().metrics.emplace("manual_lon_jerk", 0.0);
-      extract_data.back().metrics.emplace("system_lon_jerk", 0.0);
+      extract_data.back().values.emplace(METRICS::MANUAL_LONGITUDINAL_JERK, 0.0);
+      extract_data.back().values.emplace(METRICS::SYSTEM_LONGITUDINAL_JERK, 0.0);
     }
-  }
-
-  Float32MultiArrayStamped metrics{};
-
-  constexpr size_t METRICS_NUM = 9;
-
-  metrics.stamp = now();
-  metrics.data.resize(METRICS_NUM * extract_data.size());
-  metrics.layout.dim.resize(METRICS_NUM);
-
-  metrics.layout.dim.at(0).label = "manual_lon_accel";
-  metrics.layout.dim.at(0).size = extract_data.size();
-  metrics.layout.dim.at(1).label = "manual_ttc_min";
-  metrics.layout.dim.at(1).size = extract_data.size();
-  metrics.layout.dim.at(2).label = "manual_lon_jerk";
-  metrics.layout.dim.at(2).size = extract_data.size();
-  metrics.layout.dim.at(3).label = "maunal_travel_distance";
-  metrics.layout.dim.at(3).size = extract_data.size();
-  metrics.layout.dim.at(4).label = "manual_lat_accel";
-  metrics.layout.dim.at(4).size = extract_data.size();
-
-  metrics.layout.dim.at(5).label = "system_lon_jerk";
-  metrics.layout.dim.at(5).size = extract_data.size();
-  metrics.layout.dim.at(6).label = "system_travel_distance";
-  metrics.layout.dim.at(6).size = extract_data.size();
-  metrics.layout.dim.at(7).label = "system_lat_accel";
-  metrics.layout.dim.at(7).size = extract_data.size();
-  metrics.layout.dim.at(8).label = "system_ttc_min";
-  metrics.layout.dim.at(8).size = extract_data.size();
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    // acceleration
-    if (extract_data.at(i).metrics.count("manual_lon_accel") != 0) {
-      metrics.data.at(0 * metrics.layout.dim.at(0).size + i) =
-        extract_data.at(i).metrics.at("manual_lon_accel");
-    }
-
-    // minimum ttc
-    if (extract_data.at(i).metrics.count("manual_ttc_min") != 0) {
-      metrics.data.at(1 * metrics.layout.dim.at(1).size + i) =
-        extract_data.at(i).metrics.at("manual_ttc_min");
-    }
-    if (extract_data.at(i).metrics.count("system_ttc_min") != 0) {
-      metrics.data.at(8 * metrics.layout.dim.at(8).size + i) =
-        extract_data.at(i).metrics.at("system_ttc_min");
-    }
-
-    // longitudinal jerk
-    if (extract_data.at(i).metrics.count("manual_lon_jerk") != 0) {
-      metrics.data.at(2 * metrics.layout.dim.at(2).size + i) =
-        extract_data.at(i).metrics.at("manual_lon_jerk");
-    }
-    if (extract_data.at(i).metrics.count("system_lon_jerk") != 0) {
-      metrics.data.at(5 * metrics.layout.dim.at(5).size + i) =
-        extract_data.at(i).metrics.at("system_lon_jerk");
-    }
-
-    // travel_distance
-    if (extract_data.at(i).metrics.count("maunal_travel_distance") != 0) {
-      metrics.data.at(3 * metrics.layout.dim.at(3).size + i) =
-        extract_data.at(i).metrics.at("maunal_travel_distance");
-    }
-    if (extract_data.at(i).metrics.count("system_travel_distance") != 0) {
-      metrics.data.at(6 * metrics.layout.dim.at(6).size + i) =
-        extract_data.at(i).metrics.at("system_travel_distance");
-    }
-
-    // acceleration
-    if (extract_data.at(i).metrics.count("manual_lat_accel") != 0) {
-      metrics.data.at(4 * metrics.layout.dim.at(0).size + i) =
-        extract_data.at(i).metrics.at("manual_lat_accel");
-    }
-    if (extract_data.at(i).metrics.count("system_lat_accel") != 0) {
-      metrics.data.at(7 * metrics.layout.dim.at(7).size + i) =
-        extract_data.at(i).metrics.at("system_lat_accel");
-    }
-  }
-
-  Float32MultiArrayStamped cost{};
-
-  constexpr size_t COST_NUM = 8;
-
-  cost.stamp = now();
-  cost.data.resize(COST_NUM);
-
-  {
-    const auto [manual, system] = longitudinal_comfortability(extract_data);
-    cost.data.at(0) = manual;
-    cost.data.at(4) = system;
-  }
-
-  {
-    const auto [manual, system] = lateral_comfortability(extract_data);
-    cost.data.at(1) = manual;
-    cost.data.at(5) = system;
-  }
-
-  {
-    const auto [manual, system] = efficiency(extract_data);
-    cost.data.at(2) = manual;
-    cost.data.at(6) = system;
-  }
-
-  {
-    const auto [manual, system] = safety(extract_data);
-    cost.data.at(3) = manual;
-    cost.data.at(7) = system;
   }
 
   pub_tf_->publish(extract_data.front().tf);
@@ -525,11 +420,88 @@ void PathSelectorNode::process(std::vector<Data> & extract_data) const
 
   pub_trajectory_->publish(extract_data.front().trajectory);
 
-  pub_metrics_->publish(metrics);
+  pub_metrics_->publish(metrics(extract_data));
 
-  pub_cost_->publish(cost);
+  pub_cost_->publish(reward(extract_data));
 
   visualize(extract_data);
+}
+
+auto PathSelectorNode::metrics(const std::vector<Data> & extract_data) const
+  -> Float32MultiArrayStamped
+{
+  Float32MultiArrayStamped msg{};
+
+  msg.stamp = now();
+  msg.data.resize(static_cast<size_t>(METRICS::SIZE) * extract_data.size());
+
+  const auto set_metrics = [&msg, &extract_data](const auto metrics_type, const auto idx) {
+    const auto offset = static_cast<size_t>(metrics_type) * extract_data.size();
+    if (extract_data.at(idx).values.count(metrics_type) != 0) {
+      msg.data.at(offset + idx) = extract_data.at(idx).values.at(metrics_type);
+    }
+  };
+
+  for (size_t i = 0; i < extract_data.size(); i++) {
+    // comfortability
+    set_metrics(METRICS::MANUAL_LATERAL_ACCEL, i);
+    set_metrics(METRICS::SYSTEM_LATERAL_ACCEL, i);
+
+    set_metrics(METRICS::MANUAL_LONGITUDINAL_ACCEL, i);
+    set_metrics(METRICS::SYSTEM_LONGITUDINAL_ACCEL, i);
+
+    set_metrics(METRICS::MANUAL_LONGITUDINAL_JERK, i);
+    set_metrics(METRICS::SYSTEM_LONGITUDINAL_JERK, i);
+
+    // efficiency
+    set_metrics(METRICS::MANUAL_TRAVEL_DISTANCE, i);
+    set_metrics(METRICS::SYSTEM_TRAVEL_DISTANCE, i);
+
+    // minimum ttc
+    set_metrics(METRICS::MANUAL_MINIMUM_TTC, i);
+    set_metrics(METRICS::SYSTEM_MINIMUM_TTC, i);
+  }
+
+  return msg;
+}
+
+auto PathSelectorNode::reward(const std::vector<Data> & extract_data) const
+  -> Float32MultiArrayStamped
+{
+  Float32MultiArrayStamped msg{};
+
+  msg.stamp = now();
+  msg.data.resize(static_cast<size_t>(REWARD::SIZE));
+
+  const auto set_reward = [&msg](const auto reward_type, const auto value) {
+    msg.data.at(static_cast<size_t>(reward_type)) = value;
+  };
+
+  {
+    const auto [manual, system] = longitudinal_comfortability(extract_data);
+    set_reward(REWARD::MANUAL_LONGITUDINAL_COMFORTABILITY, manual);
+    set_reward(REWARD::SYSTEM_LONGITUDINAL_COMFORTABILITY, system);
+  }
+
+  {
+    const auto [manual, system] = lateral_comfortability(extract_data);
+    set_reward(REWARD::MANUAL_LATERAL_COMFORTABILITY, manual);
+    set_reward(REWARD::SYSTEM_LATERAL_COMFORTABILITY, system);
+  }
+
+  {
+    const auto [manual, system] = efficiency(extract_data);
+    set_reward(REWARD::MANUAL_EFFICIENCY, manual);
+    set_reward(REWARD::SYSTEM_EFFICIENCY, system);
+  }
+
+  {
+    const auto [manual, system] = safety(extract_data);
+    set_reward(REWARD::MANUAL_SAFETY, manual);
+    set_reward(REWARD::SYSTEM_SAFETY, system);
+  }
+
+  return msg;
 }
 
 auto PathSelectorNode::safety(const std::vector<Data> & extract_data) const
@@ -547,13 +519,13 @@ auto PathSelectorNode::safety(const std::vector<Data> & extract_data) const
   };
 
   for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).metrics.count("manual_ttc_min") != 0) {
-      manual_cost +=
-        normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("manual_ttc_min"));
+    if (extract_data.at(i).values.count(METRICS::MANUAL_MINIMUM_TTC) != 0) {
+      manual_cost += normalize(
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::MANUAL_MINIMUM_TTC));
     }
-    if (extract_data.at(i).metrics.count("system_ttc_min") != 0) {
-      system_cost +=
-        normalize(std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("system_ttc_min"));
+    if (extract_data.at(i).values.count(METRICS::SYSTEM_MINIMUM_TTC) != 0) {
+      system_cost += normalize(
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::SYSTEM_MINIMUM_TTC));
     }
   }
 
@@ -575,13 +547,15 @@ auto PathSelectorNode::longitudinal_comfortability(const std::vector<Data> & ext
   };
 
   for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).metrics.count("manual_lon_jerk") != 0) {
+    if (extract_data.at(i).values.count(METRICS::MANUAL_LONGITUDINAL_JERK) != 0) {
       manual_cost += normalize(
-        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("manual_lon_jerk")));
+        std::pow(TIME_FACTOR, i) *
+        std::abs(extract_data.at(i).values.at(METRICS::MANUAL_LONGITUDINAL_JERK)));
     }
-    if (extract_data.at(i).metrics.count("system_lon_jerk") != 0) {
+    if (extract_data.at(i).values.count(METRICS::SYSTEM_LONGITUDINAL_JERK) != 0) {
       system_cost += normalize(
-        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("system_lon_jerk")));
+        std::pow(TIME_FACTOR, i) *
+        std::abs(extract_data.at(i).values.at(METRICS::SYSTEM_LONGITUDINAL_JERK)));
     }
   }
 
@@ -603,13 +577,15 @@ auto PathSelectorNode::lateral_comfortability(const std::vector<Data> & extract_
   };
 
   for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).metrics.count("manual_lat_accel") != 0) {
+    if (extract_data.at(i).values.count(METRICS::MANUAL_LATERAL_ACCEL) != 0) {
       manual_cost += normalize(
-        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("manual_lat_accel")));
+        std::pow(TIME_FACTOR, i) *
+        std::abs(extract_data.at(i).values.at(METRICS::MANUAL_LATERAL_ACCEL)));
     }
-    if (extract_data.at(i).metrics.count("system_lat_accel") != 0) {
+    if (extract_data.at(i).values.count(METRICS::SYSTEM_LATERAL_ACCEL) != 0) {
       system_cost += normalize(
-        std::pow(TIME_FACTOR, i) * std::abs(extract_data.at(i).metrics.at("system_lat_accel")));
+        std::pow(TIME_FACTOR, i) *
+        std::abs(extract_data.at(i).values.at(METRICS::SYSTEM_LATERAL_ACCEL)));
     }
   }
 
@@ -631,13 +607,15 @@ auto PathSelectorNode::efficiency(const std::vector<Data> & extract_data) const
   };
 
   for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).metrics.count("maunal_travel_distance") != 0) {
+    if (extract_data.at(i).values.count(METRICS::MANUAL_TRAVEL_DISTANCE) != 0) {
       manual_reward += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("maunal_travel_distance") / 0.5);
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::MANUAL_TRAVEL_DISTANCE) /
+        0.5);
     }
-    if (extract_data.at(i).metrics.count("system_travel_distance") != 0) {
+    if (extract_data.at(i).values.count(METRICS::SYSTEM_TRAVEL_DISTANCE) != 0) {
       system_reward += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).metrics.at("system_travel_distance") / 0.5);
+        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::SYSTEM_TRAVEL_DISTANCE) /
+        0.5);
     }
   }
 
@@ -666,14 +644,14 @@ void PathSelectorNode::visualize(const std::vector<Data> & extract_data) const
       msg.markers.push_back(marker);
     }
 
-    if (data.metrics.count("manual_ttc_min") != 0) {
+    if (data.values.count(METRICS::MANUAL_MINIMUM_TTC) != 0) {
       Marker marker = createDefaultMarker(
         "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "ttc", i++, Marker::TEXT_VIEW_FACING,
         createMarkerScale(1.0, 1.0, 1.0), createMarkerColor(1.0, 1.0, 1.0, 1.0));
       marker.pose = data.odometry.pose.pose;
 
       std::ostringstream string_stream;
-      string_stream << data.metrics.at("manual_ttc_min") << "[s]";
+      string_stream << data.values.at(METRICS::MANUAL_MINIMUM_TTC) << "[s]";
       marker.text = string_stream.str();
       msg.markers.push_back(marker);
     }

@@ -23,6 +23,7 @@
 
 #include <autoware/route_handler/route_handler.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
+#include <magic_enum.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <algorithm>
@@ -34,6 +35,32 @@
 
 namespace autoware::path_selector
 {
+
+enum class METRICS {
+  MANUAL_LATERAL_ACCEL = 0,
+  MANUAL_LONGITUDINAL_ACCEL = 1,
+  MANUAL_LONGITUDINAL_JERK = 2,
+  MANUAL_TRAVEL_DISTANCE = 3,
+  MANUAL_MINIMUM_TTC = 4,
+  SYSTEM_LATERAL_ACCEL = 5,
+  SYSTEM_LONGITUDINAL_ACCEL = 6,
+  SYSTEM_LONGITUDINAL_JERK = 7,
+  SYSTEM_TRAVEL_DISTANCE = 8,
+  SYSTEM_MINIMUM_TTC = 9,
+  SIZE
+};
+
+enum class REWARD {
+  MANUAL_LATERAL_COMFORTABILITY = 0,
+  MANUAL_LONGITUDINAL_COMFORTABILITY = 1,
+  MANUAL_EFFICIENCY = 2,
+  MANUAL_SAFETY = 3,
+  SYSTEM_LATERAL_COMFORTABILITY = 4,
+  SYSTEM_LONGITUDINAL_COMFORTABILITY = 5,
+  SYSTEM_EFFICIENCY = 6,
+  SYSTEM_SAFETY = 7,
+  SIZE
+};
 
 template <class T>
 struct Buffer
@@ -178,7 +205,7 @@ struct Data
   Trajectory trajectory;
   TrajectoryPoint predicted_point;
 
-  std::unordered_map<std::string, double> metrics;
+  std::unordered_map<METRICS, double> values;
 };
 
 struct FrenetPoint
@@ -366,6 +393,10 @@ private:
   double manual_travel_distance(const Data & front_data, const Data & back_data) const;
 
   double system_travel_distance(const Data & front_data, const Data & back_data) const;
+
+  auto metrics(const std::vector<Data> & extract_data) const -> Float32MultiArrayStamped;
+
+  auto reward(const std::vector<Data> & extract_data) const -> Float32MultiArrayStamped;
 
   auto longitudinal_comfortability(const std::vector<Data> & extract_data) const
     -> std::pair<double, double>;
