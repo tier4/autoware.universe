@@ -14,14 +14,7 @@
 
 #include "node.hpp"
 
-#include <autoware/universe_utils/geometry/boost_geometry.hpp>
-#include <autoware/universe_utils/geometry/boost_polygon_utils.hpp>
 #include <autoware/universe_utils/ros/marker_helper.hpp>
-
-#include <boost/geometry.hpp>
-#include <boost/geometry/algorithms/convex_hull.hpp>
-#include <boost/geometry/algorithms/correct.hpp>
-#include <boost/geometry/algorithms/union.hpp>
 
 namespace autoware::behavior_analyzer
 {
@@ -30,72 +23,6 @@ using autoware::universe_utils::createMarkerColor;
 using autoware::universe_utils::createMarkerScale;
 using autoware::universe_utils::Point2d;
 using autoware::universe_utils::Polygon2d;
-
-namespace
-{
-Point vector2point(const geometry_msgs::msg::Vector3 & v)
-{
-  return autoware::universe_utils::createPoint(v.x, v.y, v.z);
-}
-
-tf2::Vector3 from_msg(const Point & p)
-{
-  return tf2::Vector3(p.x, p.y, p.z);
-}
-
-tf2::Vector3 get_velocity_in_world_coordinate(const PredictedObjectKinematics & kinematics)
-{
-  const auto pose = kinematics.initial_pose_with_covariance.pose;
-  const auto v_local = kinematics.initial_twist_with_covariance.twist.linear;
-  const auto v_world = autoware::universe_utils::transformPoint(vector2point(v_local), pose);
-
-  return from_msg(v_world) - from_msg(pose.position);
-}
-
-tf2::Vector3 get_velocity_in_world_coordinate(const Odometry & odometry)
-{
-  const auto pose = odometry.pose.pose;
-  const auto v_local = odometry.twist.twist.linear;
-  const auto v_world = autoware::universe_utils::transformPoint(vector2point(v_local), pose);
-
-  return from_msg(v_world) - from_msg(pose.position);
-}
-
-tf2::Vector3 get_velocity_in_world_coordinate(const TrajectoryPoint & point)
-{
-  const auto pose = point.pose;
-  const auto v_local =
-    geometry_msgs::build<Vector3>().x(point.longitudinal_velocity_mps).y(0.0).z(0.0);
-  const auto v_world = autoware::universe_utils::transformPoint(vector2point(v_local), pose);
-
-  return from_msg(v_world) - from_msg(pose.position);
-}
-
-std::vector<double> time_to_collisions(
-  const PredictedObjects & objects, const Pose & p_ego, const tf2::Vector3 & v_ego)
-{
-  std::vector<double> time_to_collisions(objects.objects.size());
-
-  for (const auto & object : objects.objects) {
-    const auto p_object = object.kinematics.initial_pose_with_covariance.pose;
-    const auto v_ego2object =
-      autoware::universe_utils::point2tfVector(p_ego.position, p_object.position);
-
-    const auto v_object = get_velocity_in_world_coordinate(object.kinematics);
-    const auto v_relative = tf2::tf2Dot(v_ego2object.normalized(), v_ego) -
-                            tf2::tf2Dot(v_ego2object.normalized(), v_object);
-
-    time_to_collisions.push_back(v_ego2object.length() / v_relative);
-  }
-
-  const auto itr = std::remove_if(
-    time_to_collisions.begin(), time_to_collisions.end(),
-    [](const auto & value) { return value < 1e-3; });
-  time_to_collisions.erase(itr, time_to_collisions.end());
-
-  return time_to_collisions;
-}
-}  // namespace
 
 BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_options)
 : Node("path_selector_node", node_options)
@@ -114,8 +41,12 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
     create_publisher<Trajectory>("/planning/scenario_planning/trajectory", rclcpp::QoS(1));
   pub_tf_ = create_publisher<TFMessage>("/tf", rclcpp::QoS(1));
 
-  pub_metrics_ = create_publisher<Float32MultiArrayStamped>("~/metrics", rclcpp::QoS{1});
-  pub_cost_ = create_publisher<Float32MultiArrayStamped>("~/cost", rclcpp::QoS{1});
+  pub_manual_metrics_ =
+    create_publisher<Float32MultiArrayStamped>("~/manual_metrics", rclcpp::QoS{1});
+  pub_system_metrics_ =
+    create_publisher<Float32MultiArrayStamped>("~/system_metrics", rclcpp::QoS{1});
+  pub_manual_score_ = create_publisher<Float32MultiArrayStamped>("~/manual_score", rclcpp::QoS{1});
+  pub_system_score_ = create_publisher<Float32MultiArrayStamped>("~/system_score", rclcpp::QoS{1});
 
   srv_play_ = this->create_service<SetBool>(
     "play",
@@ -129,11 +60,11 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
 
   reader_.open(declare_parameter<std::string>("bag_path"));
 
-  data_set_ = std::make_shared<DataSet>(
+  trimmed_data_ = std::make_shared<TrimmedData>(
     duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
 }
 
-void BehaviorAnalyzerNode::update(std::shared_ptr<DataSet> & data_set) const
+void BehaviorAnalyzerNode::update(std::shared_ptr<TrimmedData> & trimmed_data) const
 {
   rosbag2_storage::StorageFilter filter;
   filter.topics.emplace_back("/tf");
@@ -148,13 +79,13 @@ void BehaviorAnalyzerNode::update(std::shared_ptr<DataSet> & data_set) const
     return;
   }
 
-  data_set->update(0.1 * 1e9);
+  trimmed_data->update(0.1 * 1e9);
 
   while (reader_.has_next()) {
     const auto next_data = reader_.read_next();
     rclcpp::SerializedMessage serialized_msg(*next_data->serialized_data);
 
-    if (data_set->is_ready()) {
+    if (trimmed_data->is_ready()) {
       break;
     }
 
@@ -162,42 +93,42 @@ void BehaviorAnalyzerNode::update(std::shared_ptr<DataSet> & data_set) const
       rclcpp::Serialization<TFMessage> serializer;
       const auto deserialized_message = std::make_shared<TFMessage>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_tf.append(*deserialized_message);
+      trimmed_data->buf_tf.append(*deserialized_message);
     }
 
     if (next_data->topic_name == "/localization/kinematic_state") {
       rclcpp::Serialization<Odometry> serializer;
       const auto deserialized_message = std::make_shared<Odometry>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_odometry.append(*deserialized_message);
+      trimmed_data->buf_odometry.append(*deserialized_message);
     }
 
     if (next_data->topic_name == "/localization/acceleration") {
       rclcpp::Serialization<AccelWithCovarianceStamped> serializer;
       const auto deserialized_message = std::make_shared<AccelWithCovarianceStamped>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_accel.append(*deserialized_message);
+      trimmed_data->buf_accel.append(*deserialized_message);
     }
 
     if (next_data->topic_name == "/perception/object_recognition/objects") {
       rclcpp::Serialization<PredictedObjects> serializer;
       const auto deserialized_message = std::make_shared<PredictedObjects>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_objects.append(*deserialized_message);
+      trimmed_data->buf_objects.append(*deserialized_message);
     }
 
     if (next_data->topic_name == "/vehicle/status/steering_status") {
       rclcpp::Serialization<SteeringReport> serializer;
       const auto deserialized_message = std::make_shared<SteeringReport>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_steer.append(*deserialized_message);
+      trimmed_data->buf_steer.append(*deserialized_message);
     }
 
     if (next_data->topic_name == "/planning/scenario_planning/trajectory") {
       rclcpp::Serialization<Trajectory> serializer;
       const auto deserialized_message = std::make_shared<Trajectory>();
       serializer.deserialize_message(&serialized_msg, deserialized_message.get());
-      data_set->buf_trajectory.append(*deserialized_message);
+      trimmed_data->buf_trajectory.append(*deserialized_message);
     }
   }
 }
@@ -219,434 +150,158 @@ void BehaviorAnalyzerNode::rewind(
 {
   reader_.seek(0);
 
-  data_set_.reset();
-  data_set_ = std::make_shared<DataSet>(
+  trimmed_data_.reset();
+  trimmed_data_ = std::make_shared<TrimmedData>(
     duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
 
   res->success = true;
 }
 
-auto BehaviorAnalyzerNode::manual_all_ttc(const Data & data) const -> std::vector<double>
+void BehaviorAnalyzerNode::process(const std::shared_ptr<TrimmedData> & trimmed_data) const
 {
-  if (data.objects.objects.empty()) {
-    return {};
+  const auto data_set = std::make_shared<DataSet>(trimmed_data, vehicle_info_, size_t(20), 0.5);
+
+  const auto opt_tf = trimmed_data->buf_tf.get(trimmed_data->timestamp);
+  if (opt_tf.has_value()) {
+    pub_tf_->publish(opt_tf.value());
   }
 
-  const auto p_ego = data.odometry.pose.pose;
-  const auto v_ego = get_velocity_in_world_coordinate(data.odometry);
-
-  return time_to_collisions(data.objects, p_ego, v_ego);
-}
-
-auto BehaviorAnalyzerNode::system_all_ttc(const Data & data) const -> std::vector<double>
-{
-  if (data.objects.objects.empty()) {
-    return {};
+  const auto opt_objects = trimmed_data->buf_objects.get(trimmed_data->timestamp);
+  if (opt_objects.has_value()) {
+    pub_objects_->publish(opt_objects.value());
   }
 
-  const auto p_ego = data.predicted_point.pose;
-  const auto v_ego = get_velocity_in_world_coordinate(data.predicted_point);
-
-  return time_to_collisions(data.objects, p_ego, v_ego);
-}
-
-double BehaviorAnalyzerNode::manual_lateral_accel(const Data & data) const
-{
-  const auto radius = vehicle_info_.wheel_base_m / std::tan(data.steer.steering_tire_angle);
-  const auto speed = data.odometry.twist.twist.linear.x;
-  return speed * speed / radius;
-}
-
-double BehaviorAnalyzerNode::system_lateral_accel(const Data & data) const
-{
-  const auto radius =
-    vehicle_info_.wheel_base_m / std::tan(data.predicted_point.front_wheel_angle_rad);
-  const auto speed = data.predicted_point.longitudinal_velocity_mps;
-  return speed * speed / radius;
-}
-
-double BehaviorAnalyzerNode::manual_longitudinal_jerk(
-  const Data & front_data, const Data & back_data) const
-{
-  const auto & front_accel = front_data.accel;
-  const auto & back_accel = back_data.accel;
-
-  const double dt = rclcpp::Time(back_accel.header.stamp).nanoseconds() -
-                    rclcpp::Time(front_accel.header.stamp).nanoseconds();
-
-  return 1e9 * (back_accel.accel.accel.linear.x - front_accel.accel.accel.linear.x) / dt;
-}
-
-double BehaviorAnalyzerNode::system_longitudinal_jerk(
-  const Data & front_data, const Data & back_data) const
-{
-  return (back_data.predicted_point.acceleration_mps2 -
-          front_data.predicted_point.acceleration_mps2) /
-         0.5;
-}
-
-double BehaviorAnalyzerNode::manual_travel_distance(
-  const Data & front_data, const Data & back_data) const
-{
-  const auto travel_distance = autoware::universe_utils::calcDistance3d(
-    front_data.odometry.pose.pose, back_data.odometry.pose.pose);
-  return travel_distance + front_data.values.at(METRICS::MANUAL_TRAVEL_DISTANCE);
-}
-
-double BehaviorAnalyzerNode::system_travel_distance(
-  const Data & front_data, const Data & back_data) const
-{
-  const auto travel_distance = autoware::universe_utils::calcDistance3d(
-    front_data.predicted_point.pose, back_data.predicted_point.pose);
-  return travel_distance + front_data.values.at(METRICS::SYSTEM_TRAVEL_DISTANCE);
-}
-
-void BehaviorAnalyzerNode::process(std::vector<Data> & extract_data) const
-{
-  if (extract_data.empty()) {
-    return;
+  const auto opt_trajectory = trimmed_data->buf_trajectory.get(trimmed_data->timestamp);
+  if (opt_trajectory.has_value()) {
+    pub_trajectory_->publish(opt_trajectory.value());
   }
 
-  fill(extract_data);
+  metrics(data_set);
 
-  pub_tf_->publish(extract_data.front().tf);
+  score(data_set);
 
-  pub_objects_->publish(extract_data.front().objects);
-
-  pub_trajectory_->publish(extract_data.front().trajectory);
-
-  pub_metrics_->publish(metrics(extract_data));
-
-  pub_cost_->publish(reward(extract_data));
-
-  visualize(extract_data);
+  visualize(data_set);
 }
 
-void BehaviorAnalyzerNode::fill(std::vector<Data> & extract_data) const
+void BehaviorAnalyzerNode::metrics(const std::shared_ptr<DataSet> & data_set) const
 {
   {
-    // travel distance
-    {
-      extract_data.front().values.emplace(METRICS::MANUAL_TRAVEL_DISTANCE, 0.0);
-      extract_data.front().values.emplace(METRICS::SYSTEM_TRAVEL_DISTANCE, 0.0);
-    }
-  }
+    Float32MultiArrayStamped msg{};
 
-  for (size_t i = 0; i < extract_data.size() - 1; i++) {
-    // longitudinal acceleration
-    {
-      extract_data.at(i).values.emplace(
-        METRICS::MANUAL_LONGITUDINAL_ACCEL, extract_data.at(i).accel.accel.accel.linear.x);
-    }
+    msg.stamp = now();
+    msg.data.resize(static_cast<size_t>(METRIC::SIZE) * data_set->manual.resample_num);
 
-    // lateral acceleration
-    {
-      extract_data.at(i).values.emplace(
-        METRICS::MANUAL_LATERAL_ACCEL, manual_lateral_accel(extract_data.at(i)));
-      extract_data.at(i).values.emplace(
-        METRICS::SYSTEM_LATERAL_ACCEL, system_lateral_accel(extract_data.at(i)));
-    }
+    const auto set_metrics = [&msg](const auto & data, const auto metric_type) {
+      const auto offset = static_cast<size_t>(metric_type) * data.resample_num;
+      const auto metric = data.values.at(metric_type);
+      std::copy(metric.begin(), metric.end(), msg.data.begin() + offset);
+    };
 
-    // minimum ttc
-    {
-      std::vector<double> ttc = manual_all_ttc(extract_data.at(i));
-      std::sort(ttc.begin(), ttc.end());
-      if (!ttc.empty()) {
-        extract_data.at(i).values.emplace(METRICS::MANUAL_MINIMUM_TTC, ttc.front());
-      }
-    }
-    {
-      std::vector<double> ttc = system_all_ttc(extract_data.at(i));
-      std::sort(ttc.begin(), ttc.end());
-      if (!ttc.empty()) {
-        extract_data.at(i).values.emplace(METRICS::SYSTEM_MINIMUM_TTC, ttc.front());
-      }
-    }
+    set_metrics(data_set->manual, METRIC::LATERAL_ACCEL);
+    set_metrics(data_set->manual, METRIC::LONGITUDINAL_JERK);
+    set_metrics(data_set->manual, METRIC::TRAVEL_DISTANCE);
+    set_metrics(data_set->manual, METRIC::MINIMUM_TTC);
 
-    // longitudinal jerk
-    {
-      extract_data.at(i).values.emplace(
-        METRICS::MANUAL_LONGITUDINAL_JERK,
-        manual_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
-      extract_data.at(i).values.emplace(
-        METRICS::SYSTEM_LONGITUDINAL_JERK,
-        system_longitudinal_jerk(extract_data.at(i), extract_data.at(i + 1)));
-    }
-
-    // travel distance
-    {
-      extract_data.at(i + 1).values.emplace(
-        METRICS::MANUAL_TRAVEL_DISTANCE,
-        manual_travel_distance(extract_data.at(i), extract_data.at(i + 1)));
-      extract_data.at(i + 1).values.emplace(
-        METRICS::SYSTEM_TRAVEL_DISTANCE,
-        system_travel_distance(extract_data.at(i), extract_data.at(i + 1)));
-    }
+    pub_manual_metrics_->publish(msg);
   }
 
   {
-    // acceleration
-    {
-      extract_data.back().values.emplace(
-        METRICS::MANUAL_LONGITUDINAL_ACCEL, extract_data.back().accel.accel.accel.linear.x);
-    }
+    Float32MultiArrayStamped msg{};
 
-    // lateral acceleration
-    {
-      extract_data.back().values.emplace(
-        METRICS::MANUAL_LATERAL_ACCEL, manual_lateral_accel(extract_data.back()));
-      extract_data.back().values.emplace(
-        METRICS::SYSTEM_LATERAL_ACCEL, system_lateral_accel(extract_data.back()));
-    }
+    msg.stamp = now();
+    msg.data.resize(static_cast<size_t>(METRIC::SIZE) * data_set->manual.resample_num);
 
-    // minimum ttc
-    {
-      std::vector<double> ttc = manual_all_ttc(extract_data.back());
-      std::sort(ttc.begin(), ttc.end());
-      if (!ttc.empty()) {
-        extract_data.back().values.emplace(METRICS::MANUAL_MINIMUM_TTC, ttc.front());
-      }
-    }
-    {
-      std::vector<double> ttc = system_all_ttc(extract_data.back());
-      std::sort(ttc.begin(), ttc.end());
-      if (!ttc.empty()) {
-        extract_data.back().values.emplace(METRICS::SYSTEM_MINIMUM_TTC, ttc.front());
-      }
-    }
+    const auto set_metrics = [&msg](const auto & data, const auto metric_type) {
+      const auto offset = static_cast<size_t>(metric_type) * data.resample_num;
+      const auto metric = data.values.at(metric_type);
+      std::copy(metric.begin(), metric.end(), msg.data.begin() + offset);
+    };
 
-    // longitudinal jerk
-    {
-      extract_data.back().values.emplace(METRICS::MANUAL_LONGITUDINAL_JERK, 0.0);
-      extract_data.back().values.emplace(METRICS::SYSTEM_LONGITUDINAL_JERK, 0.0);
-    }
+    set_metrics(data_set->sampling.autoware(), METRIC::LATERAL_ACCEL);
+    set_metrics(data_set->sampling.autoware(), METRIC::LONGITUDINAL_JERK);
+    set_metrics(data_set->sampling.autoware(), METRIC::TRAVEL_DISTANCE);
+    set_metrics(data_set->sampling.autoware(), METRIC::MINIMUM_TTC);
+
+    pub_system_metrics_->publish(msg);
   }
 }
 
-auto BehaviorAnalyzerNode::metrics(const std::vector<Data> & extract_data) const
-  -> Float32MultiArrayStamped
+void BehaviorAnalyzerNode::score(const std::shared_ptr<DataSet> & data_set) const
 {
-  Float32MultiArrayStamped msg{};
-
-  msg.stamp = now();
-  msg.data.resize(static_cast<size_t>(METRICS::SIZE) * extract_data.size());
-
-  const auto set_metrics = [&msg, &extract_data](const auto metrics_type, const auto idx) {
-    const auto offset = static_cast<size_t>(metrics_type) * extract_data.size();
-    if (extract_data.at(idx).values.count(metrics_type) != 0) {
-      msg.data.at(offset + idx) = extract_data.at(idx).values.at(metrics_type);
-    }
-  };
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    // comfortability
-    set_metrics(METRICS::MANUAL_LATERAL_ACCEL, i);
-    set_metrics(METRICS::SYSTEM_LATERAL_ACCEL, i);
-
-    set_metrics(METRICS::MANUAL_LONGITUDINAL_ACCEL, i);
-    set_metrics(METRICS::SYSTEM_LONGITUDINAL_ACCEL, i);
-
-    set_metrics(METRICS::MANUAL_LONGITUDINAL_JERK, i);
-    set_metrics(METRICS::SYSTEM_LONGITUDINAL_JERK, i);
-
-    // efficiency
-    set_metrics(METRICS::MANUAL_TRAVEL_DISTANCE, i);
-    set_metrics(METRICS::SYSTEM_TRAVEL_DISTANCE, i);
-
-    // minimum ttc
-    set_metrics(METRICS::MANUAL_MINIMUM_TTC, i);
-    set_metrics(METRICS::SYSTEM_MINIMUM_TTC, i);
-  }
-
-  return msg;
-}
-
-auto BehaviorAnalyzerNode::reward(const std::vector<Data> & extract_data) const
-  -> Float32MultiArrayStamped
-{
-  Float32MultiArrayStamped msg{};
-
-  msg.stamp = now();
-  msg.data.resize(static_cast<size_t>(REWARD::SIZE));
-
-  const auto set_reward = [&msg](const auto reward_type, const auto value) {
-    msg.data.at(static_cast<size_t>(reward_type)) = value;
-  };
-
   {
-    const auto [manual, system] = longitudinal_comfortability(extract_data);
-    set_reward(REWARD::MANUAL_LONGITUDINAL_COMFORTABILITY, manual);
-    set_reward(REWARD::SYSTEM_LONGITUDINAL_COMFORTABILITY, system);
+    Float32MultiArrayStamped msg{};
+
+    msg.stamp = now();
+    msg.data.resize(static_cast<size_t>(SCORE::SIZE));
+
+    const auto set_reward = [&msg](const auto & data, const auto score_type) {
+      msg.data.at(static_cast<size_t>(score_type)) = static_cast<float>(data.scores.at(score_type));
+    };
+
+    set_reward(data_set->manual, SCORE::LONGITUDINAL_COMFORTABILITY);
+    set_reward(data_set->manual, SCORE::LATERAL_COMFORTABILITY);
+    set_reward(data_set->manual, SCORE::EFFICIENCY);
+    set_reward(data_set->manual, SCORE::SAFETY);
+
+    pub_manual_score_->publish(msg);
   }
 
   {
-    const auto [manual, system] = lateral_comfortability(extract_data);
-    set_reward(REWARD::MANUAL_LATERAL_COMFORTABILITY, manual);
-    set_reward(REWARD::SYSTEM_LATERAL_COMFORTABILITY, system);
-  }
+    Float32MultiArrayStamped msg{};
 
-  {
-    const auto [manual, system] = efficiency(extract_data);
-    set_reward(REWARD::MANUAL_EFFICIENCY, manual);
-    set_reward(REWARD::SYSTEM_EFFICIENCY, system);
-  }
+    msg.stamp = now();
+    msg.data.resize(static_cast<size_t>(SCORE::SIZE));
 
-  {
-    const auto [manual, system] = safety(extract_data);
-    set_reward(REWARD::MANUAL_SAFETY, manual);
-    set_reward(REWARD::SYSTEM_SAFETY, system);
-  }
+    const auto set_reward = [&msg](const auto & data, const auto score_type) {
+      msg.data.at(static_cast<size_t>(score_type)) = static_cast<float>(data.scores.at(score_type));
+    };
 
-  return msg;
+    set_reward(data_set->sampling.autoware(), SCORE::LONGITUDINAL_COMFORTABILITY);
+    set_reward(data_set->sampling.autoware(), SCORE::LATERAL_COMFORTABILITY);
+    set_reward(data_set->sampling.autoware(), SCORE::EFFICIENCY);
+    set_reward(data_set->sampling.autoware(), SCORE::SAFETY);
+
+    pub_system_score_->publish(msg);
+  }
 }
 
-auto BehaviorAnalyzerNode::safety(const std::vector<Data> & extract_data) const
-  -> std::pair<double, double>
-{
-  constexpr double TIME_FACTOR = 0.8;
-
-  double manual_cost = 0.0;
-  double system_cost = 0.0;
-
-  const auto min = 0.0;
-  const auto max = 5.0;
-  const auto normalize = [&min, &max](const double value) {
-    return std::clamp(value, min, max) / (max - min);
-  };
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).values.count(METRICS::MANUAL_MINIMUM_TTC) != 0) {
-      manual_cost += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::MANUAL_MINIMUM_TTC));
-    }
-    if (extract_data.at(i).values.count(METRICS::SYSTEM_MINIMUM_TTC) != 0) {
-      system_cost += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::SYSTEM_MINIMUM_TTC));
-    }
-  }
-
-  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
-}
-
-auto BehaviorAnalyzerNode::longitudinal_comfortability(const std::vector<Data> & extract_data) const
-  -> std::pair<double, double>
-{
-  constexpr double TIME_FACTOR = 0.8;
-
-  double manual_cost = 0.0;
-  double system_cost = 0.0;
-
-  const auto min = 0.0;
-  const auto max = 0.5;
-  const auto normalize = [&min, &max](const double value) {
-    return (max - std::clamp(value, min, max)) / (max - min);
-  };
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).values.count(METRICS::MANUAL_LONGITUDINAL_JERK) != 0) {
-      manual_cost += normalize(
-        std::pow(TIME_FACTOR, i) *
-        std::abs(extract_data.at(i).values.at(METRICS::MANUAL_LONGITUDINAL_JERK)));
-    }
-    if (extract_data.at(i).values.count(METRICS::SYSTEM_LONGITUDINAL_JERK) != 0) {
-      system_cost += normalize(
-        std::pow(TIME_FACTOR, i) *
-        std::abs(extract_data.at(i).values.at(METRICS::SYSTEM_LONGITUDINAL_JERK)));
-    }
-  }
-
-  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
-}
-
-auto BehaviorAnalyzerNode::lateral_comfortability(const std::vector<Data> & extract_data) const
-  -> std::pair<double, double>
-{
-  constexpr double TIME_FACTOR = 0.8;
-
-  double manual_cost = 0.0;
-  double system_cost = 0.0;
-
-  const auto min = 0.0;
-  const auto max = 0.5;
-  const auto normalize = [&min, &max](const double value) {
-    return (max - std::clamp(value, min, max)) / (max - min);
-  };
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).values.count(METRICS::MANUAL_LATERAL_ACCEL) != 0) {
-      manual_cost += normalize(
-        std::pow(TIME_FACTOR, i) *
-        std::abs(extract_data.at(i).values.at(METRICS::MANUAL_LATERAL_ACCEL)));
-    }
-    if (extract_data.at(i).values.count(METRICS::SYSTEM_LATERAL_ACCEL) != 0) {
-      system_cost += normalize(
-        std::pow(TIME_FACTOR, i) *
-        std::abs(extract_data.at(i).values.at(METRICS::SYSTEM_LATERAL_ACCEL)));
-    }
-  }
-
-  return {manual_cost / extract_data.size(), system_cost / extract_data.size()};
-}
-
-auto BehaviorAnalyzerNode::efficiency(const std::vector<Data> & extract_data) const
-  -> std::pair<double, double>
-{
-  constexpr double TIME_FACTOR = 0.8;
-
-  double manual_reward = 0.0;
-  double system_reward = 0.0;
-
-  const auto min = 0.0;
-  const auto max = 20.0;
-  const auto normalize = [&min, &max](const double value) {
-    return std::clamp(value, min, max) / (max - min);
-  };
-
-  for (size_t i = 0; i < extract_data.size(); i++) {
-    if (extract_data.at(i).values.count(METRICS::MANUAL_TRAVEL_DISTANCE) != 0) {
-      manual_reward += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::MANUAL_TRAVEL_DISTANCE) /
-        0.5);
-    }
-    if (extract_data.at(i).values.count(METRICS::SYSTEM_TRAVEL_DISTANCE) != 0) {
-      system_reward += normalize(
-        std::pow(TIME_FACTOR, i) * extract_data.at(i).values.at(METRICS::SYSTEM_TRAVEL_DISTANCE) /
-        0.5);
-    }
-  }
-
-  return {manual_reward / extract_data.size(), system_reward / extract_data.size()};
-}
-
-void BehaviorAnalyzerNode::visualize(const std::vector<Data> & extract_data) const
+void BehaviorAnalyzerNode::visualize(const std::shared_ptr<DataSet> & data_set) const
 {
   MarkerArray msg;
 
   size_t i = 0;
-  for (const auto & data : extract_data) {
-    {
-      Marker marker = createDefaultMarker(
-        "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "future_poses", i++, Marker::ARROW,
-        createMarkerScale(0.7, 0.3, 0.3), createMarkerColor(1.0, 0.0, 0.0, 0.999));
-      marker.pose = data.odometry.pose.pose;
-      msg.markers.push_back(marker);
-    }
-
-    {
-      Marker marker = createDefaultMarker(
-        "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "predicted_poses", i++, Marker::ARROW,
-        createMarkerScale(0.7, 0.3, 0.3), createMarkerColor(1.0, 1.0, 0.0, 0.999));
-      marker.pose = data.predicted_point.pose;
-      msg.markers.push_back(marker);
-    }
+  for (const auto & point : data_set->manual.odometry_history) {
+    Marker marker = createDefaultMarker(
+      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "manual", i++, Marker::ARROW,
+      createMarkerScale(0.7, 0.3, 0.3), createMarkerColor(1.0, 0.0, 0.0, 0.999));
+    marker.pose = point.pose.pose;
+    msg.markers.push_back(marker);
   }
 
-  for (size_t j = 0; j < extract_data.front().candidate_points.size(); j++) {
+  for (const auto & point : data_set->sampling.autoware().points) {
     Marker marker = createDefaultMarker(
-      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "candidate_poses", i++, Marker::LINE_STRIP,
+      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "system", i++, Marker::ARROW,
+      createMarkerScale(0.7, 0.3, 0.3), createMarkerColor(1.0, 1.0, 0.0, 0.999));
+    marker.pose = point.pose;
+    msg.markers.push_back(marker);
+  }
+
+  for (const auto & trajectory : data_set->sampling.data) {
+    Marker marker = createDefaultMarker(
+      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "candidates", i++, Marker::LINE_STRIP,
       createMarkerScale(0.05, 0.0, 0.0), createMarkerColor(0.0, 0.0, 1.0, 0.999));
-    for (const auto & data : extract_data) {
-      marker.points.push_back(data.candidate_points.at(j).pose.position);
+    for (const auto & point : trajectory.points) {
+      marker.points.push_back(point.pose.position);
+    }
+    msg.markers.push_back(marker);
+  }
+
+  {
+    Marker marker = createDefaultMarker(
+      "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "best", i++, Marker::LINE_STRIP,
+      createMarkerScale(0.2, 0.0, 0.0), createMarkerColor(1.0, 1.0, 1.0, 0.999));
+    for (const auto & point : data_set->sampling.best().points) {
+      marker.points.push_back(point.pose.position);
     }
     msg.markers.push_back(marker);
   }
@@ -660,11 +315,9 @@ void BehaviorAnalyzerNode::on_timer()
     return;
   }
 
-  update(data_set_);
+  update(trimmed_data_);
 
-  auto extract_data = data_set_->extract(10.0, 0.5);
-
-  process(extract_data);
+  process(trimmed_data_);
 }
 }  // namespace autoware::behavior_analyzer
 

@@ -12,34 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef NODE_HPP_
-#define NODE_HPP_
-
-#include "autoware/motion_utils/trajectory/interpolation.hpp"
-#include "autoware/motion_utils/trajectory/trajectory.hpp"
-#include "autoware/universe_utils/ros/polling_subscriber.hpp"
-#include "autoware_frenet_planner/frenet_planner.hpp"
-#include "autoware_path_sampler/prepare_inputs.hpp"
-#include "autoware_path_sampler/utils/trajectory_utils.hpp"
-#include "rosbag2_cpp/reader.hpp"
-#include "type_alias.hpp"
+#ifndef DATA_STRUCTS_HPP_
+#define DATA_STRUCTS_HPP_
 
 #include <autoware/route_handler/route_handler.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
-#include <magic_enum.hpp>
-#include <rclcpp/rclcpp.hpp>
 
-#include <algorithm>
-#include <limits>
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
+#include "autoware_map_msgs/msg/lanelet_map_bin.hpp"
+#include "autoware_perception_msgs/msg/predicted_objects.hpp"
+#include "autoware_planning_msgs/msg/lanelet_route.hpp"
+#include "autoware_planning_msgs/msg/trajectory.hpp"
+#include "autoware_planning_msgs/msg/trajectory_point.hpp"
+#include "autoware_vehicle_msgs/msg/steering_report.hpp"
+#include "geometry_msgs/msg/accel_with_covariance_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "tier4_debug_msgs/msg/float32_multi_array_stamped.hpp"
+#include "visualization_msgs/msg/marker.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
+#include <std_srvs/srv/set_bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <tf2_msgs/msg/tf_message.hpp>
 
 namespace autoware::behavior_analyzer
 {
-
 namespace
 {
 Point vector2point(const geometry_msgs::msg::Vector3 & v)
@@ -83,10 +78,6 @@ tf2::Vector3 get_velocity_in_world_coordinate(const TrajectoryPoint & point)
 double time_to_collision(
   const PredictedObjects & objects, const Pose & p_ego, const tf2::Vector3 & v_ego)
 {
-  if (objects.objects.empty()) {
-    return std::numeric_limits<double>::max();
-  }
-
   std::vector<double> time_to_collisions(objects.objects.size());
 
   for (const auto & object : objects.objects) {
@@ -112,20 +103,29 @@ double time_to_collision(
 }
 }  // namespace
 
-enum class METRIC {
-  LATERAL_ACCEL = 0,
-  LONGITUDINAL_ACCEL = 1,
-  LONGITUDINAL_JERK = 2,
-  TRAVEL_DISTANCE = 3,
-  MINIMUM_TTC = 4,
+enum class METRICS {
+  MANUAL_LATERAL_ACCEL = 0,
+  MANUAL_LONGITUDINAL_ACCEL = 1,
+  MANUAL_LONGITUDINAL_JERK = 2,
+  MANUAL_TRAVEL_DISTANCE = 3,
+  MANUAL_MINIMUM_TTC = 4,
+  SYSTEM_LATERAL_ACCEL = 5,
+  SYSTEM_LONGITUDINAL_ACCEL = 6,
+  SYSTEM_LONGITUDINAL_JERK = 7,
+  SYSTEM_TRAVEL_DISTANCE = 8,
+  SYSTEM_MINIMUM_TTC = 9,
   SIZE
 };
 
-enum class SCORE {
-  LATERAL_COMFORTABILITY = 0,
-  LONGITUDINAL_COMFORTABILITY = 1,
-  EFFICIENCY = 2,
-  SAFETY = 3,
+enum class REWARD {
+  MANUAL_LATERAL_COMFORTABILITY = 0,
+  MANUAL_LONGITUDINAL_COMFORTABILITY = 1,
+  MANUAL_EFFICIENCY = 2,
+  MANUAL_SAFETY = 3,
+  SYSTEM_LATERAL_COMFORTABILITY = 4,
+  SYSTEM_LONGITUDINAL_COMFORTABILITY = 5,
+  SYSTEM_EFFICIENCY = 6,
+  SYSTEM_SAFETY = 7,
   SIZE
 };
 
@@ -359,15 +359,15 @@ struct TrimmedData
 
 struct CommonData
 {
-  CommonData(
+  explicit CommonData(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-    const double time_resolution, const std::string & tag)
-  : vehicle_info{vehicle_info}, resample_num(resample_num), tag{tag}
+    const vehicle_info_utils::VehicleInfo & vehicle_info, const double time_horizon,
+    const double time_resolution)
+  : vehicle_info{vehicle_info}, size(static_cast<size_t>(time_resolution / time_horizon))
   {
-    for (size_t i = 0; i < resample_num; i++) {
-      const auto opt_objects =
-        trimmed_data->buf_objects.get(trimmed_data->timestamp + 1e9 * time_resolution * i);
+    for (size_t t = trimmed_data->timestamp; t < trimmed_data->timestamp + time_horizon * 1e9;
+         t += time_resolution * 1e9) {
+      const auto opt_objects = trimmed_data->buf_objects.get(t);
       if (!opt_objects.has_value()) {
         break;
       }
@@ -382,29 +382,17 @@ struct CommonData
     std::vector<double> longitudinal_jerk_values;
     std::vector<double> travel_distance_values;
 
-    for (size_t i = 0; i < resample_num - 1; i++) {
+    for (size_t i = 0; i < size - 1; i++) {
       lateral_accel_values.push_back(lateral_accel(i));
       longitudinal_jerk_values.push_back(longitudinal_jerk(i));
       minimum_ttc_values.push_back(minimum_ttc(i));
       travel_distance_values.push_back(travel_distance(i));
     }
 
-    {
-      lateral_accel_values.push_back(lateral_accel(resample_num - 1));
-      longitudinal_jerk_values.push_back(0.0);
-      minimum_ttc_values.push_back(minimum_ttc(resample_num - 1));
-      travel_distance_values.push_back(travel_distance(resample_num - 1));
-    }
-
-    values.emplace(METRIC::LATERAL_ACCEL, lateral_accel_values);
-    values.emplace(METRIC::LONGITUDINAL_JERK, longitudinal_jerk_values);
-    values.emplace(METRIC::MINIMUM_TTC, minimum_ttc_values);
-    values.emplace(METRIC::TRAVEL_DISTANCE, travel_distance_values);
-
-    scores.emplace(SCORE::LONGITUDINAL_COMFORTABILITY, longitudinal_comfortability());
-    scores.emplace(SCORE::LATERAL_COMFORTABILITY, lateral_comfortability());
-    scores.emplace(SCORE::EFFICIENCY, efficiency());
-    scores.emplace(SCORE::SAFETY, safety());
+    values.emplace(METRICS::MANUAL_LATERAL_ACCEL, lateral_accel_values);
+    values.emplace(METRICS::SYSTEM_LONGITUDINAL_JERK, longitudinal_jerk_values);
+    values.emplace(METRICS::MANUAL_MINIMUM_TTC, minimum_ttc_values);
+    values.emplace(METRICS::SYSTEM_TRAVEL_DISTANCE, travel_distance_values);
   }
 
   double longitudinal_comfortability() const
@@ -419,12 +407,12 @@ struct CommonData
       return (max - std::clamp(value, min, max)) / (max - min);
     };
 
-    for (size_t i = 0; i < resample_num; i++) {
-      score +=
-        normalize(std::pow(TIME_FACTOR, i) * std::abs(values.at(METRIC::LONGITUDINAL_JERK).at(i)));
+    for (size_t i = 0; i < size; i++) {
+      score += normalize(
+        std::pow(TIME_FACTOR, i) * std::abs(values.at(METRICS::MANUAL_LONGITUDINAL_JERK).at(i)));
     }
 
-    return score / resample_num;
+    return score / size;
   }
 
   double lateral_comfortability() const
@@ -439,12 +427,12 @@ struct CommonData
       return (max - std::clamp(value, min, max)) / (max - min);
     };
 
-    for (size_t i = 0; i < resample_num; i++) {
-      score +=
-        normalize(std::pow(TIME_FACTOR, i) * std::abs(values.at(METRIC::LATERAL_ACCEL).at(i)));
+    for (size_t i = 0; i < size; i++) {
+      score += normalize(
+        std::pow(TIME_FACTOR, i) * std::abs(values.at(METRICS::MANUAL_LATERAL_ACCEL).at(i)));
     }
 
-    return score / resample_num;
+    return score / size;
   }
 
   double efficiency() const
@@ -459,11 +447,12 @@ struct CommonData
       return std::clamp(value, min, max) / (max - min);
     };
 
-    for (size_t i = 0; i < resample_num; i++) {
-      score += normalize(std::pow(TIME_FACTOR, i) * values.at(METRIC::TRAVEL_DISTANCE).at(i) / 0.5);
+    for (size_t i = 0; i < size; i++) {
+      score += normalize(
+        std::pow(TIME_FACTOR, i) * values.at(METRICS::MANUAL_TRAVEL_DISTANCE).at(i) / 0.5);
     }
 
-    return score / resample_num;
+    return score / size;
   }
 
   double safety() const
@@ -478,22 +467,11 @@ struct CommonData
       return std::clamp(value, min, max) / (max - min);
     };
 
-    for (size_t i = 0; i < resample_num; i++) {
-      score += normalize(std::pow(TIME_FACTOR, i) * values.at(METRIC::MINIMUM_TTC).at(i));
+    for (size_t i = 0; i < size; i++) {
+      score += normalize(std::pow(TIME_FACTOR, i) * values.at(METRICS::MANUAL_MINIMUM_TTC).at(i));
     }
 
-    return score / resample_num;
-  }
-
-  double total() const
-  {
-    constexpr double w0 = 1.0;
-    constexpr double w1 = 1.0;
-    constexpr double w2 = 1.0;
-    constexpr double w3 = 1.0;
-    return w0 * scores.at(SCORE::LATERAL_COMFORTABILITY) +
-           w1 * scores.at(SCORE::LONGITUDINAL_COMFORTABILITY) + w2 * scores.at(SCORE::EFFICIENCY) +
-           w3 * scores.at(SCORE::SAFETY);
+    return score / size;
   }
 
   virtual double lateral_accel(const size_t idx) const = 0;
@@ -506,41 +484,36 @@ struct CommonData
 
   std::vector<PredictedObjects> objects_history;
 
-  std::unordered_map<METRIC, std::vector<double>> values;
-  std::unordered_map<SCORE, double> scores;
+  std::unordered_map<METRICS, std::vector<double>> values;
 
   vehicle_info_utils::VehicleInfo vehicle_info;
 
-  size_t resample_num;
-
-  std::string tag{""};
+  size_t size;
 };
 
 struct ManualDrivingData : CommonData
 {
   explicit ManualDrivingData(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
+    const vehicle_info_utils::VehicleInfo & vehicle_info, const double time_horizon,
     const double time_resolution)
-  : CommonData(trimmed_data, vehicle_info, resample_num, time_resolution, "manual")
+  : CommonData(trimmed_data, vehicle_info, time_horizon, time_resolution)
   {
-    for (size_t i = 0; i < resample_num; i++) {
-      const auto opt_odometry =
-        trimmed_data->buf_odometry.get(trimmed_data->timestamp + 1e9 * time_resolution * i);
+    for (size_t t = trimmed_data->timestamp; t < trimmed_data->timestamp + time_horizon * 1e9;
+         t += time_resolution * 1e9) {
+      const auto opt_odometry = trimmed_data->buf_odometry.get(t);
       if (!opt_odometry.has_value()) {
         break;
       }
       odometry_history.push_back(opt_odometry.value());
 
-      const auto opt_accel =
-        trimmed_data->buf_accel.get(trimmed_data->timestamp + 1e9 * time_resolution * i);
+      const auto opt_accel = trimmed_data->buf_accel.get(t);
       if (!opt_accel.has_value()) {
         break;
       }
       accel_history.push_back(opt_accel.value());
 
-      const auto opt_steer =
-        trimmed_data->buf_steer.get(trimmed_data->timestamp + 1e9 * time_resolution * i);
+      const auto opt_steer = trimmed_data->buf_steer.get(t);
       if (!opt_steer.has_value()) {
         break;
       }
@@ -571,6 +544,10 @@ struct ManualDrivingData : CommonData
 
   double minimum_ttc(const size_t idx) const
   {
+    if (objects_history.at(idx).objects.empty()) {
+      return {};
+    }
+
     const auto p_ego = odometry_history.at(idx).pose.pose;
     const auto v_ego = get_velocity_in_world_coordinate(odometry_history.at(idx));
 
@@ -580,7 +557,7 @@ struct ManualDrivingData : CommonData
   double travel_distance(const size_t idx) const
   {
     double distance = 0.0;
-    for (size_t i = 0L; i < idx; i++) {
+    for (size_t i = 0L; i <= idx; i++) {
       distance += autoware::universe_utils::calcDistance3d(
         odometry_history.at(i + 1).pose.pose, odometry_history.at(i).pose.pose);
     }
@@ -596,10 +573,9 @@ struct TrajectoryData : CommonData
 {
   TrajectoryData(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-    const double time_resolution, const std::string & tag,
-    const std::vector<TrajectoryPoint> & points)
-  : CommonData(trimmed_data, vehicle_info, resample_num, time_resolution, tag), points{points}
+    const vehicle_info_utils::VehicleInfo & vehicle_info, const double time_horizon,
+    const double time_resolution, const std::vector<TrajectoryPoint> & points)
+  : CommonData(trimmed_data, vehicle_info, time_horizon, time_resolution), points{points}
   {
     calculate();
   }
@@ -618,6 +594,10 @@ struct TrajectoryData : CommonData
 
   double minimum_ttc(const size_t idx) const
   {
+    if (objects_history.at(idx).objects.empty()) {
+      return {};
+    }
+
     const auto p_ego = points.at(idx).pose;
     const auto v_ego = get_velocity_in_world_coordinate(points.at(idx));
 
@@ -634,10 +614,9 @@ struct TrajectoryData : CommonData
 
 struct SamplingTrajectoryData
 {
-  SamplingTrajectoryData(
+  void init(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const double time_horizon,
-    const double time_resolution)
+    const vehicle_info_utils::VehicleInfo & vehicle_info)
   {
     const auto opt_odometry = trimmed_data->buf_odometry.get(trimmed_data->timestamp);
     if (!opt_odometry.has_value()) {
@@ -656,21 +635,15 @@ struct SamplingTrajectoryData
       throw std::logic_error("data is not enough.");
     }
     data.emplace_back(
-      trimmed_data, vehicle_info, time_horizon, time_resolution, "autoware",
-      resampling(opt_trajectory.value(), time_horizon, time_resolution));
+      trimmed_data, vehicle_info, time_horizon, time_resolution,
+      resampling(opt_trajectory.value()));
 
     for (const auto & sample : sampling(opt_trajectory.value())) {
-      data.emplace_back(
-        trimmed_data, vehicle_info, time_horizon, time_resolution, "frenet", sample);
+      data.emplace_back(trimmed_data, vehicle_info, time_horizon, time_resolution, sample);
     }
-
-    std::sort(data.begin(), data.end(), [](const auto & a, const auto & b) {
-      return a.total() > b.total();
-    });
   }
 
-  std::vector<TrajectoryPoint> resampling(
-    const Trajectory & trajectory, const double time_horizon, const double time_resolution)
+  std::vector<TrajectoryPoint> resampling(const Trajectory & trajectory)
   {
     const auto ego_seg_idx =
       autoware::motion_utils::findFirstNearestSegmentIndexWithSoftConstraints(
@@ -755,79 +728,13 @@ struct SamplingTrajectoryData
     return output;
   }
 
-  auto best() const -> TrajectoryData { return data.front(); }
-
-  auto autoware() const -> TrajectoryData
-  {
-    const auto itr = std::find_if(data.begin(), data.end(), [](const auto & trajectory) {
-      return trajectory.tag == "autoware";
-    });
-    return *itr;
-  }
-
   Odometry init_odometory;
   AccelWithCovarianceStamped init_accel;
   std::vector<TrajectoryData> data;
-};
 
-struct DataSet
-{
-  DataSet(
-    const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-    const double time_resolution)
-  : manual{ManualDrivingData(trimmed_data, vehicle_info, resample_num, time_resolution)},
-    sampling{SamplingTrajectoryData(trimmed_data, vehicle_info, resample_num, time_resolution)}
-  {
-  }
-
-  ManualDrivingData manual;
-  SamplingTrajectoryData sampling;
-};
-
-class BehaviorAnalyzerNode : public rclcpp::Node
-{
-public:
-  explicit BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_options);
-
-private:
-  void on_timer();
-
-  void play(const SetBool::Request::SharedPtr req, SetBool::Response::SharedPtr res);
-
-  void rewind(const Trigger::Request::SharedPtr req, Trigger::Response::SharedPtr res);
-
-  void update(std::shared_ptr<TrimmedData> & trimmed_data) const;
-
-  void process(const std::shared_ptr<TrimmedData> & trimmed_data) const;
-
-  void metrics(const std::shared_ptr<DataSet> & data_set) const;
-
-  void score(const std::shared_ptr<DataSet> & data_set) const;
-
-  void visualize(const std::shared_ptr<DataSet> & data_set) const;
-
-  rclcpp::TimerBase::SharedPtr timer_;
-  rclcpp::Publisher<MarkerArray>::SharedPtr pub_marker_;
-  rclcpp::Publisher<Odometry>::SharedPtr pub_odometry_;
-  rclcpp::Publisher<PredictedObjects>::SharedPtr pub_objects_;
-  rclcpp::Publisher<Trajectory>::SharedPtr pub_trajectory_;
-  rclcpp::Publisher<TFMessage>::SharedPtr pub_tf_;
-  rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_manual_metrics_;
-  rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_system_metrics_;
-  rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_manual_score_;
-  rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr pub_system_score_;
-  rclcpp::Service<SetBool>::SharedPtr srv_play_;
-  rclcpp::Service<Trigger>::SharedPtr srv_rewind_;
-
-  vehicle_info_utils::VehicleInfo vehicle_info_;
-
-  std::shared_ptr<TrimmedData> trimmed_data_;
-
-  mutable rosbag2_cpp::Reader reader_;
-
-  bool is_ready_{false};
+  double time_horizon{10.0};
+  double time_resolution{0.5};
 };
 }  // namespace autoware::behavior_analyzer
 
-#endif  // NODE_HPP_
+#endif  // DATA_STRUCTS_HPP_
