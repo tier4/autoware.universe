@@ -70,6 +70,31 @@ tf2::Vector3 get_velocity_in_world_coordinate(const TrajectoryPoint & point)
 
   return from_msg(v_world) - from_msg(pose.position);
 }
+
+std::vector<double> time_to_collisions(
+  const PredictedObjects & objects, const Pose & p_ego, const tf2::Vector3 & v_ego)
+{
+  std::vector<double> time_to_collisions(objects.objects.size());
+
+  for (const auto & object : objects.objects) {
+    const auto p_object = object.kinematics.initial_pose_with_covariance.pose;
+    const auto v_ego2object =
+      autoware::universe_utils::point2tfVector(p_ego.position, p_object.position);
+
+    const auto v_object = get_velocity_in_world_coordinate(object.kinematics);
+    const auto v_relative = tf2::tf2Dot(v_ego2object.normalized(), v_ego) -
+                            tf2::tf2Dot(v_ego2object.normalized(), v_object);
+
+    time_to_collisions.push_back(v_ego2object.length() / v_relative);
+  }
+
+  const auto itr = std::remove_if(
+    time_to_collisions.begin(), time_to_collisions.end(),
+    [](const auto & value) { return value < 1e-3; });
+  time_to_collisions.erase(itr, time_to_collisions.end());
+
+  return time_to_collisions;
+}
 }  // namespace
 
 BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_options)
@@ -210,25 +235,7 @@ auto BehaviorAnalyzerNode::manual_all_ttc(const Data & data) const -> std::vecto
   const auto p_ego = data.odometry.pose.pose;
   const auto v_ego = get_velocity_in_world_coordinate(data.odometry);
 
-  std::vector<double> ttc(data.objects.objects.size());
-
-  for (const auto & object : data.objects.objects) {
-    const auto p_object = object.kinematics.initial_pose_with_covariance.pose;
-    const auto v_ego2object =
-      autoware::universe_utils::point2tfVector(p_ego.position, p_object.position);
-
-    const auto v_object = get_velocity_in_world_coordinate(object.kinematics);
-    const auto v_relative = tf2::tf2Dot(v_ego2object.normalized(), v_ego) -
-                            tf2::tf2Dot(v_ego2object.normalized(), v_object);
-
-    ttc.push_back(v_ego2object.length() / v_relative);
-  }
-
-  const auto itr =
-    std::remove_if(ttc.begin(), ttc.end(), [](const auto & value) { return value < 1e-3; });
-  ttc.erase(itr, ttc.end());
-
-  return ttc;
+  return time_to_collisions(data.objects, p_ego, v_ego);
 }
 
 auto BehaviorAnalyzerNode::system_all_ttc(const Data & data) const -> std::vector<double>
@@ -240,25 +247,7 @@ auto BehaviorAnalyzerNode::system_all_ttc(const Data & data) const -> std::vecto
   const auto p_ego = data.predicted_point.pose;
   const auto v_ego = get_velocity_in_world_coordinate(data.predicted_point);
 
-  std::vector<double> ttc(data.objects.objects.size());
-
-  for (const auto & object : data.objects.objects) {
-    const auto p_object = object.kinematics.initial_pose_with_covariance.pose;
-    const auto v_ego2object =
-      autoware::universe_utils::point2tfVector(p_ego.position, p_object.position);
-
-    const auto v_object = get_velocity_in_world_coordinate(object.kinematics);
-    const auto v_relative = tf2::tf2Dot(v_ego2object.normalized(), v_ego) -
-                            tf2::tf2Dot(v_ego2object.normalized(), v_object);
-
-    ttc.push_back(v_ego2object.length() / v_relative);
-  }
-
-  const auto itr =
-    std::remove_if(ttc.begin(), ttc.end(), [](const auto & value) { return value < 1e-3; });
-  ttc.erase(itr, ttc.end());
-
-  return ttc;
+  return time_to_collisions(data.objects, p_ego, v_ego);
 }
 
 double BehaviorAnalyzerNode::manual_lateral_accel(const Data & data) const
@@ -652,12 +641,12 @@ void BehaviorAnalyzerNode::visualize(const std::vector<Data> & extract_data) con
     }
   }
 
-  for (const auto & points : extract_data.front().candidate_trajectories) {
+  for (size_t j = 0; j < extract_data.front().candidate_points.size(); j++) {
     Marker marker = createDefaultMarker(
       "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "candidate_poses", i++, Marker::LINE_STRIP,
       createMarkerScale(0.05, 0.0, 0.0), createMarkerColor(0.0, 0.0, 1.0, 0.999));
-    for (const auto & point : points) {
-      marker.points.push_back(point.pose.position);
+    for (const auto & data : extract_data) {
+      marker.points.push_back(data.candidate_points.at(j).pose.position);
     }
     msg.markers.push_back(marker);
   }

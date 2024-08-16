@@ -210,6 +210,8 @@ struct Data
 
   std::vector<std::vector<TrajectoryPoint>> candidate_trajectories;
 
+  std::vector<TrajectoryPoint> candidate_points;
+
   std::unordered_map<METRICS, double> values;
 };
 
@@ -330,7 +332,7 @@ struct DataSet
     current_state.heading = tf2::getYaw(data.odometry.pose.pose.orientation);
 
     current_state.frenet = reference_trajectory.frenet(current_state.pose);
-    current_state.pose = reference_trajectory.cartesian(current_state.frenet.s);
+    // current_state.pose = reference_trajectory.cartesian(current_state.frenet.s);
     current_state.heading = reference_trajectory.yaw(current_state.frenet.s);
     current_state.curvature = reference_trajectory.curvature(current_state.frenet.s);
 
@@ -423,6 +425,15 @@ struct DataSet
     for (const auto & frenet_trajectory : candidate_frenet_trajectories) {
       extract_data.front().candidate_trajectories.push_back(
         autoware::path_sampler::trajectory_utils::convertToTrajectoryPoints(frenet_trajectory));
+    }
+
+    for (const auto & frenet_trajectory : candidate_frenet_trajectories) {
+      const auto resampled_trajectory =
+        autoware::path_sampler::trajectory_utils::convertToTrajectoryPoints(
+          frenet_trajectory.resampleTimeFromZero(0.5));
+      for (size_t i = 0; i < extract_data.size(); ++i) {
+        extract_data.at(i).candidate_points.push_back(resampled_trajectory.at(i));
+      }
     }
 
     for (size_t i = 0; i < extract_data.size(); ++i) {
