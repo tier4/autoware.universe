@@ -60,6 +60,10 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
 
   reader_.open(declare_parameter<std::string>("bag_path"));
 
+  resample_num_ = declare_parameter<int>("resample_num");
+
+  time_resolution_ = declare_parameter<double>("time_resolution");
+
   trimmed_data_ = std::make_shared<TrimmedData>(
     duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
 }
@@ -159,7 +163,8 @@ void BehaviorAnalyzerNode::rewind(
 
 void BehaviorAnalyzerNode::process(const std::shared_ptr<TrimmedData> & trimmed_data) const
 {
-  const auto data_set = std::make_shared<DataSet>(trimmed_data, vehicle_info_, size_t(20), 0.5);
+  const auto data_set =
+    std::make_shared<DataSet>(trimmed_data, vehicle_info_, resample_num_, time_resolution_);
 
   const auto opt_tf = trimmed_data->buf_tf.get(trimmed_data->timestamp);
   if (opt_tf.has_value()) {

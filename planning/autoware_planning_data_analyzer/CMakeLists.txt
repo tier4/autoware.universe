@@ -6,6 +6,7 @@ autoware_package()
 
 ament_auto_add_library(${PROJECT_NAME} SHARED
   src/node.cpp
+  src/data_structs.cpp
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}
