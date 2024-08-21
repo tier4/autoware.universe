@@ -1,0 +1,12 @@
+/**:
+  ros__parameters:
+    resample_num: 20
+    time_resolution: 0.5
+
+    target_state:
+      lateral_positions: [-4.5, -2.5, 0.0, 2.5, 4.0]
+      lateral_velocities: [0.0]
+      lateral_accelerations: [0.0]
+      longitudinal_positions: [0.1, 0.5, 1.0]
+      longitudinal_velocities: [0.0, 5.56, 11.1]
+      longitudinal_accelerations: [-0.2, -0.1, 0.0, 0.1, 0.2]

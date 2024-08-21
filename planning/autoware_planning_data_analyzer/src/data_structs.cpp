@@ -354,10 +354,16 @@ double TrajectoryData::travel_distance(const size_t idx) const
   return autoware::motion_utils::calcSignedArcLength(points, 0L, idx);
 }
 
+bool TrajectoryData::feasible() const
+{
+  const auto condition = [](const auto & p) { return p.longitudinal_velocity_mps > 0.0; };
+  return std::all_of(points.begin(), points.end(), condition);
+}
+
 SamplingTrajectoryData::SamplingTrajectoryData(
   const std::shared_ptr<TrimmedData> & trimmed_data,
-  const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-  const double time_resolution)
+  const vehicle_info_utils::VehicleInfo & vehicle_info,
+  const std::shared_ptr<Parameters> & parameters)
 {
   const auto opt_odometry = trimmed_data->buf_odometry.get(trimmed_data->timestamp);
   if (!opt_odometry.has_value()) {
@@ -374,18 +380,23 @@ SamplingTrajectoryData::SamplingTrajectoryData(
     throw std::logic_error("data is not enough.");
   }
   data.emplace_back(
-    trimmed_data, vehicle_info, resample_num, time_resolution, "autoware",
+    trimmed_data, vehicle_info, parameters->resample_num, parameters->time_resolution, "autoware",
     utils::resampling(
-      opt_trajectory.value(), opt_odometry.value().pose.pose, resample_num, time_resolution));
+      opt_trajectory.value(), opt_odometry.value().pose.pose, parameters->resample_num,
+      parameters->time_resolution));
 
   for (const auto & sample : utils::sampling(
          opt_trajectory.value(), opt_odometry.value().pose.pose,
          opt_odometry.value().twist.twist.linear.x, opt_accel.value().accel.accel.linear.x,
-         time_resolution)) {
-    data.emplace_back(trimmed_data, vehicle_info, resample_num, time_resolution, "frenet", sample);
+         vehicle_info, parameters)) {
+    data.emplace_back(
+      trimmed_data, vehicle_info, parameters->resample_num, parameters->time_resolution, "frenet",
+      sample);
   }
 
   std::sort(
     data.begin(), data.end(), [](const auto & a, const auto & b) { return a.total() > b.total(); });
+
+  std::remove_if(data.begin(), data.end(), [](const auto & d) { return !d.feasible(); });
 }
 }  // namespace autoware::behavior_analyzer

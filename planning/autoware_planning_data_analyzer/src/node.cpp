@@ -60,12 +60,24 @@ BehaviorAnalyzerNode::BehaviorAnalyzerNode(const rclcpp::NodeOptions & node_opti
 
   reader_.open(declare_parameter<std::string>("bag_path"));
 
-  resample_num_ = declare_parameter<int>("resample_num");
-
-  time_resolution_ = declare_parameter<double>("time_resolution");
-
   trimmed_data_ = std::make_shared<TrimmedData>(
     duration_cast<nanoseconds>(reader_.get_metadata().starting_time.time_since_epoch()).count());
+
+  parameters_ = std::make_shared<Parameters>();
+  parameters_->resample_num = declare_parameter<int>("resample_num");
+  parameters_->time_resolution = declare_parameter<double>("time_resolution");
+  parameters_->target_state.lat_positions =
+    declare_parameter<std::vector<double>>("target_state.lateral_positions");
+  parameters_->target_state.lat_velocities =
+    declare_parameter<std::vector<double>>("target_state.lateral_velocities");
+  parameters_->target_state.lat_accelerations =
+    declare_parameter<std::vector<double>>("target_state.lateral_accelerations");
+  parameters_->target_state.lon_positions =
+    declare_parameter<std::vector<double>>("target_state.longitudinal_positions");
+  parameters_->target_state.lon_velocities =
+    declare_parameter<std::vector<double>>("target_state.longitudinal_velocities");
+  parameters_->target_state.lon_accelerations =
+    declare_parameter<std::vector<double>>("target_state.longitudinal_accelerations");
 }
 
 void BehaviorAnalyzerNode::update(std::shared_ptr<TrimmedData> & trimmed_data) const
@@ -163,8 +175,7 @@ void BehaviorAnalyzerNode::rewind(
 
 void BehaviorAnalyzerNode::process(const std::shared_ptr<TrimmedData> & trimmed_data) const
 {
-  const auto data_set =
-    std::make_shared<DataSet>(trimmed_data, vehicle_info_, resample_num_, time_resolution_);
+  const auto data_set = std::make_shared<DataSet>(trimmed_data, vehicle_info_, parameters_);
 
   const auto opt_tf = trimmed_data->buf_tf.get(trimmed_data->timestamp);
   if (opt_tf.has_value()) {
@@ -295,8 +306,16 @@ void BehaviorAnalyzerNode::visualize(const std::shared_ptr<DataSet> & data_set) 
     Marker marker = createDefaultMarker(
       "map", rclcpp::Clock{RCL_ROS_TIME}.now(), "candidates", i++, Marker::LINE_STRIP,
       createMarkerScale(0.05, 0.0, 0.0), createMarkerColor(0.0, 0.0, 1.0, 0.999));
-    for (const auto & point : trajectory.points) {
-      marker.points.push_back(point.pose.position);
+    if (!trajectory.feasible()) {
+      for (const auto & point : trajectory.points) {
+        marker.points.push_back(point.pose.position);
+        marker.colors.push_back(createMarkerColor(0.1, 0.1, 0.1, 0.5));
+      }
+    } else {
+      for (const auto & point : trajectory.points) {
+        marker.points.push_back(point.pose.position);
+        marker.colors.push_back(createMarkerColor(0.0, 0.0, 1.0, 0.999));
+      }
     }
     msg.markers.push_back(marker);
   }

@@ -102,6 +102,29 @@ double time_to_collision(
   return time_to_collisions.front();
 }
 
+auto convertToTrajectoryPoints(
+  const autoware::sampler_common::Trajectory & trajectory,
+  const vehicle_info_utils::VehicleInfo & vehicle_info) -> std::vector<TrajectoryPoint>
+{
+  std::vector<TrajectoryPoint> traj_points;
+  for (auto i = 0UL; i < trajectory.points.size(); ++i) {
+    TrajectoryPoint p;
+    p.pose.position.x = trajectory.points[i].x();
+    p.pose.position.y = trajectory.points[i].y();
+    auto quat = tf2::Quaternion();
+    quat.setRPY(0.0, 0.0, trajectory.yaws[i]);
+    p.pose.orientation.w = quat.w();
+    p.pose.orientation.x = quat.x();
+    p.pose.orientation.y = quat.y();
+    p.pose.orientation.z = quat.z();
+    p.longitudinal_velocity_mps = trajectory.longitudinal_velocities.at(i);
+    p.lateral_velocity_mps = trajectory.lateral_velocities.at(i);
+    p.front_wheel_angle_rad = vehicle_info.wheel_base_m * trajectory.curvatures.at(i);
+    traj_points.push_back(p);
+  }
+  return traj_points;
+}
+
 template <class T>
 auto convertToFrenetPoint(const T & points, const Point & search_point_geom, const size_t seg_idx)
   -> FrenetPoint
@@ -130,9 +153,10 @@ auto prepareSamplingParameters(
   const auto max_s = path_spline.lastS();
   autoware::frenet_planner::SamplingParameter p;
   p.target_duration = 10.0;
-  for (const auto target_length : {trajectory_length}) {
+  for (const auto lon_position : parameters.lon_positions) {
     p.target_state.position.s = std::min(
-      max_s, path_spline.frenet(initial_state.pose).s + std::max(0.0, target_length - base_length));
+      max_s, path_spline.frenet(initial_state.pose).s +
+               std::max(0.0, lon_position * trajectory_length - base_length));
     for (const auto lon_velocity : parameters.lon_velocities) {
       p.target_state.longitudinal_velocity = lon_velocity;
       for (const auto lon_acceleration : parameters.lon_accelerations) {
@@ -184,7 +208,8 @@ auto resampling(
 
 auto sampling(
   const Trajectory & trajectory, const Pose & p_ego, const double v_ego, const double a_ego,
-  const double time_resolution) -> std::vector<std::vector<TrajectoryPoint>>
+  const vehicle_info_utils::VehicleInfo & vehicle_info,
+  const std::shared_ptr<Parameters> & parameters) -> std::vector<std::vector<TrajectoryPoint>>
 {
   const auto reference_trajectory =
     autoware::path_sampler::preparePathSpline(trajectory.points, true);
@@ -198,11 +223,9 @@ auto sampling(
   current_state.heading = reference_trajectory.yaw(current_state.frenet.s);
   current_state.curvature = reference_trajectory.curvature(current_state.frenet.s);
 
-  const auto parameters = TargetStateParameters();
-
   const auto trajectory_length = autoware::motion_utils::calcArcLength(trajectory.points);
   const auto sampling_parameters = prepareSamplingParameters(
-    current_state, 0.0, reference_trajectory, trajectory_length, parameters);
+    current_state, 0.0, reference_trajectory, trajectory_length, parameters->target_state);
 
   autoware::frenet_planner::FrenetState initial_frenet_state;
   initial_frenet_state.position = reference_trajectory.frenet(current_state.pose);
@@ -237,8 +260,8 @@ auto sampling(
   output.reserve(sampling_frenet_trajectories.size());
 
   for (const auto & trajectory : sampling_frenet_trajectories) {
-    output.push_back(autoware::path_sampler::trajectory_utils::convertToTrajectoryPoints(
-      trajectory.resampleTimeFromZero(time_resolution)));
+    output.push_back(convertToTrajectoryPoints(
+      trajectory.resampleTimeFromZero(parameters->time_resolution), vehicle_info));
   }
 
   return output;

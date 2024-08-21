@@ -179,6 +179,8 @@ struct CommonData
 
   virtual double travel_distance(const size_t idx) const = 0;
 
+  virtual bool feasible() const = 0;
+
   std::vector<PredictedObjects> objects_history;
 
   std::unordered_map<METRIC, std::vector<double>> values;
@@ -206,6 +208,8 @@ struct ManualDrivingData : CommonData
 
   double travel_distance(const size_t idx) const override;
 
+  bool feasible() const override { return true; }
+
   std::vector<Odometry> odometry_history;
   std::vector<AccelWithCovarianceStamped> accel_history;
   std::vector<SteeringReport> steer_history;
@@ -227,25 +231,34 @@ struct TrajectoryData : CommonData
 
   double travel_distance(const size_t idx) const override;
 
+  bool feasible() const override;
+
   std::vector<TrajectoryPoint> points;
 };
 
 struct TargetStateParameters
 {
-  std::vector<double> lat_positions{-4.5, -2.5, 0.0, 2.5, 4.5};
-  std::vector<double> lat_velocities{0.0};
-  std::vector<double> lat_accelerations{0.0};
-  std::vector<double> lon_positions{10.0, 50.0, 100.0};
-  std::vector<double> lon_velocities = {0.0, 5.56, 11.1};
-  std::vector<double> lon_accelerations = {-0.2, -0.1, 0.0, 0.1, 0.2};
+  std::vector<double> lat_positions{};
+  std::vector<double> lat_velocities{};
+  std::vector<double> lat_accelerations{};
+  std::vector<double> lon_positions{};
+  std::vector<double> lon_velocities{};
+  std::vector<double> lon_accelerations{};
+};
+
+struct Parameters
+{
+  size_t resample_num{20};
+  double time_resolution{0.5};
+  TargetStateParameters target_state{};
 };
 
 struct SamplingTrajectoryData
 {
   SamplingTrajectoryData(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-    const double time_resolution);
+    const vehicle_info_utils::VehicleInfo & vehicle_info,
+    const std::shared_ptr<Parameters> & parameters);
 
   auto best() const -> TrajectoryData { return data.front(); }
 
@@ -264,10 +277,11 @@ struct DataSet
 {
   DataSet(
     const std::shared_ptr<TrimmedData> & trimmed_data,
-    const vehicle_info_utils::VehicleInfo & vehicle_info, const size_t resample_num,
-    const double time_resolution)
-  : manual{ManualDrivingData(trimmed_data, vehicle_info, resample_num, time_resolution)},
-    sampling{SamplingTrajectoryData(trimmed_data, vehicle_info, resample_num, time_resolution)}
+    const vehicle_info_utils::VehicleInfo & vehicle_info,
+    const std::shared_ptr<Parameters> & parameters)
+  : manual{ManualDrivingData(
+      trimmed_data, vehicle_info, parameters->resample_num, parameters->time_resolution)},
+    sampling{SamplingTrajectoryData(trimmed_data, vehicle_info, parameters)}
   {
   }
 

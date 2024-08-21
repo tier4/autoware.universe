@@ -73,11 +73,9 @@ private:
 
   std::shared_ptr<TrimmedData> trimmed_data_;
 
+  std::shared_ptr<Parameters> parameters_;
+
   mutable rosbag2_cpp::Reader reader_;
-
-  double time_resolution_{0.5};
-
-  size_t resample_num_{20};
 
   bool is_ready_{false};
 };
