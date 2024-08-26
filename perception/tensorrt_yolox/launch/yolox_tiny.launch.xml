@@ -15,7 +15,7 @@
     <param from="$(var param_file)"/>
   </node>
 
-  <node pkg="tensorrt_yolox" exec="tensorrt_yolox_node_exe" name="tensorrt_yolox" output="screen">
+  <node pkg="tensorrt_yolox" exec="tensorrt_yolox_node_exe" name="tensorrt_yolox" output="both">
     <remap from="~/in/image" to="$(var input/image)"/>
     <remap from="~/out/objects" to="$(var output/objects)"/>
     <param from="$(var yolox_param_path)" allow_substs="true"/>
