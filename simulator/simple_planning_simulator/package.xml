@@ -19,6 +19,7 @@
   <depend>tier4_external_api_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>vehicle_info_util</depend>
   <depend>tier4_autoware_utils</depend>
   <depend>rclcpp_components</depend>

@@ -15,6 +15,7 @@
 #ifndef SIMPLE_PLANNING_SIMULATOR__SIMPLE_PLANNING_SIMULATOR_CORE_HPP_
 #define SIMPLE_PLANNING_SIMULATOR__SIMPLE_PLANNING_SIMULATOR_CORE_HPP_
 
+#include "sensor_msgs/msg/imu.hpp"
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -85,6 +86,23 @@ using geometry_msgs::msg::PoseWithCovarianceStamped;
 using geometry_msgs::msg::TransformStamped;
 using geometry_msgs::msg::Twist;
 using nav_msgs::msg::Odometry;
+using sensor_msgs::msg::Imu;
+
+/// Covariance for x-y-z.
+/// Used at
+/// - sensor_msgs/msg/Imu.msg: msg.linear_acceleration_covariance
+/// copied from msg_covariance.hpp in autoware_universe_utils at latest version as of 2024/08/07
+enum XYZ_COV_IDX {
+  X_X = 0,
+  X_Y = 1,
+  X_Z = 2,
+  Y_X = 3,
+  Y_Y = 4,
+  Y_Z = 5,
+  Z_X = 6,
+  Z_Y = 7,
+  Z_Z = 8,
+};
 
 class DeltaTime
 {
@@ -128,6 +146,7 @@ private:
   rclcpp::Publisher<VelocityReport>::SharedPtr pub_velocity_;
   rclcpp::Publisher<Odometry>::SharedPtr pub_odom_;
   rclcpp::Publisher<SteeringReport>::SharedPtr pub_steer_;
+  rclcpp::Publisher<Imu>::SharedPtr pub_imu_;
   rclcpp::Publisher<ControlModeReport>::SharedPtr pub_control_mode_report_;
   rclcpp::Publisher<GearReport>::SharedPtr pub_gear_report_;
   rclcpp::Publisher<TurnIndicatorsReport>::SharedPtr pub_turn_indicators_report_;
@@ -314,6 +333,11 @@ private:
    * @param [in] steer The steering to publish
    */
   void publish_steering(const SteeringReport & steer);
+
+  /**
+   * @brief publish imu
+   */
+  void publish_imu();
 
   /**
    * @brief publish control_mode report
