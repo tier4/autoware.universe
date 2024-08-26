@@ -185,6 +185,9 @@ bool ControlValidator::checkValidMaxDistanceDeviation(const Trajectory & predict
 bool ControlValidator::checkValidVelocityDeviation(
   const Trajectory & reference_trajectory, const Odometry & kinematics)
 {
+  // for experiment with holding feature
+  static bool valid = true;
+
   const double current_vel = kinematics.twist.twist.linear.x;
   if (reference_trajectory.points.size() < 2) return true;
   const double desired_vel =
@@ -202,7 +205,13 @@ bool ControlValidator::checkValidVelocityDeviation(
     std::signbit(current_vel * desired_vel) &&
     std::abs(current_vel) > validation_params_.max_reverse_velocity_threshold;
 
-  return !(is_over_velocity || is_reverse_velocity);
+  // return !(is_over_velocity || is_reverse_velocity);
+
+  // for experiment with holding feature
+  if (valid || std::abs(current_vel) < 0.05) {
+    valid = !(is_over_velocity || is_reverse_velocity);
+  }
+  return valid;
 }
 
 bool ControlValidator::isAllValid(const ControlValidatorStatus & s)
