@@ -688,10 +688,10 @@ class PyMPCTrajectoryFollower(Node):
             self.get_clock().now().to_msg()
         )
         if self.get_parameter("enable_vehicle_adaptor").get_parameter_value().bool_value:
-            #self.vehicle_adaptor.set_controller_prediction(self.controller.nominal_traj[:,2],self.controller.nominal_traj[:,3],self.controller.nominal_traj[:,4], self.controller.nominal_traj[:,5])
+            # self.vehicle_adaptor.set_controller_prediction(self.controller.nominal_traj[:,2],self.controller.nominal_traj[:,3],self.controller.nominal_traj[:,4], self.controller.nominal_traj[:,5])
             self.vehicle_adaptor.set_controller_d_inputs_schedule(self.controller.nominal_inputs[:,0], self.controller.nominal_inputs[:,1])
             u_opt_adjusted = self.vehicle_adaptor.get_adjusted_inputs(cmd_msg.stamp.sec + 1e-9 * cmd_msg.stamp.nanosec, self.controller.nominal_traj[0][:6], acc_cmd, steer_cmd)
-            self.get_logger().info("u_opt_adjusted: " + str(u_opt_adjusted))
+            # self.get_logger().info("u_opt_adjusted: " + str(u_opt_adjusted))
         cmd_msg.longitudinal.velocity = trajectory_longitudinal_velocity[nearestIndex]
         if self.get_parameter("enable_vehicle_adaptor").get_parameter_value().bool_value and (not self.emergency_stop_mode_flag) and (not self.goal_stop_mode_flag):
             cmd_msg.longitudinal.acceleration = u_opt_adjusted[0]
