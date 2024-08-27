@@ -440,7 +440,8 @@ BehaviorModuleOutput DynamicObstacleAvoidanceModule::plan()
   // generate drivable lanes
   DrivableAreaInfo current_drivable_area_info;
   if (parameters_->expand_drivable_area) {
-    auto current_lanelets = getCurrentLanesFromPath(getPreviousModuleOutput().reference_path, planner_data_);
+    auto current_lanelets =
+      getCurrentLanesFromPath(getPreviousModuleOutput().reference_path, planner_data_);
     std::for_each(current_lanelets.begin(), current_lanelets.end(), [&](const auto & lanelet) {
       current_drivable_area_info.drivable_lanes.push_back(
         generateExpandedDrivableLanes(lanelet, planner_data_, parameters_));
