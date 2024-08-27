@@ -15,9 +15,6 @@
 #ifndef MISSION_PLANNER__MISSION_PLANNER_BASE_HPP_
 #define MISSION_PLANNER__MISSION_PLANNER_BASE_HPP_
 
-#include <std_srvs/srv/trigger.hpp>
-
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -63,11 +60,6 @@ private:
 
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
-
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr alive_service_;
-  void handleAliveService(
-    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-    std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 
   bool getEgoVehiclePose(geometry_msgs::msg::PoseStamped * ego_vehicle_pose);
   void goalPoseCallback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr goal_msg_ptr);

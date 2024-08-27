@@ -47,11 +47,6 @@ MissionPlanner::MissionPlanner(
     create_publisher<autoware_auto_planning_msgs::msg::HADMapRoute>("output/route", durable_qos);
   marker_publisher_ =
     create_publisher<visualization_msgs::msg::MarkerArray>("debug/route_marker", durable_qos);
-
-  alive_service_ = create_service<std_srvs::srv::Trigger>(
-    "/planning/mission_planner/alive",
-    std::bind(
-      &MissionPlanner::handleAliveService, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 bool MissionPlanner::getEgoVehiclePose(geometry_msgs::msg::PoseStamped * ego_vehicle_pose)
@@ -137,15 +132,6 @@ void MissionPlanner::checkpointCallback(
 
   autoware_auto_planning_msgs::msg::HADMapRoute route = planRoute();
   publishRoute(route);
-}
-
-void MissionPlanner::handleAliveService(
-  const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
-  std::shared_ptr<std_srvs::srv::Trigger::Response> response)
-{
-  (void)request;
-  response->success = true;
-  response->message = "MissionPlanner is alive and running.";
 }
 
 void MissionPlanner::publishRoute(const autoware_auto_planning_msgs::msg::HADMapRoute & route) const
