@@ -360,7 +360,6 @@ public:
     parameters_ = std::any_cast<std::shared_ptr<DynamicAvoidanceParameters>>(parameters);
   }
 
-  bool arrived_path_end_{false};
   bool isExecutionRequested() const override;
   bool isExecutionReady() const override;
   // TODO(someone): remove this, and use base class function
@@ -454,7 +453,6 @@ private:
   DrivableLanes generateExpandedDrivableLanes(
     const lanelet::ConstLanelet & lanelet, const std::shared_ptr<const PlannerData> & planner_data,
     const std::shared_ptr<DynamicAvoidanceParameters> & parameters);
-  DrivableLanes generateNotExpandedDrivableLanes(const lanelet::ConstLanelet & lanelet);
 
   void printIgnoreReason(const std::string & obj_uuid, const std::string & reason)
   {
