@@ -188,7 +188,7 @@ bool ControlValidator::checkValidVelocityDeviation(
   // for experiment with holding feature
   static bool valid = true;
 
-  constexpr double lpf_param = 0.9;
+  constexpr double lpf_param = 0.0;
 
   static double desired_vel_filltered;
   static double current_vel_filltered;
