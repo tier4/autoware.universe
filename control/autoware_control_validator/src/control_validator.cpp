@@ -188,27 +188,36 @@ bool ControlValidator::checkValidVelocityDeviation(
   // for experiment with holding feature
   static bool valid = true;
 
-  const double current_vel = kinematics.twist.twist.linear.x;
-  if (reference_trajectory.points.size() < 2) return true;
-  const double desired_vel =
-    autoware::motion_utils::calcInterpolatedPoint(reference_trajectory, kinematics.pose.pose)
-      .longitudinal_velocity_mps;
+  constexpr double lpf_param = 0.9;
 
-  validation_status_.current_velocity = current_vel;
-  validation_status_.desired_velocity = desired_vel;
+  static double desired_vel_filltered;
+  static double current_vel_filltered;
+
+  if (reference_trajectory.points.size() < 2) return true;
+  desired_vel_filltered =
+    desired_vel_filltered * lpf_param +
+    autoware::motion_utils::calcInterpolatedPoint(reference_trajectory, kinematics.pose.pose)
+        .longitudinal_velocity_mps *
+      (1 - lpf_param);
+
+  current_vel_filltered =
+    current_vel_filltered * lpf_param + kinematics.twist.twist.linear.x * (1.0 - lpf_param);
+
+  validation_status_.current_velocity = current_vel_filltered;
+  validation_status_.desired_velocity = desired_vel_filltered;
 
   const bool is_over_velocity =
-    std::abs(current_vel) >
-    std::abs(desired_vel) * (1.0 + validation_params_.max_over_velocity_ratio_threshold) +
+    std::abs(current_vel_filltered) >
+    std::abs(desired_vel_filltered) * (1.0 + validation_params_.max_over_velocity_ratio_threshold) +
       validation_params_.max_reverse_velocity_threshold;
   const bool is_reverse_velocity =
-    std::signbit(current_vel * desired_vel) &&
-    std::abs(current_vel) > validation_params_.max_reverse_velocity_threshold;
+    std::signbit(current_vel_filltered * desired_vel_filltered) &&
+    std::abs(current_vel_filltered) > validation_params_.max_reverse_velocity_threshold;
 
   // return !(is_over_velocity || is_reverse_velocity);
 
   // for experiment with holding feature
-  if (valid || std::abs(current_vel) < 0.05) {
+  if (valid || std::abs(current_vel_filltered) < 0.05) {
     valid = !(is_over_velocity || is_reverse_velocity);
   }
   return valid;
