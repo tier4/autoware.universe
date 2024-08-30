@@ -23,9 +23,11 @@
 #include "autoware_lanelet2_extension/regulatory_elements/no_stopping_area.hpp"
 #include "autoware_lanelet2_extension/utility/utilities.hpp"
 
+#include <boost/geometry/algorithms/detail/intersects/interface.hpp>
 #include <boost/geometry/algorithms/union.hpp>
 
 #include <lanelet2_core/geometry/Polygon.h>
+#include <lanelet2_core/primitives/Point.h>
 
 #include <memory>
 #include <vector>
@@ -97,9 +99,7 @@ GoalSearcher::GoalSearcher(
 {
 }
 
-GoalCandidates GoalSearcher::search(
-  const std::shared_ptr<OccupancyGridBasedCollisionDetector> occupancy_grid_map,
-  const std::shared_ptr<const PlannerData> & planner_data)
+GoalCandidates GoalSearcher::search(const std::shared_ptr<const PlannerData> & planner_data)
 {
   GoalCandidates goal_candidates{};
 
@@ -117,10 +117,7 @@ GoalCandidates GoalSearcher::search(
   const auto pull_over_lanes = goal_planner_utils::getPullOverLanes(
     *route_handler, left_side_parking_, parameters_.backward_goal_search_length,
     parameters_.forward_goal_search_length);
-  auto lanes = utils::getExtendedCurrentLanes(
-    planner_data, backward_length, forward_length,
-    /*forward_only_in_route*/ false);
-  lanes.insert(lanes.end(), pull_over_lanes.begin(), pull_over_lanes.end());
+  const auto departure_check_lane = createDepartureCehckLanelet(pull_over_lanes, *route_handler);
 
   const auto goal_arc_coords =
     lanelet::utils::getArcCoordinates(pull_over_lanes, reference_goal_pose_);
@@ -177,7 +174,8 @@ GoalCandidates GoalSearcher::search(
         break;
       }
 
-      if (LaneDepartureChecker::isOutOfLane(lanes, transformed_vehicle_footprint)) {
+      if (boost::geometry::intersects(
+            transformed_vehicle_footprint, departure_check_lane.polygon2d().basicPolygon())) {
         continue;
       }
 
@@ -192,8 +190,6 @@ GoalCandidates GoalSearcher::search(
     }
   }
   createAreaPolygons(original_search_poses, planner_data);
-
-  update(goal_candidates, occupancy_grid_map, planner_data);
 
   return goal_candidates;
 }
@@ -268,16 +264,16 @@ void GoalSearcher::countObjectsToAvoid(
 void GoalSearcher::update(
   GoalCandidates & goal_candidates,
   const std::shared_ptr<OccupancyGridBasedCollisionDetector> occupancy_grid_map,
-  const std::shared_ptr<const PlannerData> & planner_data) const
+  const std::shared_ptr<const PlannerData> & planner_data, const PredictedObjects & objects) const
 {
   const auto pull_over_lane_stop_objects =
     goal_planner_utils::extractStaticObjectsInExpandedPullOverLanes(
       *(planner_data->route_handler), left_side_parking_, parameters_.backward_goal_search_length,
-      parameters_.forward_goal_search_length, parameters_.detection_bound_offset,
-      *(planner_data->dynamic_object), parameters_.th_moving_object_velocity);
+      parameters_.forward_goal_search_length, parameters_.detection_bound_offset, objects,
+      parameters_.th_moving_object_velocity);
 
   if (parameters_.prioritize_goals_before_objects) {
-    countObjectsToAvoid(goal_candidates, pull_over_lane_stop_objects, planner_data);
+    countObjectsToAvoid(goal_candidates, objects, planner_data);  // tmp
   }
 
   if (parameters_.goal_priority == "minimum_weighted_distance") {
@@ -305,7 +301,7 @@ void GoalSearcher::update(
     // check longitudinal margin with pull over lane objects
     constexpr bool filter_inside = true;
     const auto target_objects = goal_planner_utils::filterObjectsByLateralDistance(
-      goal_pose, planner_data->parameters.vehicle_width, pull_over_lane_stop_objects,
+      goal_pose, planner_data->parameters.vehicle_width, objects,
       parameters_.object_recognition_collision_check_hard_margins.back(), filter_inside);
     if (checkCollisionWithLongitudinalDistance(
           goal_pose, target_objects, occupancy_grid_map, planner_data)) {
@@ -438,6 +434,10 @@ void GoalSearcher::createAreaPolygons(
   const double vehicle_width = planner_data->parameters.vehicle_width;
   const double base_link2front = planner_data->parameters.base_link2front;
   const double base_link2rear = planner_data->parameters.base_link2rear;
+
+  const double max_longitudinal_vehicle_length_from_base_link =
+    std::max(base_link2front, base_link2rear);
+
   const double max_lateral_offset = parameters_.max_lateral_offset;
 
   const auto appendPointToPolygon =
@@ -448,36 +448,65 @@ void GoalSearcher::createAreaPolygons(
       boost::geometry::append(polygon.outer(), point);
     };
 
+  const auto calculateOffsetPose = [&](const Pose & pose, double curvature, bool isLeft) -> Pose {
+    const double abs_curvature = std::abs(curvature);
+    const double lateral_offset = isLeft ? vehicle_width / 2 : -vehicle_width / 2;
+    if ((isLeft && abs_curvature < -1e-6) || (!isLeft && abs_curvature > 1e-6)) {
+      const double radius = 1.0 / abs_curvature;
+      const double maximum_radius =
+        std::hypot(max_longitudinal_vehicle_length_from_base_link, radius + vehicle_width / 2);
+      return universe_utils::calcOffsetPose(
+        pose, 0, isLeft ? maximum_radius - radius : -(maximum_radius - radius), 0);
+    }
+    return universe_utils::calcOffsetPose(pose, 0, lateral_offset, 0);
+  };
+
   boost::geometry::clear(area_polygons_);
-  for (const auto p : original_search_poses) {
-    Polygon2d footprint{};
 
-    const double left_front_offset =
-      left_side_parking_ ? vehicle_width / 2 : vehicle_width / 2 + max_lateral_offset;
-    const Point p_left_front = calcOffsetPose(p, base_link2front, left_front_offset, 0).position;
-    appendPointToPolygon(footprint, p_left_front);
+  const auto curvatures = motion_utils::calcCurvature(original_search_poses);
 
-    const double right_front_offset =
-      left_side_parking_ ? -vehicle_width / 2 - max_lateral_offset : -vehicle_width / 2;
-    const Point p_right_front = calcOffsetPose(p, base_link2front, right_front_offset, 0).position;
-    appendPointToPolygon(footprint, p_right_front);
+  std::vector<Pose> left_boundary_poses{};
+  std::vector<Pose> right_boundary_poses{};
 
-    const double right_back_offset =
-      left_side_parking_ ? -vehicle_width / 2 - max_lateral_offset : -vehicle_width / 2;
-    const Point p_right_back = calcOffsetPose(p, -base_link2rear, right_back_offset, 0).position;
-    appendPointToPolygon(footprint, p_right_back);
+  const double left_lateral_offset = left_side_parking_ ? 0 : max_lateral_offset;
+  const double right_lateral_offset = left_side_parking_ ? -max_lateral_offset : 0;
 
-    const double left_back_offset =
-      left_side_parking_ ? vehicle_width / 2 : vehicle_width / 2 + max_lateral_offset;
-    const Point p_left_back = calcOffsetPose(p, -base_link2rear, left_back_offset, 0).position;
-    appendPointToPolygon(footprint, p_left_back);
+  const Pose & first_pose = original_search_poses.front();
+  left_boundary_poses.push_back(universe_utils::calcOffsetPose(
+    first_pose, -base_link2rear, vehicle_width / 2 + left_lateral_offset, 0));
+  right_boundary_poses.push_back(universe_utils::calcOffsetPose(
+    first_pose, -base_link2rear, -vehicle_width / 2 + right_lateral_offset, 0));
 
-    appendPointToPolygon(footprint, p_left_front);
+  for (size_t i = 0; i < original_search_poses.size(); i++) {
+    const Pose & pose = original_search_poses[i];
+    const double curvature = curvatures[i];
 
-    MultiPolygon2d current_result{};
-    boost::geometry::union_(footprint, area_polygons_, current_result);
-    area_polygons_ = current_result;
+    left_boundary_poses.push_back(universe_utils::calcOffsetPose(
+      calculateOffsetPose(pose, curvature, true), 0, left_lateral_offset, 0));
+
+    right_boundary_poses.push_back(universe_utils::calcOffsetPose(
+      calculateOffsetPose(pose, curvature, false), 0, right_lateral_offset, 0));
   }
+
+  const Pose & end_pose = original_search_poses.back();
+  left_boundary_poses.push_back(universe_utils::calcOffsetPose(
+    end_pose, base_link2front, vehicle_width / 2 + left_lateral_offset, 0));
+  right_boundary_poses.push_back(universe_utils::calcOffsetPose(
+    end_pose, base_link2front, -vehicle_width / 2 + right_lateral_offset, 0));
+
+  Polygon2d polygon;
+  for (const Pose & left_pose : left_boundary_poses) {
+    appendPointToPolygon(polygon, left_pose.position);
+  }
+  auto reversed_right_boundary_poses = right_boundary_poses;
+  std::reverse(reversed_right_boundary_poses.begin(), reversed_right_boundary_poses.end());
+  for (const Pose & right_pose : reversed_right_boundary_poses) {
+    appendPointToPolygon(polygon, right_pose.position);
+  }
+
+  appendPointToPolygon(polygon, left_boundary_poses.front().position);
+
+  area_polygons_.push_back(polygon);
 }
 
 BasicPolygons2d GoalSearcher::getNoParkingAreaPolygons(const lanelet::ConstLanelets & lanes) const
@@ -543,6 +572,54 @@ GoalCandidate GoalSearcher::getClosetGoalCandidateAlongLanes(
   }
 
   return *closest_goal_candidate;
+}
+
+lanelet::Lanelet GoalSearcher::createDepartureCehckLanelet(
+  const lanelet::ConstLanelets & pull_over_lanes,
+  const route_handler::RouteHandler & route_handler) const
+{
+  const auto getBoundPoints =
+    [&](const lanelet::ConstLanelet & lane, const bool is_outer) -> lanelet::Points3d {
+    lanelet::Points3d points;
+    const auto & bound = left_side_parking_ ? (is_outer ? lane.leftBound() : lane.rightBound())
+                                            : (is_outer ? lane.rightBound() : lane.leftBound());
+    for (const auto & pt : bound) {
+      points.push_back(lanelet::Point3d(pt));
+    }
+    return points;
+  };
+
+  const auto getMostInnerLane =
+    [&](const lanelet::ConstLanelet & lane) -> std::optional<lanelet::ConstLanelet> {
+    auto neighboring_inner_lane = left_side_parking_ ? route_handler.getRightShoulderLanelet(lane)
+                                                     : route_handler.getLeftShoulderLanelet(lane);
+    if (!neighboring_inner_lane) {
+      neighboring_inner_lane = left_side_parking_ ? route_handler.getRightLanelet(lane)
+                                                  : route_handler.getLeftLanelet(lane);
+    }
+    return neighboring_inner_lane;
+  };
+
+  lanelet::Points3d outer_bound_points{};
+  lanelet::Points3d inner_bound_points{};
+  for (const auto & lane : pull_over_lanes) {
+    outer_bound_points = getBoundPoints(lane, true);
+    auto neighboring_inner_lane = getMostInnerLane(lane);
+    while (neighboring_inner_lane.has_value()) {
+      neighboring_inner_lane = getMostInnerLane(*neighboring_inner_lane);
+    }
+    if (neighboring_inner_lane.has_value()) {
+      inner_bound_points = getBoundPoints(*neighboring_inner_lane, false);
+    } else {
+      inner_bound_points = getBoundPoints(lane, false);
+    }
+  }
+
+  const auto outer_linestring = lanelet::LineString3d(lanelet::InvalId, outer_bound_points);
+  const auto inner_linestring = lanelet::LineString3d(lanelet::InvalId, inner_bound_points);
+  return lanelet::Lanelet(
+    lanelet::InvalId, left_side_parking_ ? outer_linestring : inner_linestring,
+    left_side_parking_ ? inner_linestring : outer_linestring);
 }
 
 }  // namespace autoware::behavior_path_planner
