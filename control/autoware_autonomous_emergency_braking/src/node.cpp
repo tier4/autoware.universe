@@ -408,7 +408,6 @@ void AEB::onCheckCollision(DiagnosticStatusWrapper & stat)
         addCollisionMarker(data.value(), debug_markers);
       }
     }
-
     addVirtualStopWallMarker(info_markers);
   } else {
     const std::string error_msg = "[AEB]: No Collision";
