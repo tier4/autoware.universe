@@ -22,6 +22,10 @@
 
 namespace autoware::map_based_prediction
 {
+using autoware::universe_utils::calcAzimuthAngle;
+using autoware::universe_utils::calcOffsetPose;
+using autoware::universe_utils::createPoint;
+using autoware::universe_utils::createQuaternionFromYaw;
 using autoware::universe_utils::ScopedTimeTrack;
 
 PathGenerator::PathGenerator(
@@ -63,9 +67,8 @@ PredictedPath PathGenerator::generatePathToTargetPoint(
   const auto arrival_time = pedestrian_to_entry_point.norm() / velocity;
 
   const auto pedestrian_to_entry_point_normalized = pedestrian_to_entry_point.normalized();
-  const auto pedestrian_to_entry_point_orientation =
-    autoware::universe_utils::createQuaternionFromYaw(std::atan2(
-      pedestrian_to_entry_point_normalized.y(), pedestrian_to_entry_point_normalized.x()));
+  const auto pedestrian_to_entry_point_orientation = createQuaternionFromYaw(
+    std::atan2(pedestrian_to_entry_point_normalized.y(), pedestrian_to_entry_point_normalized.x()));
 
   for (double dt = 0.0; dt < arrival_time + ep; dt += sampling_time_interval_) {
     geometry_msgs::msg::Pose world_frame_pose;
@@ -110,11 +113,10 @@ PredictedPath PathGenerator::generatePathForCrosswalkUser(
   const auto arrival_time = pedestrian_to_entry_point.norm() / velocity;
 
   const auto pedestrian_to_entry_point_normalized = pedestrian_to_entry_point.normalized();
-  const auto pedestrian_to_entry_point_orientation =
-    autoware::universe_utils::createQuaternionFromYaw(std::atan2(
-      pedestrian_to_entry_point_normalized.y(), pedestrian_to_entry_point_normalized.x()));
+  const auto pedestrian_to_entry_point_orientation = createQuaternionFromYaw(
+    std::atan2(pedestrian_to_entry_point_normalized.y(), pedestrian_to_entry_point_normalized.x()));
   const auto entry_to_exit_point_normalized = entry_to_exit_point.normalized();
-  const auto entry_to_exit_point_orientation = autoware::universe_utils::createQuaternionFromYaw(
+  const auto entry_to_exit_point_orientation = createQuaternionFromYaw(
     std::atan2(entry_to_exit_point_normalized.y(), entry_to_exit_point_normalized.x()));
 
   for (double dt = 0.0; dt < duration + ep; dt += sampling_time_interval_) {
@@ -200,8 +202,8 @@ PredictedPath PathGenerator::generateStraightPath(
   path.time_step = rclcpp::Duration::from_seconds(sampling_time_interval_);
   path.path.reserve(static_cast<size_t>((duration) / sampling_time_interval_));
   for (double dt = 0.0; dt < duration; dt += sampling_time_interval_) {
-    const auto future_obj_pose = autoware::universe_utils::calcOffsetPose(
-      object_pose, object_twist.linear.x * dt, object_twist.linear.y * dt, 0.0);
+    const auto future_obj_pose =
+      calcOffsetPose(object_pose, object_twist.linear.x * dt, object_twist.linear.y * dt, 0.0);
     path.path.push_back(future_obj_pose);
   }
 
@@ -383,18 +385,16 @@ PosePath PathGenerator::interpolateReferencePath(
   interpolated_path.resize(interpolate_num);
   for (size_t i = 0; i < interpolate_num - 1; ++i) {
     geometry_msgs::msg::Pose interpolated_pose;
-    const auto current_point =
-      autoware::universe_utils::createPoint(lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), 0.0);
-    const auto next_point = autoware::universe_utils::createPoint(
-      lerp_ref_path_x.at(i + 1), lerp_ref_path_y.at(i + 1), 0.0);
-    const double yaw = autoware::universe_utils::calcAzimuthAngle(current_point, next_point);
-    interpolated_pose.position = autoware::universe_utils::createPoint(
-      lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), lerp_ref_path_z.at(i));
-    interpolated_pose.orientation = autoware::universe_utils::createQuaternionFromYaw(yaw);
+    const auto current_point = createPoint(lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), 0.0);
+    const auto next_point = createPoint(lerp_ref_path_x.at(i + 1), lerp_ref_path_y.at(i + 1), 0.0);
+    const double yaw = calcAzimuthAngle(current_point, next_point);
+    interpolated_pose.position =
+      createPoint(lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), lerp_ref_path_z.at(i));
+    interpolated_pose.orientation = createQuaternionFromYaw(yaw);
     interpolated_path.at(i) = interpolated_pose;
   }
-  interpolated_path.back().position = autoware::universe_utils::createPoint(
-    lerp_ref_path_x.back(), lerp_ref_path_y.back(), lerp_ref_path_z.back());
+  interpolated_path.back().position =
+    createPoint(lerp_ref_path_x.back(), lerp_ref_path_y.back(), lerp_ref_path_z.back());
   interpolated_path.back().orientation = interpolated_path.at(interpolate_num - 2).orientation;
 
   return interpolated_path;
@@ -418,15 +418,14 @@ PredictedPath PathGenerator::convertToPredictedPath(
     const auto & frenet_point = frenet_predicted_path.at(i);
 
     // Converted Pose
-    auto predicted_pose =
-      autoware::universe_utils::calcOffsetPose(ref_pose, 0.0, frenet_point.d, 0.0);
+    auto predicted_pose = calcOffsetPose(ref_pose, 0.0, frenet_point.d, 0.0);
     predicted_pose.position.z = object.kinematics.pose_with_covariance.pose.position.z;
     if (i == 0) {
       predicted_pose.orientation = object.kinematics.pose_with_covariance.pose.orientation;
     } else {
-      const double yaw = autoware::universe_utils::calcAzimuthAngle(
-        predicted_path.path.at(i - 1).position, predicted_pose.position);
-      predicted_pose.orientation = autoware::universe_utils::createQuaternionFromYaw(yaw);
+      const double yaw =
+        calcAzimuthAngle(predicted_path.path.at(i - 1).position, predicted_pose.position);
+      predicted_pose.orientation = createQuaternionFromYaw(yaw);
     }
     predicted_path.path.at(i) = predicted_pose;
   }
@@ -499,8 +498,7 @@ FrenetPoint PathGenerator::getFrenetPoint(
 
       // Calculate the distance traveled until stopping
       auto distance_to_reach_zero_speed =
-        v * t_stop + a * t_stop * (1.0 / lambda) +
-        a * (1.0 / lambda_2) * std::expm1(-lambda * t_h);
+        v * t_stop + a * t_stop * (1.0 / lambda) + a * (1.0 / lambda_2) * std::expm1(-lambda * t_h);
       // Output an equivalent constant speed
       return distance_to_reach_zero_speed / t_h;
     }
@@ -520,8 +518,7 @@ FrenetPoint PathGenerator::getFrenetPoint(
     const double t_f = (-1.0 / lambda) * std::log(1 - ((speed_limit - v) * lambda) / a);
     const double distance_covered =
       // Distance covered while accelerating
-      a * (1.0 / lambda) * t_f + a * (1.0 / lambda_2) * std::expm1(-lambda * t_f) +
-      v * t_f +
+      a * (1.0 / lambda) * t_f + a * (1.0 / lambda_2) * std::expm1(-lambda * t_f) + v * t_f +
       // Distance covered at constant speed for the rest of the horizon time
       speed_limit * (t_h - t_f);
     return distance_covered / t_h;

@@ -157,6 +157,12 @@ using autoware_perception_msgs::msg::TrafficLightGroupArray;
 using autoware_planning_msgs::msg::TrajectoryPoint;
 using tier4_debug_msgs::msg::StringStamped;
 using TrajectoryPoints = std::vector<TrajectoryPoint>;
+using geometry_msgs::msg::Point;
+using geometry_msgs::msg::Pose;
+using geometry_msgs::msg::PoseStamped;
+using geometry_msgs::msg::Twist;
+using lanelet::routing::LaneletPaths;
+
 class MapBasedPredictionNode : public rclcpp::Node
 {
 public:
@@ -264,8 +270,8 @@ private:
     const PredictedPath & predicted_path, const lanelet::ConstLineString3d & fence_line);
   lanelet::BasicLineString2d convertToFenceLine(const lanelet::ConstLineString3d & fence);
   bool isIntersecting(
-    const geometry_msgs::msg::Point & point1, const geometry_msgs::msg::Point & point2,
-    const lanelet::ConstPoint3d & point3, const lanelet::ConstPoint3d & point4);
+    const Point & point1, const Point & point2, const lanelet::ConstPoint3d & point3,
+    const lanelet::ConstPoint3d & point4);
 
   PredictedObjectKinematics convertToPredictedKinematics(
     const TrackedObjectKinematics & tracked_object);
@@ -297,30 +303,26 @@ private:
   Maneuver predictObjectManeuver(
     const TrackedObject & object, const LaneletData & current_lanelet_data,
     const double object_detected_time);
-  geometry_msgs::msg::Pose compensateTimeDelay(
-    const geometry_msgs::msg::Pose & delayed_pose, const geometry_msgs::msg::Twist & twist,
-    const double dt) const;
+  Pose compensateTimeDelay(const Pose & delayed_pose, const Twist & twist, const double dt) const;
   double calcRightLateralOffset(
-    const lanelet::ConstLineString2d & boundary_line, const geometry_msgs::msg::Pose & search_pose);
+    const lanelet::ConstLineString2d & boundary_line, const Pose & search_pose);
   double calcLeftLateralOffset(
-    const lanelet::ConstLineString2d & boundary_line, const geometry_msgs::msg::Pose & search_pose);
+    const lanelet::ConstLineString2d & boundary_line, const Pose & search_pose);
   ManeuverProbability calculateManeuverProbability(
-    const Maneuver & predicted_maneuver, const lanelet::routing::LaneletPaths & left_paths,
-    const lanelet::routing::LaneletPaths & right_paths,
-    const lanelet::routing::LaneletPaths & center_paths);
+    const Maneuver & predicted_maneuver, const LaneletPaths & left_paths,
+    const LaneletPaths & right_paths, const LaneletPaths & center_paths);
 
   void addReferencePaths(
-    const TrackedObject & object, const lanelet::routing::LaneletPaths & candidate_paths,
+    const TrackedObject & object, const LaneletPaths & candidate_paths,
     const float path_probability, const ManeuverProbability & maneuver_probability,
     const Maneuver & maneuver, std::vector<PredictedRefPath> & reference_paths,
     const double speed_limit = 0.0);
 
-  mutable universe_utils::LRUCache<lanelet::routing::LaneletPaths, std::vector<PosePath>>
+  mutable universe_utils::LRUCache<LaneletPaths, std::vector<PosePath>>
     lru_cache_of_convert_path_type_{1000};
-  std::vector<PosePath> convertPathType(const lanelet::routing::LaneletPaths & paths) const;
+  std::vector<PosePath> convertPathType(const LaneletPaths & paths) const;
 
-  void updateFuturePossibleLanelets(
-    const TrackedObject & object, const lanelet::routing::LaneletPaths & paths);
+  void updateFuturePossibleLanelets(const TrackedObject & object, const LaneletPaths & paths);
 
   bool isDuplicated(
     const std::pair<double, lanelet::ConstLanelet> & target_lanelet,
