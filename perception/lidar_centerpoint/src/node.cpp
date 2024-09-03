@@ -114,6 +114,8 @@ LidarCenterPointNode::LidarCenterPointNode(const rclcpp::NodeOptions & node_opti
     std::bind(&LidarCenterPointNode::pointCloudCallback, this, std::placeholders::_1));
   objects_pub_ = this->create_publisher<autoware_perception_msgs::msg::DetectedObjects>(
     "~/output/objects", rclcpp::QoS{1});
+  debug_pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+    "~/debug/voxel_pointcloud", rclcpp::SensorDataQoS{}.keep_last(1));
 
   // initialize debug tool
   {
@@ -151,6 +153,9 @@ void LidarCenterPointNode::pointCloudCallback(
   if (!is_success) {
     return;
   }
+  sensor_msgs::msg::PointCloud2::SharedPtr preprocessed_voxel = detector_ptr_->getLatestFilteredVoxels();
+  preprocessed_voxel->header = input_pointcloud_msg->header;
+  debug_pointcloud_pub_->publish(*preprocessed_voxel);
 
   std::vector<autoware_perception_msgs::msg::DetectedObject> raw_objects;
   raw_objects.reserve(det_boxes3d.size());

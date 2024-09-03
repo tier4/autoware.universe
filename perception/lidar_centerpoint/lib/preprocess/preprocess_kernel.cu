@@ -31,6 +31,10 @@
 #include "lidar_centerpoint/preprocess/preprocess_kernel.hpp"
 
 #include <lidar_centerpoint/utils.hpp>
+#include <cuda_runtime.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <vector>
 
 namespace
 {
@@ -258,4 +262,66 @@ cudaError_t generateFeatures_launch(
   return cudaGetLastError();
 }
 
+
+__global__ void extractFilteredVoxels_kernel(
+  const float* voxels_buffer, const unsigned int* mask,
+  int grid_x_size, int grid_y_size, int max_points_per_voxel,
+  PointXYZI* filtered_points, int* point_count)
+{
+  int voxel_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int total_voxels = grid_x_size * grid_y_size;
+  
+  if (voxel_idx >= total_voxels) return;
+
+  if (mask[voxel_idx] > 0) {
+    int voxel_point_count = min(static_cast<int>(mask[voxel_idx]), max_points_per_voxel);
+    int base_idx = atomicAdd(point_count, voxel_point_count);
+    
+    for (int i = 0; i < voxel_point_count; ++i) {
+      int src_idx = (voxel_idx * max_points_per_voxel + i) * 4;
+      int dst_idx = base_idx + i;
+
+      filtered_points[dst_idx].x = voxels_buffer[src_idx];
+      filtered_points[dst_idx].y = voxels_buffer[src_idx + 1];
+      filtered_points[dst_idx].z = voxels_buffer[src_idx + 2];
+      filtered_points[dst_idx].intensity = voxels_buffer[src_idx + 3];
+    }
+  }
+}
+
+__host__ void getFilteredVoxelsHost(
+  const float* voxels_buffer_d, const unsigned int* mask_d,
+  const int grid_x_size, const int grid_y_size,
+  PointXYZI** filtered_points, int* point_count,
+  cudaStream_t stream)
+{
+  int total_voxels = grid_x_size * grid_y_size;
+  int max_points = total_voxels * MAX_POINT_IN_VOXEL_SIZE;
+
+  // Allocate device memory
+  PointXYZI* d_filtered_points;
+  int* d_point_count;
+  cudaMalloc(&d_filtered_points, max_points * sizeof(PointXYZI));
+  cudaMalloc(&d_point_count, sizeof(int));
+  cudaMemsetAsync(d_point_count, 0, sizeof(int), stream);
+
+  // Launch kernel
+  dim3 block(256);
+  dim3 grid((total_voxels + block.x - 1) / block.x);
+  extractFilteredVoxels_kernel<<<grid, block, 0, stream>>>(
+    voxels_buffer_d, mask_d, grid_x_size, grid_y_size, MAX_POINT_IN_VOXEL_SIZE,
+    d_filtered_points, d_point_count);
+
+  // Copy point count to host
+  cudaMemcpyAsync(point_count, d_point_count, sizeof(int), cudaMemcpyDeviceToHost, stream);
+  cudaStreamSynchronize(stream);
+
+  // Allocate host memory and copy filtered points
+  *filtered_points = new PointXYZI[*point_count];
+  cudaMemcpyAsync(*filtered_points, d_filtered_points, *point_count * sizeof(PointXYZI), cudaMemcpyDeviceToHost, stream);
+
+  // Clean up
+  cudaFree(d_filtered_points);
+  cudaFree(d_point_count);
+}
 }  // namespace centerpoint

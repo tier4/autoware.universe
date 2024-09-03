@@ -153,6 +153,7 @@ bool CenterPointTRT::preprocess(
     config_.range_max_y_, config_.range_min_z_, config_.range_max_z_, config_.voxel_size_x_,
     config_.voxel_size_y_, config_.voxel_size_z_, config_.grid_size_y_, config_.grid_size_x_,
     mask_d_.get(), voxels_buffer_d_.get(), stream_));
+  latest_voxel_ptr_ = getFilteredVoxels();
 
   CHECK_CUDA_ERROR(generateBaseFeatures_launch(
     mask_d_.get(), voxels_buffer_d_.get(), config_.grid_size_y_, config_.grid_size_x_,
@@ -167,6 +168,49 @@ bool CenterPointTRT::preprocess(
 
   return true;
 }
+
+
+sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getLatestFilteredVoxels() const
+{
+  return latest_voxel_ptr_;
+}
+
+sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getFilteredVoxels() const
+{
+  PointXYZI* filtered_points;
+  int point_count;
+
+  getFilteredVoxelsHost(
+    voxels_buffer_d_.get(), mask_d_.get(),
+    config_.grid_size_x_, config_.grid_size_y_,
+    &filtered_points, &point_count, stream_);
+
+  sensor_msgs::msg::PointCloud2 cloud_msg;
+  cloud_msg.height = 1;
+  cloud_msg.width = point_count;
+  cloud_msg.fields.resize(4);
+  cloud_msg.fields[0].name = "x";
+  cloud_msg.fields[1].name = "y";
+  cloud_msg.fields[2].name = "z";
+  cloud_msg.fields[3].name = "intensity";
+  for (int i = 0; i < 4; ++i) {
+    cloud_msg.fields[i].offset = i * sizeof(float);
+    cloud_msg.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    cloud_msg.fields[i].count = 1;
+  }
+  cloud_msg.point_step = sizeof(PointXYZI);
+  cloud_msg.row_step = cloud_msg.point_step * cloud_msg.width;
+  cloud_msg.data.resize(cloud_msg.row_step * cloud_msg.height);
+  memcpy(cloud_msg.data.data(), filtered_points, cloud_msg.row_step);
+
+  cloud_msg.is_bigendian = false;
+  cloud_msg.is_dense = true;
+
+  delete[] filtered_points;  // Don't forget to free the memory
+
+  return std::make_shared<sensor_msgs::msg::PointCloud2>(cloud_msg);
+}
+
 
 void CenterPointTRT::inference()
 {
