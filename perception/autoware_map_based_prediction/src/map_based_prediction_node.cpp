@@ -147,25 +147,22 @@ void calcLateralKinematics(
   const LateralKinematicsToLanelet & prev_lateral_kinematics,
   LateralKinematicsToLanelet & current_lateral_kinematics, const double dt, const double cutoff)
 {
+  const auto & prev = prev_lateral_kinematics;
+  auto & current = current_lateral_kinematics;
+
   // calc velocity via backward difference
-  current_lateral_kinematics.left_lateral_velocity =
-    (current_lateral_kinematics.dist_from_left_boundary -
-     prev_lateral_kinematics.dist_from_left_boundary) /
-    dt;
-  current_lateral_kinematics.right_lateral_velocity =
-    (current_lateral_kinematics.dist_from_right_boundary -
-     prev_lateral_kinematics.dist_from_right_boundary) /
-    dt;
+  current.left_lateral_velocity =
+    (current.dist_from_left_boundary - prev.dist_from_left_boundary) / dt;
+  current.right_lateral_velocity =
+    (current.dist_from_right_boundary - prev.dist_from_right_boundary) / dt;
 
   // low pass filtering left velocity: default cut_off is 0.6 Hz
-  current_lateral_kinematics.filtered_left_lateral_velocity = FirstOrderLowpassFilter(
-    prev_lateral_kinematics.filtered_left_lateral_velocity,
-    prev_lateral_kinematics.left_lateral_velocity, current_lateral_kinematics.left_lateral_velocity,
+  current.filtered_left_lateral_velocity = FirstOrderLowpassFilter(
+    prev.filtered_left_lateral_velocity, prev.left_lateral_velocity, current.left_lateral_velocity,
     dt, cutoff);
-  current_lateral_kinematics.filtered_right_lateral_velocity = FirstOrderLowpassFilter(
-    prev_lateral_kinematics.filtered_right_lateral_velocity,
-    prev_lateral_kinematics.right_lateral_velocity,
-    current_lateral_kinematics.right_lateral_velocity, dt, cutoff);
+  current.filtered_right_lateral_velocity = FirstOrderLowpassFilter(
+    prev.filtered_right_lateral_velocity, prev.right_lateral_velocity,
+    current.right_lateral_velocity, dt, cutoff);
 }
 
 /**
@@ -336,9 +333,8 @@ bool validateIsolatedLaneletLength(
   // calc approx distance between closest point and end point
   const double approx_distance = lanelet::geometry::distance2d(obj_point, end_point);
   // calc min length for prediction
-  const double abs_speed = std::hypot(
-    object.kinematics.twist_with_covariance.twist.linear.x,
-    object.kinematics.twist_with_covariance.twist.linear.y);
+  const auto & v = object.kinematics.twist_with_covariance.twist.linear;
+  const double abs_speed = std::hypot(v.x, v.y);
   const double min_length = abs_speed * prediction_time;
   return approx_distance > min_length;
 }
