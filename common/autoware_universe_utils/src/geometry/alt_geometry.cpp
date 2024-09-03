@@ -19,29 +19,81 @@ namespace autoware::universe_utils
 // Alternatives for Boost.Geometry ----------------------------------------------------------------
 namespace alt
 {
-Point2d from_boost(const autoware::universe_utils::Point2d & point)
+
+std::optional<ConvexPolygon2d> ConvexPolygon2d::createConvexPolygon2d(
+  const Points2d & vertices_orig) noexcept
+{
+  if (vertices_orig.size() < 3) {
+    return std::nullopt;
+  }
+  auto vertices = vertices_orig;
+  correct(vertices);
+  if (vertices.size() < 3) {
+    return std::nullopt;
+  }
+  /*
+  if (!is_convex) {
+    return std::nullopt;
+  }
+  */
+  return ConvexPolygon2d(std::move(vertices));
+}
+
+std::optional<ConvexPolygon2d> ConvexPolygon2d::createConvexPolygon2d(Points2d && vertices) noexcept
+{
+  if (vertices.size() < 3) {
+    return std::nullopt;
+  }
+  correct(vertices);
+  if (vertices.size() < 3) {
+    return std::nullopt;
+  }
+  /*
+  if (!is_convex) {
+    return std::nullopt;
+  }
+  */
+  return ConvexPolygon2d(std::move(vertices));
+}
+
+void ConvexPolygon2d::correct(Points2d & vertices) noexcept
+{
+  // sort points in clockwise order with respect to the first point
+  std::sort(vertices.begin() + 1, vertices.end(), [&](const auto & a, const auto & b) {
+    return (a - vertices.front()).cross(b - vertices.front()) < 0;
+  });
+  if (equals(vertices.front(), vertices.back())) {
+    vertices.pop_back();
+  }
+}
+
+Point2d from_boost(const autoware::universe_utils::Point2d & point) noexcept
 {
   return {point.x(), point.y()};
 }
 
-ConvexPolygon2d from_boost(const autoware::universe_utils::Polygon2d & polygon)
+std::optional<ConvexPolygon2d> from_boost(
+  const autoware::universe_utils::Polygon2d & polygon) noexcept
 {
   Points2d points;
   for (const auto & point : polygon.outer()) {
     points.push_back(from_boost(point));
   }
 
-  ConvexPolygon2d _polygon(points);
-  correct(_polygon);
-  return _polygon;
+  auto polygon_opt = ConvexPolygon2d::createConvexPolygon2d(points);
+  if (!polygon_opt) {
+    return std::nullopt;
+  }
+
+  return polygon_opt.value();
 }
 
-autoware::universe_utils::Point2d to_boost(const Point2d & point)
+autoware::universe_utils::Point2d to_boost(const Point2d & point) noexcept
 {
   return {point.x(), point.y()};
 }
 
-autoware::universe_utils::Polygon2d to_boost(const ConvexPolygon2d & polygon)
+autoware::universe_utils::Polygon2d to_boost(const ConvexPolygon2d & polygon) noexcept
 {
   autoware::universe_utils::Polygon2d _polygon;
   for (const auto & vertex : polygon.vertices()) {
@@ -51,7 +103,7 @@ autoware::universe_utils::Polygon2d to_boost(const ConvexPolygon2d & polygon)
 }
 }  // namespace alt
 
-double area(const alt::ConvexPolygon2d & poly)
+double area(const alt::ConvexPolygon2d & poly) noexcept
 {
   const auto & vertices = poly.vertices();
 
@@ -63,10 +115,11 @@ double area(const alt::ConvexPolygon2d & poly)
   return area;
 }
 
-alt::ConvexPolygon2d convex_hull(const alt::Points2d & points)
+std::optional<alt::ConvexPolygon2d> convex_hull(const alt::Points2d & points) noexcept
 {
   if (points.size() < 3) {
-    throw std::invalid_argument("At least 3 points are required for calculating convex hull.");
+    // throw std::invalid_argument("At least 3 points are required for calculating convex hull.");
+    return std::nullopt;
   }
 
   // QuickHull algorithm
@@ -124,24 +177,12 @@ alt::ConvexPolygon2d convex_hull(const alt::Points2d & points)
     make_hull(make_hull, p_max, p_min, below_points);
   }
 
-  alt::ConvexPolygon2d hull(vertices);
-  correct(hull);
-
-  return hull;
-}
-
-void correct(alt::ConvexPolygon2d & poly)
-{
-  auto & vertices = poly.vertices();
-
-  // sort points in clockwise order with respect to the first point
-  std::sort(vertices.begin() + 1, vertices.end(), [&](const auto & a, const auto & b) {
-    return (a - vertices.front()).cross(b - vertices.front()) < 0;
-  });
-
-  if (equals(vertices.front(), vertices.back())) {
-    vertices.pop_back();
+  auto hull_opt = alt::ConvexPolygon2d::createConvexPolygon2d(vertices);
+  if (!hull_opt) {
+    return std::nullopt;
   }
+
+  return hull_opt.value();
 }
 
 bool covered_by(const alt::Point2d & point, const alt::ConvexPolygon2d & poly)

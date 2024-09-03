@@ -17,13 +17,14 @@
 
 #include "autoware/universe_utils/geometry/boost_geometry.hpp"
 
+#include <optional>
 #include <utility>
 #include <vector>
 
 namespace autoware::universe_utils
 {
 // Alternatives for Boost.Geometry ----------------------------------------------------------------
-// TODO(mitukou1109): remove namespace
+// TODO(soblin): use inlinen namespace for API versioning
 namespace alt
 {
 class Vector2d
@@ -68,25 +69,24 @@ using Points2d = std::vector<Point2d>;
 class ConvexPolygon2d
 {
 public:
-  explicit ConvexPolygon2d(const Points2d & vertices)
-  {
-    if (vertices.size() < 3) {
-      throw std::invalid_argument("At least 3 points are required for vertices.");
-    }
-    vertices_ = vertices;
-  }
+  // TODO(soblin): this factory should check if the inputs points really form a valid "Convex"
+  // polygon, because current implementation allows the user to create actually NonConvexPolygon and
+  // calculate wrong result without notice
+  static std::optional<ConvexPolygon2d> createConvexPolygon2d(const Points2d & vertices) noexcept;
 
-  explicit ConvexPolygon2d(Points2d && vertices)
-  {
-    if (vertices.size() < 3) {
-      throw std::invalid_argument("At least 3 points are required for vertices.");
-    }
-    vertices_ = std::move(vertices);
-  }
+  static std::optional<ConvexPolygon2d> createConvexPolygon2d(Points2d && vertices) noexcept;
 
-  const Points2d & vertices() const { return vertices_; }
+  static void correct(Points2d & vertices) noexcept;
 
-  Points2d & vertices() { return vertices_; }
+private:
+  explicit ConvexPolygon2d(const Points2d & vertices) { vertices_ = vertices; }
+
+  explicit ConvexPolygon2d(Points2d && vertices) { vertices_ = std::move(vertices); }
+
+public:
+  const Points2d & vertices() const noexcept { return vertices_; }
+
+  Points2d & vertices() noexcept { return vertices_; }
 
 private:
   Points2d vertices_;
@@ -112,20 +112,19 @@ inline Vector2d operator*(const double & s, const Vector2d & v)
   return {s * v.x(), s * v.y()};
 }
 
-Point2d from_boost(const autoware::universe_utils::Point2d & point);
+Point2d from_boost(const autoware::universe_utils::Point2d & point) noexcept;
 
-ConvexPolygon2d from_boost(const autoware::universe_utils::Polygon2d & polygon);
+std::optional<ConvexPolygon2d> from_boost(
+  const autoware::universe_utils::Polygon2d & polygon) noexcept;
 
-autoware::universe_utils::Point2d to_boost(const Point2d & point);
+autoware::universe_utils::Point2d to_boost(const Point2d & point) noexcept;
 
-autoware::universe_utils::Polygon2d to_boost(const ConvexPolygon2d & polygon);
+autoware::universe_utils::Polygon2d to_boost(const ConvexPolygon2d & polygon) noexcept;
 }  // namespace alt
 
-double area(const alt::ConvexPolygon2d & poly);
+double area(const alt::ConvexPolygon2d & poly) noexcept;
 
-alt::ConvexPolygon2d convex_hull(const alt::Points2d & points);
-
-void correct(alt::ConvexPolygon2d & poly);
+std::optional<alt::ConvexPolygon2d> convex_hull(const alt::Points2d & points) noexcept;
 
 bool covered_by(const alt::Point2d & point, const alt::ConvexPolygon2d & poly);
 
