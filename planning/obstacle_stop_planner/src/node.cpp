@@ -753,7 +753,7 @@ void ObstacleStopPlannerNode::insertVelocity(
   const std_msgs::msg::Header & trajectory_header, const VehicleInfo & vehicle_info,
   const double current_acc, const double current_vel, const StopParam & stop_param)
 {
-  if (planner_data.stop_require) {
+  if (planner_data.stop_require && false) {
     // insert stop point
     const auto traj_end_idx = output.size() - 1;
     const auto idx = planner_data.decimate_trajectory_index_map.at(

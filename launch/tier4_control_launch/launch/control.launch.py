@@ -160,7 +160,7 @@ def launch_setup(context, *args, **kwargs):
         plugin="autoware::motion::control::autonomous_emergency_braking::AEB",
         name="autonomous_emergency_braking",
         remappings=[
-            ("~/input/pointcloud", "/perception/obstacle_segmentation/pointcloud"),
+            ("~/input/pointcloud", "/perception/obstacle_segmentation/single_frame/pointcloud"),
             ("~/input/velocity", "/vehicle/status/velocity_status"),
             ("~/input/imu", "/sensing/imu/imu_data"),
             ("~/input/odometry", "/localization/kinematic_state"),
