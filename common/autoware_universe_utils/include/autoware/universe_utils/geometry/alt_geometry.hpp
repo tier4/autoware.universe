@@ -148,8 +148,6 @@ bool intersects(const alt::ConvexPolygon2d & poly1, const alt::ConvexPolygon2d &
 bool is_above(
   const alt::Point2d & point, const alt::Point2d & seg_start, const alt::Point2d & seg_end);
 
-bool is_clockwise(const alt::ConvexPolygon2d & poly);
-
 bool is_convex(const alt::Points2d & vertices);
 
 bool touches(

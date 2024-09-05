@@ -108,7 +108,6 @@ double area(const alt::ConvexPolygon2d & poly) noexcept
 std::optional<alt::ConvexPolygon2d> convex_hull(const alt::Points2d & points) noexcept
 {
   if (points.size() < 3) {
-    // throw std::invalid_argument("At least 3 points are required for calculating convex hull.");
     return std::nullopt;
   }
 
@@ -371,11 +370,6 @@ bool is_above(
   const alt::Point2d & point, const alt::Point2d & seg_start, const alt::Point2d & seg_end)
 {
   return (seg_end - seg_start).cross(point - seg_start) > 0;
-}
-
-bool is_clockwise(const alt::ConvexPolygon2d & poly)
-{
-  return area(poly) > 0;
 }
 
 bool is_convex(const alt::Points2d & vertices)
