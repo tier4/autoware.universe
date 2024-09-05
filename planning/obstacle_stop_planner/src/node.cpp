@@ -772,7 +772,7 @@ void ObstacleStopPlannerNode::insertVelocity(
     }
   }
 
-  if (planner_data.slow_down_require) {
+  if (planner_data.slow_down_require && false) {
     // insert slow down point
     const auto traj_end_idx = output.size() - 1;
     const auto idx = planner_data.decimate_trajectory_index_map.at(
