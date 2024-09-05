@@ -28,14 +28,9 @@ std::optional<ConvexPolygon2d> ConvexPolygon2d::createConvexPolygon2d(
   }
   auto vertices = vertices_orig;
   correct(vertices);
-  if (vertices.size() < 3) {
+  if (!is_convex(vertices)) {
     return std::nullopt;
   }
-  /*
-  if (!is_convex) {
-    return std::nullopt;
-  }
-  */
   return ConvexPolygon2d(std::move(vertices));
 }
 
@@ -45,14 +40,9 @@ std::optional<ConvexPolygon2d> ConvexPolygon2d::createConvexPolygon2d(Points2d &
     return std::nullopt;
   }
   correct(vertices);
-  if (vertices.size() < 3) {
+  if (!is_convex(vertices)) {
     return std::nullopt;
   }
-  /*
-  if (!is_convex) {
-    return std::nullopt;
-  }
-  */
   return ConvexPolygon2d(std::move(vertices));
 }
 
@@ -386,6 +376,31 @@ bool is_above(
 bool is_clockwise(const alt::ConvexPolygon2d & poly)
 {
   return area(poly) > 0;
+}
+
+bool is_convex(const alt::Points2d & vertices)
+{
+  constexpr double epsilon = 1e-6;
+
+  const auto num_of_vertices = vertices.size();
+  if (num_of_vertices < 3) {
+    return false;
+  }
+
+  auto _vertices = vertices;
+  alt::ConvexPolygon2d::correct(_vertices);
+
+  for (size_t i = 0; i < num_of_vertices; ++i) {
+    const auto & p1 = _vertices[i];
+    const auto & p2 = _vertices[(i + 1) % num_of_vertices];
+    const auto & p3 = _vertices[(i + 2) % num_of_vertices];
+
+    if ((p2 - p1).cross(p3 - p2) > epsilon) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool touches(
