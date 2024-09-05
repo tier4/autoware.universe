@@ -31,9 +31,11 @@
 #include "lidar_centerpoint/preprocess/preprocess_kernel.hpp"
 
 #include <lidar_centerpoint/utils.hpp>
+
 #include <cuda_runtime.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
+
 #include <vector>
 
 namespace
@@ -45,6 +47,47 @@ const std::size_t ENCODER_IN_FEATURE_SIZE = 9;  // the same as encoder_in_featur
 
 namespace centerpoint
 {
+
+__global__ void shufflePoints_kernel(
+  const float * points, const unsigned int * indices, float * shuffled_points,
+  const std::size_t valid_size, const std::size_t total_size)
+{
+  int point_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (point_idx >= total_size) return;
+
+  int src_idx = indices[point_idx];
+  int dst_idx = point_idx;
+
+  if (src_idx >= valid_size) {
+    shuffled_points[4 * dst_idx + 0] = NAN;
+    shuffled_points[4 * dst_idx + 1] = NAN;
+    shuffled_points[4 * dst_idx + 2] = NAN;
+    shuffled_points[4 * dst_idx + 3] = NAN;
+  } else {
+    shuffled_points[4 * dst_idx + 0] = points[4 * src_idx + 0];
+    shuffled_points[4 * dst_idx + 1] = points[4 * src_idx + 1];
+    shuffled_points[4 * dst_idx + 2] = points[4 * src_idx + 2];
+    shuffled_points[4 * dst_idx + 3] = points[4 * src_idx + 3];
+  }
+}
+
+cudaError_t shufflePoints_launch(
+  const float * points, const unsigned int * indices, float * shuffled_points,
+  const std::size_t valid_size, const std::size_t total_size, cudaStream_t stream)
+{
+  dim3 blocks((total_size + 256 - 1) / 256);
+  dim3 threads(256);
+
+  if (blocks.x == 0) {
+    return cudaGetLastError();
+  }
+
+  shufflePoints_kernel<<<blocks, threads, 0, stream>>>(
+    points, indices, shuffled_points, valid_size, total_size);
+  cudaError_t err = cudaGetLastError();
+  return err;
+}
+
 __global__ void generateVoxels_random_kernel(
   const float * points, size_t points_size, float min_x_range, float max_x_range, float min_y_range,
   float max_y_range, float min_z_range, float max_z_range, float pillar_x_size, float pillar_y_size,
@@ -262,21 +305,19 @@ cudaError_t generateFeatures_launch(
   return cudaGetLastError();
 }
 
-
 __global__ void extractFilteredVoxels_kernel(
-  const float* voxels_buffer, const unsigned int* mask,
-  int grid_x_size, int grid_y_size, int max_points_per_voxel,
-  PointXYZI* filtered_points, int* point_count)
+  const float * voxels_buffer, const unsigned int * mask, int grid_x_size, int grid_y_size,
+  int max_points_per_voxel, PointXYZI * filtered_points, int * point_count)
 {
   int voxel_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int total_voxels = grid_x_size * grid_y_size;
-  
+
   if (voxel_idx >= total_voxels) return;
 
   if (mask[voxel_idx] > 0) {
     int voxel_point_count = min(static_cast<int>(mask[voxel_idx]), max_points_per_voxel);
     int base_idx = atomicAdd(point_count, voxel_point_count);
-    
+
     for (int i = 0; i < voxel_point_count; ++i) {
       int src_idx = (voxel_idx * max_points_per_voxel + i) * 4;
       int dst_idx = base_idx + i;
@@ -290,17 +331,15 @@ __global__ void extractFilteredVoxels_kernel(
 }
 
 __host__ void getFilteredVoxelsHost(
-  const float* voxels_buffer_d, const unsigned int* mask_d,
-  const int grid_x_size, const int grid_y_size,
-  PointXYZI** filtered_points, int* point_count,
-  cudaStream_t stream)
+  const float * voxels_buffer_d, const unsigned int * mask_d, const int grid_x_size,
+  const int grid_y_size, PointXYZI ** filtered_points, int * point_count, cudaStream_t stream)
 {
   int total_voxels = grid_x_size * grid_y_size;
   int max_points = total_voxels * MAX_POINT_IN_VOXEL_SIZE;
 
   // Allocate device memory
-  PointXYZI* d_filtered_points;
-  int* d_point_count;
+  PointXYZI * d_filtered_points;
+  int * d_point_count;
   cudaMalloc(&d_filtered_points, max_points * sizeof(PointXYZI));
   cudaMalloc(&d_point_count, sizeof(int));
   cudaMemsetAsync(d_point_count, 0, sizeof(int), stream);
@@ -309,8 +348,8 @@ __host__ void getFilteredVoxelsHost(
   dim3 block(256);
   dim3 grid((total_voxels + block.x - 1) / block.x);
   extractFilteredVoxels_kernel<<<grid, block, 0, stream>>>(
-    voxels_buffer_d, mask_d, grid_x_size, grid_y_size, MAX_POINT_IN_VOXEL_SIZE,
-    d_filtered_points, d_point_count);
+    voxels_buffer_d, mask_d, grid_x_size, grid_y_size, MAX_POINT_IN_VOXEL_SIZE, d_filtered_points,
+    d_point_count);
 
   // Copy point count to host
   cudaMemcpyAsync(point_count, d_point_count, sizeof(int), cudaMemcpyDeviceToHost, stream);
@@ -318,7 +357,9 @@ __host__ void getFilteredVoxelsHost(
 
   // Allocate host memory and copy filtered points
   *filtered_points = new PointXYZI[*point_count];
-  cudaMemcpyAsync(*filtered_points, d_filtered_points, *point_count * sizeof(PointXYZI), cudaMemcpyDeviceToHost, stream);
+  cudaMemcpyAsync(
+    *filtered_points, d_filtered_points, *point_count * sizeof(PointXYZI), cudaMemcpyDeviceToHost,
+    stream);
 
   // Clean up
   cudaFree(d_filtered_points);

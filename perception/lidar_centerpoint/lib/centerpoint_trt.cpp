@@ -19,8 +19,10 @@
 #include <lidar_centerpoint/network/scatter_kernel.hpp>
 #include <lidar_centerpoint/preprocess/preprocess_kernel.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -100,9 +102,22 @@ void CenterPointTRT::initPtr()
   head_out_rot_d_ = cuda::make_unique<float[]>(grid_xy_size * config_.head_out_rot_size_);
   head_out_vel_d_ = cuda::make_unique<float[]>(grid_xy_size * config_.head_out_vel_size_);
   points_d_ = cuda::make_unique<float[]>(CAPACITY_POINT * config_.point_feature_size_);
+  points_aux_d_ = cuda::make_unique<float[]>(CAPACITY_POINT * config_.point_feature_size_);
   voxels_buffer_d_ = cuda::make_unique<float[]>(voxels_buffer_size_);
   mask_d_ = cuda::make_unique<unsigned int[]>(mask_size_);
   num_voxels_d_ = cuda::make_unique<unsigned int[]>(1);
+
+  shuffle_indexes_d_ = cuda::make_unique<unsigned int[]>(CAPACITY_POINT);
+
+  std::vector<unsigned int> indexes(CAPACITY_POINT);
+  std::iota(indexes.begin(), indexes.end(), 0);
+
+  std::default_random_engine e(0);
+  std::shuffle(indexes.begin(), indexes.end(), e);
+
+  CHECK_CUDA_ERROR(cudaMemcpyAsync(
+    shuffle_indexes_d_.get(), indexes.data(), CAPACITY_POINT * sizeof(unsigned int),
+    cudaMemcpyHostToDevice, stream_));
 }
 
 bool CenterPointTRT::detect(
@@ -134,10 +149,23 @@ bool CenterPointTRT::preprocess(
   if (!is_success) {
     return false;
   }
-  const auto count = vg_ptr_->generateSweepPoints(points_);
-  CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    points_d_.get(), points_.data(), count * config_.point_feature_size_ * sizeof(float),
-    cudaMemcpyHostToDevice, stream_));
+  auto count = vg_ptr_->generateSweepPoints(points_);
+
+  if (shuffle_pointcloud_) {
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(
+      points_aux_d_.get(), points_.data(), count * config_.point_feature_size_ * sizeof(float),
+      cudaMemcpyHostToDevice, stream_));
+
+    shufflePoints_launch(
+      points_d_.get(), shuffle_indexes_d_.get(), points_aux_d_.get(), count, CAPACITY_POINT,
+      stream_);
+    count = CAPACITY_POINT;
+  } else {
+    CHECK_CUDA_ERROR(cudaMemcpyAsync(
+      points_d_.get(), points_.data(), count * config_.point_feature_size_ * sizeof(float),
+      cudaMemcpyHostToDevice, stream_));
+  }
+
   CHECK_CUDA_ERROR(cudaMemsetAsync(num_voxels_d_.get(), 0, sizeof(unsigned int), stream_));
   CHECK_CUDA_ERROR(
     cudaMemsetAsync(voxels_buffer_d_.get(), 0, voxels_buffer_size_ * sizeof(float), stream_));
@@ -169,7 +197,6 @@ bool CenterPointTRT::preprocess(
   return true;
 }
 
-
 sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getLatestFilteredVoxels() const
 {
   return latest_voxel_ptr_;
@@ -177,12 +204,11 @@ sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getLatestFilteredVoxels
 
 sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getFilteredVoxels() const
 {
-  PointXYZI* filtered_points;
+  PointXYZI * filtered_points;
   int point_count;
 
   getFilteredVoxelsHost(
-    voxels_buffer_d_.get(), mask_d_.get(),
-    config_.grid_size_x_, config_.grid_size_y_,
+    voxels_buffer_d_.get(), mask_d_.get(), config_.grid_size_x_, config_.grid_size_y_,
     &filtered_points, &point_count, stream_);
 
   sensor_msgs::msg::PointCloud2 cloud_msg;
@@ -210,7 +236,6 @@ sensor_msgs::msg::PointCloud2::SharedPtr CenterPointTRT::getFilteredVoxels() con
 
   return std::make_shared<sensor_msgs::msg::PointCloud2>(cloud_msg);
 }
-
 
 void CenterPointTRT::inference()
 {

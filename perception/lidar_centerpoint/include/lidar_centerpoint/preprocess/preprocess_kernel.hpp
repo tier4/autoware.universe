@@ -20,10 +20,14 @@
 
 namespace centerpoint
 {
-struct PointXYZI {
+struct PointXYZI
+{
   float x, y, z, intensity;
 };
 
+cudaError_t shufflePoints_launch(
+  const float * points, const unsigned int * indices, float * shuffled_points,
+  const std::size_t valid_size, const std::size_t total_size, cudaStream_t stream);
 
 cudaError_t generateVoxels_random_launch(
   const float * points, size_t points_size, float min_x_range, float max_x_range, float min_y_range,
@@ -43,10 +47,8 @@ cudaError_t generateFeatures_launch(
   const float range_min_y, const float range_min_z, float * features, cudaStream_t stream);
 
 __host__ void getFilteredVoxelsHost(
-  const float* voxels_buffer_d, const unsigned int* mask_d,
-  const int grid_x_size, const int grid_y_size,
-  PointXYZI** filtered_points, int* point_count,
-  cudaStream_t stream);
+  const float * voxels_buffer_d, const unsigned int * mask_d, const int grid_x_size,
+  const int grid_y_size, PointXYZI ** filtered_points, int * point_count, cudaStream_t stream);
 
 }  // namespace centerpoint
 

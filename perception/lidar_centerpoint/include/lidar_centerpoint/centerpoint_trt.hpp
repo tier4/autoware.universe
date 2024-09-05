@@ -107,11 +107,14 @@ protected:
   cuda::unique_ptr<float[]> head_out_rot_d_{nullptr};
   cuda::unique_ptr<float[]> head_out_vel_d_{nullptr};
   cuda::unique_ptr<float[]> points_d_{nullptr};
+  cuda::unique_ptr<float[]> points_aux_d_{nullptr};
   cuda::unique_ptr<float[]> voxels_buffer_d_{nullptr};
   cuda::unique_ptr<unsigned int[]> mask_d_{nullptr};
   cuda::unique_ptr<unsigned int[]> num_voxels_d_{nullptr};
   sensor_msgs::msg::PointCloud2::SharedPtr latest_voxel_ptr_;
 
+  cuda::unique_ptr<unsigned int[]> shuffle_indexes_d_{nullptr};
+  bool shuffle_pointcloud_{true};
 };
 
 }  // namespace centerpoint
