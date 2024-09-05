@@ -22,6 +22,7 @@
 #include "autoware/trajectory_follower_base/lateral_controller_base.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "autoware_control_msgs/msg/control_horizon.hpp"
 #include "autoware_control_msgs/msg/lateral.hpp"
 #include "autoware_planning_msgs/msg/trajectory.hpp"
 #include "autoware_vehicle_msgs/msg/steering_report.hpp"
@@ -62,6 +63,9 @@ private:
   rclcpp::Publisher<Trajectory>::SharedPtr m_pub_predicted_traj;
   rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr m_pub_debug_values;
   rclcpp::Publisher<Float32Stamped>::SharedPtr m_pub_steer_offset;
+
+  // vehicle_adaptor開発用のテンポラリ実装
+  rclcpp::Publisher<ControlHorizon>::SharedPtr m_pub_control_horizon;
 
   //!< @brief parameters for path smoothing
   TrajectoryFilteringParam m_trajectory_filtering_param;
