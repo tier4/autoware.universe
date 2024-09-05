@@ -40,19 +40,9 @@ TEST(alt_geometry, area)
     const Point2d p2 = {0.0, 7.0};
     const Point2d p3 = {4.0, 2.0};
     const Point2d p4 = {2.0, 0.0};
-    const auto result = area(ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result = area(ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_NEAR(result, 16.0, epsilon);
-  }
-
-  {  // Counter-clockwise
-    const Point2d p1 = {0.0, 0.0};
-    const Point2d p2 = {2.0, 0.0};
-    const Point2d p3 = {4.0, 2.0};
-    const Point2d p4 = {0.0, 7.0};
-    const auto result = area(ConvexPolygon2d({p1, p2, p3, p4}));
-
-    EXPECT_NEAR(result, -16.0, epsilon);
   }
 }
 
@@ -76,27 +66,27 @@ TEST(alt_geometry, convexHull)
     points.push_back({2.9, 0.7});
     const auto result = convex_hull(points);
 
-    ASSERT_EQ(result.vertices().size(), 7);
-    EXPECT_NEAR(result.vertices().at(0).x(), 2.0, epsilon);
-    EXPECT_NEAR(result.vertices().at(0).y(), 1.3, epsilon);
-    EXPECT_NEAR(result.vertices().at(1).x(), 2.4, epsilon);
-    EXPECT_NEAR(result.vertices().at(1).y(), 1.7, epsilon);
-    EXPECT_NEAR(result.vertices().at(2).x(), 4.1, epsilon);
-    EXPECT_NEAR(result.vertices().at(2).y(), 3.0, epsilon);
-    EXPECT_NEAR(result.vertices().at(3).x(), 5.3, epsilon);
-    EXPECT_NEAR(result.vertices().at(3).y(), 2.6, epsilon);
-    EXPECT_NEAR(result.vertices().at(4).x(), 5.4, epsilon);
-    EXPECT_NEAR(result.vertices().at(4).y(), 1.2, epsilon);
-    EXPECT_NEAR(result.vertices().at(5).x(), 4.9, epsilon);
-    EXPECT_NEAR(result.vertices().at(5).y(), 0.8, epsilon);
-    EXPECT_NEAR(result.vertices().at(6).x(), 2.9, epsilon);
-    EXPECT_NEAR(result.vertices().at(6).y(), 0.7, epsilon);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(result->vertices().size(), 7);
+    EXPECT_NEAR(result->vertices().at(0).x(), 2.0, epsilon);
+    EXPECT_NEAR(result->vertices().at(0).y(), 1.3, epsilon);
+    EXPECT_NEAR(result->vertices().at(1).x(), 2.4, epsilon);
+    EXPECT_NEAR(result->vertices().at(1).y(), 1.7, epsilon);
+    EXPECT_NEAR(result->vertices().at(2).x(), 4.1, epsilon);
+    EXPECT_NEAR(result->vertices().at(2).y(), 3.0, epsilon);
+    EXPECT_NEAR(result->vertices().at(3).x(), 5.3, epsilon);
+    EXPECT_NEAR(result->vertices().at(3).y(), 2.6, epsilon);
+    EXPECT_NEAR(result->vertices().at(4).x(), 5.4, epsilon);
+    EXPECT_NEAR(result->vertices().at(4).y(), 1.2, epsilon);
+    EXPECT_NEAR(result->vertices().at(5).x(), 4.9, epsilon);
+    EXPECT_NEAR(result->vertices().at(5).y(), 0.8, epsilon);
+    EXPECT_NEAR(result->vertices().at(6).x(), 2.9, epsilon);
+    EXPECT_NEAR(result->vertices().at(6).y(), 0.7, epsilon);
   }
 }
 
 TEST(alt_geometry, correct)
 {
-  using autoware::universe_utils::correct;
   using autoware::universe_utils::alt::ConvexPolygon2d;
   using autoware::universe_utils::alt::Points2d;
 
@@ -106,18 +96,17 @@ TEST(alt_geometry, correct)
     vertices.push_back({1.0, -1.0});
     vertices.push_back({-1.0, -1.0});
     vertices.push_back({-1.0, 1.0});
-    ConvexPolygon2d poly(vertices);
-    correct(poly);
+    ConvexPolygon2d::correct(vertices);
 
-    ASSERT_EQ(poly.vertices().size(), 4);
-    EXPECT_NEAR(poly.vertices().at(0).x(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(0).y(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(1).x(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(1).y(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(2).x(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(2).y(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(3).x(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(3).y(), 1.0, epsilon);
+    ASSERT_EQ(vertices.size(), 4);
+    EXPECT_NEAR(vertices.at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(0).y(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(1).y(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(2).x(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(2).y(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(3).x(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(3).y(), 1.0, epsilon);
   }
 
   {  // Wrongly oriented
@@ -126,18 +115,17 @@ TEST(alt_geometry, correct)
     vertices.push_back({-1.0, 1.0});
     vertices.push_back({1.0, -1.0});
     vertices.push_back({-1.0, -1.0});
-    ConvexPolygon2d poly(vertices);
-    correct(poly);
+    ConvexPolygon2d::correct(vertices);
 
-    ASSERT_EQ(poly.vertices().size(), 4);
-    EXPECT_NEAR(poly.vertices().at(0).x(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(0).y(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(1).x(), 1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(1).y(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(2).x(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(2).y(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(3).x(), -1.0, epsilon);
-    EXPECT_NEAR(poly.vertices().at(3).y(), 1.0, epsilon);
+    ASSERT_EQ(vertices.size(), 4);
+    EXPECT_NEAR(vertices.at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(0).y(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(vertices.at(1).y(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(2).x(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(2).y(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(3).x(), -1.0, epsilon);
+    EXPECT_NEAR(vertices.at(3).y(), 1.0, epsilon);
   }
 }
 
@@ -153,7 +141,8 @@ TEST(alt_geometry, coveredBy)
     const Point2d p2 = {1.0, -1.0};
     const Point2d p3 = {-1.0, -1.0};
     const Point2d p4 = {-1.0, 1.0};
-    const auto result = covered_by(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      covered_by(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_TRUE(result);
   }
@@ -164,7 +153,8 @@ TEST(alt_geometry, coveredBy)
     const Point2d p2 = {2.0, 1.0};
     const Point2d p3 = {1.0, 1.0};
     const Point2d p4 = {1.0, 2.0};
-    const auto result = covered_by(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      covered_by(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_FALSE(result);
   }
@@ -175,7 +165,8 @@ TEST(alt_geometry, coveredBy)
     const Point2d p2 = {2.0, -1.0};
     const Point2d p3 = {0.0, -1.0};
     const Point2d p4 = {0.0, 1.0};
-    const auto result = covered_by(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      covered_by(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_TRUE(result);
   }
@@ -196,8 +187,9 @@ TEST(alt_geometry, disjoint)
     const Point2d p6 = {4.0, 4.0};
     const Point2d p7 = {6.0, 2.0};
     const Point2d p8 = {4.0, 0.0};
-    const auto result =
-      disjoint(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = disjoint(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_TRUE(result);
   }
@@ -211,8 +203,9 @@ TEST(alt_geometry, disjoint)
     const Point2d p6 = {2.0, 4.0};
     const Point2d p7 = {4.0, 2.0};
     const Point2d p8 = {2.0, 0.0};
-    const auto result =
-      disjoint(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = disjoint(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_FALSE(result);
   }
@@ -298,7 +291,8 @@ TEST(alt_geometry, distance)
     const Point2d p2 = {3.0, -1.0};
     const Point2d p3 = {1.0, -1.0};
     const Point2d p4 = {1.0, 1.0};
-    const auto result = distance(p, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      distance(p, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_NEAR(result, 1.0, epsilon);
   }
@@ -309,7 +303,8 @@ TEST(alt_geometry, distance)
     const Point2d p2 = {2.0, -1.0};
     const Point2d p3 = {-1.0, -1.0};
     const Point2d p4 = {-1.0, 1.0};
-    const auto result = distance(p, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      distance(p, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_NEAR(result, 0.0, epsilon);
   }
@@ -420,8 +415,9 @@ TEST(alt_geometry, intersects)
     const Point2d p6 = {2.0, 0.0};
     const Point2d p7 = {0.0, 0.0};
     const Point2d p8 = {0.0, 2.0};
-    const auto result =
-      intersects(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = intersects(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_TRUE(result);
   }
@@ -435,8 +431,9 @@ TEST(alt_geometry, intersects)
     const Point2d p6 = {3.0, 2.0};
     const Point2d p7 = {2.0, 2.0};
     const Point2d p8 = {2.0, 3.0};
-    const auto result =
-      intersects(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = intersects(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_FALSE(result);
   }
@@ -450,8 +447,9 @@ TEST(alt_geometry, intersects)
     const Point2d p6 = {2.0, 1.0};
     const Point2d p7 = {1.0, 1.0};
     const Point2d p8 = {1.0, 2.0};
-    const auto result =
-      intersects(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = intersects(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_FALSE(result);
   }
@@ -485,33 +483,6 @@ TEST(alt_geometry, isAbove)
     const Point2d p1 = {-1.0, 0.0};
     const Point2d p2 = {1.0, 0.0};
     const auto result = is_above(point, p1, p2);
-
-    EXPECT_FALSE(result);
-  }
-}
-
-TEST(alt_geometry, isClockwise)
-{
-  using autoware::universe_utils::is_clockwise;
-  using autoware::universe_utils::alt::ConvexPolygon2d;
-  using autoware::universe_utils::alt::Point2d;
-
-  {  // Clockwise
-    const Point2d p1 = {0.0, 0.0};
-    const Point2d p2 = {0.0, 7.0};
-    const Point2d p3 = {4.0, 2.0};
-    const Point2d p4 = {2.0, 0.0};
-    const auto result = is_clockwise(ConvexPolygon2d({p1, p2, p3, p4}));
-
-    EXPECT_TRUE(result);
-  }
-
-  {  // Counter-clockwise
-    const Point2d p1 = {0.0, 0.0};
-    const Point2d p2 = {2.0, 0.0};
-    const Point2d p3 = {4.0, 2.0};
-    const Point2d p4 = {0.0, 7.0};
-    const auto result = is_clockwise(ConvexPolygon2d({p1, p2, p3, p4}));
 
     EXPECT_FALSE(result);
   }
@@ -568,7 +539,8 @@ TEST(alt_geometry, touches)
     const Point2d p2 = {2.0, -1.0};
     const Point2d p3 = {0.0, -1.0};
     const Point2d p4 = {0.0, 1.0};
-    const auto result = touches(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      touches(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_TRUE(result);
   }
@@ -579,7 +551,8 @@ TEST(alt_geometry, touches)
     const Point2d p2 = {2.0, 1.0};
     const Point2d p3 = {1.0, 1.0};
     const Point2d p4 = {1.0, 2.0};
-    const auto result = touches(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      touches(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_FALSE(result);
   }
@@ -597,7 +570,8 @@ TEST(alt_geometry, within)
     const Point2d p2 = {1.0, -1.0};
     const Point2d p3 = {-1.0, -1.0};
     const Point2d p4 = {-1.0, 1.0};
-    const auto result = within(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      within(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_TRUE(result);
   }
@@ -608,7 +582,8 @@ TEST(alt_geometry, within)
     const Point2d p2 = {2.0, 1.0};
     const Point2d p3 = {1.0, 1.0};
     const Point2d p4 = {1.0, 2.0};
-    const auto result = within(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      within(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_FALSE(result);
   }
@@ -619,7 +594,8 @@ TEST(alt_geometry, within)
     const Point2d p2 = {2.0, -1.0};
     const Point2d p3 = {0.0, -1.0};
     const Point2d p4 = {0.0, 1.0};
-    const auto result = within(point, ConvexPolygon2d({p1, p2, p3, p4}));
+    const auto result =
+      within(point, ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value());
 
     EXPECT_FALSE(result);
   }
@@ -633,8 +609,9 @@ TEST(alt_geometry, within)
     const Point2d p6 = {2.0, -2.0};
     const Point2d p7 = {-2.0, -2.0};
     const Point2d p8 = {-2.0, 2.0};
-    const auto result =
-      within(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = within(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_TRUE(result);
   }
@@ -648,8 +625,9 @@ TEST(alt_geometry, within)
     const Point2d p6 = {3.0, 2.0};
     const Point2d p7 = {2.0, 2.0};
     const Point2d p8 = {2.0, 3.0};
-    const auto result =
-      within(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = within(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_FALSE(result);
   }
@@ -663,8 +641,9 @@ TEST(alt_geometry, within)
     const Point2d p6 = {1.0, -1.0};
     const Point2d p7 = {-1.0, -1.0};
     const Point2d p8 = {-1.0, 1.0};
-    const auto result =
-      within(ConvexPolygon2d({p1, p2, p3, p4}), ConvexPolygon2d({p5, p6, p7, p8}));
+    const auto result = within(
+      ConvexPolygon2d::createConvexPolygon2d({p1, p2, p3, p4}).value(),
+      ConvexPolygon2d::createConvexPolygon2d({p5, p6, p7, p8}).value());
 
     EXPECT_TRUE(result);
   }
@@ -691,7 +670,7 @@ TEST(alt_geometry, areaRand)
       const auto ground_truth = boost::geometry::area(polygons[i]);
       ground_truth_area_ns += sw.toc();
 
-      const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[i]);
+      const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[i]).value();
       sw.tic();
       const auto alt = autoware::universe_utils::area(alt_poly);
       alt_area_ns += sw.toc();
@@ -735,21 +714,23 @@ TEST(alt_geometry, convexHullRand)
       boost::geometry::convex_hull(outer, ground_truth);
       ground_truth_hull_ns += sw.toc();
 
-      const auto vertices = autoware::universe_utils::alt::from_boost(polygons[i]).vertices();
+      const auto vertices =
+        autoware::universe_utils::alt::from_boost(polygons[i]).value().vertices();
       sw.tic();
       const auto alt = autoware::universe_utils::convex_hull(vertices);
       alt_hull_ns += sw.toc();
 
-      if (ground_truth.outer().size() - 1 != alt.vertices().size()) {
+      ASSERT_TRUE(alt);
+      if (ground_truth.outer().size() - 1 != alt->vertices().size()) {
         std::cout << "Alt failed for the polygon: ";
         std::cout << boost::geometry::wkt(polygons[i]) << std::endl;
       }
       ASSERT_EQ(
         ground_truth.outer().size() - 1,
-        alt.vertices().size());  // alt::ConvexPolygon2d does not have closing point
-      for (size_t i = 0; i < alt.vertices().size(); ++i) {
-        EXPECT_NEAR(ground_truth.outer().at(i).x(), alt.vertices().at(i).x(), epsilon);
-        EXPECT_NEAR(ground_truth.outer().at(i).y(), alt.vertices().at(i).y(), epsilon);
+        alt->vertices().size());  // alt::ConvexPolygon2d does not have closing point
+      for (size_t i = 0; i < alt->vertices().size(); ++i) {
+        EXPECT_NEAR(ground_truth.outer().at(i).x(), alt->vertices().at(i).x(), epsilon);
+        EXPECT_NEAR(ground_truth.outer().at(i).y(), alt->vertices().at(i).y(), epsilon);
       }
     }
     std::printf("polygons_nb = %d, vertices = %ld\n", polygons_nb, vertices);
@@ -791,7 +772,7 @@ TEST(alt_geometry, coveredByRand)
           }
 
           const auto alt_point = autoware::universe_utils::alt::from_boost(point);
-          const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[j]);
+          const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[j]).value();
           sw.tic();
           const auto alt = autoware::universe_utils::covered_by(alt_point, alt_poly);
           if (alt) {
@@ -855,8 +836,8 @@ TEST(alt_geometry, disjointRand)
           ground_truth_not_disjoint_ns += sw.toc();
         }
 
-        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]);
-        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]);
+        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]).value();
+        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]).value();
         sw.tic();
         const auto alt = autoware::universe_utils::disjoint(alt_poly1, alt_poly2);
         if (alt) {
@@ -919,8 +900,8 @@ TEST(alt_geometry, intersectsRand)
           ground_truth_no_intersect_ns += sw.toc();
         }
 
-        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]);
-        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]);
+        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]).value();
+        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]).value();
         sw.tic();
         const auto alt = autoware::universe_utils::intersects(alt_poly1, alt_poly2);
         if (alt) {
@@ -985,7 +966,7 @@ TEST(alt_geometry, touchesRand)
           }
 
           const auto alt_point = autoware::universe_utils::alt::from_boost(point);
-          const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[j]);
+          const auto alt_poly = autoware::universe_utils::alt::from_boost(polygons[j]).value();
           sw.tic();
           const auto alt = autoware::universe_utils::touches(alt_point, alt_poly);
           if (alt) {
@@ -1049,8 +1030,8 @@ TEST(alt_geometry, withinPolygonRand)
           ground_truth_not_within_ns += sw.toc();
         }
 
-        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]);
-        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]);
+        const auto alt_poly1 = autoware::universe_utils::alt::from_boost(polygons[i]).value();
+        const auto alt_poly2 = autoware::universe_utils::alt::from_boost(polygons[j]).value();
         sw.tic();
         const auto alt = autoware::universe_utils::within(alt_poly1, alt_poly2);
         if (alt) {
