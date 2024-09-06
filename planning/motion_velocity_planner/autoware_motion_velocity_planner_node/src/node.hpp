@@ -43,8 +43,6 @@
 #include <string>
 #include <vector>
 
-using DiagnosticArray = diagnostic_msgs::msg::DiagnosticArray;
-
 namespace autoware::motion_velocity_planner
 {
 using autoware_map_msgs::msg::LaneletMapBin;
@@ -102,7 +100,6 @@ private:
   autoware::universe_utils::ProcessingTimePublisher processing_diag_publisher_{this};
   rclcpp::Publisher<tier4_debug_msgs::msg::Float64Stamped>::SharedPtr processing_time_publisher_;
   autoware::universe_utils::PublishedTimePublisher published_time_publisher_{this};
-  rclcpp::Publisher<DiagnosticArray>::SharedPtr diagnostics_pub_;
 
   //  parameters
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr set_param_callback_;
