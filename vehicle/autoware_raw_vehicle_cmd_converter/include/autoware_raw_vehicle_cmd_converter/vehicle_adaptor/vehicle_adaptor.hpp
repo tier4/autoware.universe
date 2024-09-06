@@ -15,6 +15,7 @@
 #ifndef AUTOWARE_RAW_VEHICLE_CMD_CONVERTER__VEHICLE_ADAPTOR__VEHICLE_ADAPTOR_HPP_
 #define AUTOWARE_RAW_VEHICLE_CMD_CONVERTER__VEHICLE_ADAPTOR__VEHICLE_ADAPTOR_HPP_
 
+#include <autoware_adapi_v1_msgs/msg/operation_mode_state.hpp>
 #include <autoware_control_msgs/msg/control.hpp>
 #include <autoware_vehicle_msgs/msg/steering_report.hpp>
 #include <geometry_msgs/msg/accel_with_covariance_stamped.hpp>
@@ -23,6 +24,7 @@
 namespace autoware::raw_vehicle_cmd_converter
 {
 
+using autoware_adapi_v1_msgs::msg::OperationModeState;
 using autoware_control_msgs::msg::Control;
 using autoware_vehicle_msgs::msg::SteeringReport;
 using geometry_msgs::msg::AccelWithCovarianceStamped;
@@ -35,7 +37,8 @@ public:
   Control compensate(
     const Control & input_control_cmd, [[maybe_unused]] const Odometry & odometry,
     [[maybe_unused]] const AccelWithCovarianceStamped & accel,
-    [[maybe_unused]] const double steering);
+    [[maybe_unused]] const double steering,
+    [[maybe_unused]] const OperationModeState & operation_mode);
 
 private:
 };

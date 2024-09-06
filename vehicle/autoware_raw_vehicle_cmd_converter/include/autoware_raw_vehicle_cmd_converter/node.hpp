@@ -26,6 +26,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <autoware_adapi_v1_msgs/msg/operation_mode_state.hpp>
 #include <autoware_control_msgs/msg/control.hpp>
 #include <autoware_vehicle_msgs/msg/steering_report.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
@@ -47,6 +48,7 @@ using tier4_vehicle_msgs::msg::ActuationStatusStamped;
 using TwistStamped = geometry_msgs::msg::TwistStamped;
 using Odometry = nav_msgs::msg::Odometry;
 using Steering = autoware_vehicle_msgs::msg::SteeringReport;
+using autoware_adapi_v1_msgs::msg::OperationModeState;
 using geometry_msgs::msg::AccelWithCovarianceStamped;
 class DebugValues
 {
@@ -89,6 +91,8 @@ public:
     this, "~/input/odometry"};
   autoware::universe_utils::InterProcessPollingSubscriber<AccelWithCovarianceStamped> sub_accel_{
     this, "~/input/accel"};
+  autoware::universe_utils::InterProcessPollingSubscriber<OperationModeState> sub_operation_mode_{
+    this, "~/input/operation_mode_state"};
 
   rclcpp::TimerBase::SharedPtr timer_;
 

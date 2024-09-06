@@ -139,18 +139,22 @@ void RawVehicleCommandConverterNode::publishActuationCmd()
   }
 
   const auto current_accel = sub_accel_.takeData();
+  const auto current_operation_mode = sub_operation_mode_.takeData();
   if (use_vehicle_adaptor_) {
-    if (!current_accel) {
-      RCLCPP_WARN_EXPRESSION(get_logger(), is_debugging_, "current accel is null");
+    if (!current_accel || !current_operation_mode) {
+      RCLCPP_WARN_EXPRESSION(
+        get_logger(), is_debugging_, "some pointers are null: %s, %s",
+        !current_accel ? "accel" : "", !current_operation_mode ? "operation_mode" : "");
       return;
     }
   }
 
   /* compensate control command if vehicle adaptor is enabled */
-  const Control control_cmd = use_vehicle_adaptor_ ? vehicle_adaptor_.compensate(
-                                                       *control_cmd_ptr_, *current_odometry_,
-                                                       *current_accel, *current_steer_ptr_)
-                                                   : *control_cmd_ptr_;
+  const Control control_cmd = use_vehicle_adaptor_
+                                ? vehicle_adaptor_.compensate(
+                                    *control_cmd_ptr_, *current_odometry_, *current_accel,
+                                    *current_steer_ptr_, *current_operation_mode)
+                                : *control_cmd_ptr_;
 
   /* calculate actuation command */
   double desired_accel_cmd = 0.0;
