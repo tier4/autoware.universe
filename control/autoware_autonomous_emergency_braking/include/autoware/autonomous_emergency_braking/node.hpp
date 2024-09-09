@@ -72,6 +72,7 @@ using Path = std::vector<geometry_msgs::msg::Pose>;
 using Vector3 = geometry_msgs::msg::Vector3;
 using autoware_perception_msgs::msg::PredictedObject;
 using autoware_perception_msgs::msg::PredictedObjects;
+using colorTuple = std::tuple<double, double, double, double>;
 
 /**
  * @brief Struct to store object data
@@ -482,11 +483,23 @@ public:
    * @param ns Namespace for the marker
    * @param debug_markers Marker array for debugging
    */
-  void addMarker(
-    const rclcpp::Time & current_time, const Path & path, const std::vector<Polygon2d> & polygons,
-    const std::vector<ObjectData> & objects, const std::optional<ObjectData> & closest_object,
-    const double color_r, const double color_g, const double color_b, const double color_a,
+  void addObjectMarker(
+    const rclcpp::Time & current_time, const std::vector<ObjectData> & objects,
+    const std::optional<ObjectData> & closest_object, const colorTuple debug_colors,
     const std::string & ns, MarkerArray & debug_markers);
+
+  /**
+   * @brief Add a marker of the ego path for debugging
+   * @param current_time Current time
+   * @param path Ego vehicle path
+   * @param polygons Polygons representing the ego vehicle footprint
+   * @param debug_colors colors for the markers
+   * @param ns Namespace for the marker
+   * @param debug_markers Marker array for debugging
+   */
+  void addPathMarker(
+    const rclcpp::Time & current_time, const Path & path, const std::vector<Polygon2d> & polygons,
+    const colorTuple debug_colors, const std::string & ns, MarkerArray & debug_markers);
 
   /**
    * @brief Add a collision marker for debugging

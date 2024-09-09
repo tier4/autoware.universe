@@ -411,7 +411,6 @@ void AEB::onCheckCollision(DiagnosticStatusWrapper & stat)
 bool AEB::checkCollision(MarkerArray & debug_markers)
 {
   autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
-  using colorTuple = std::tuple<double, double, double, double>;
 
   // step1. check data
   if (!fetchLatestData()) {
@@ -430,48 +429,35 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
     return false;
   }
 
-  auto merge_expanded_path_polys = [&](const std::vector<Path> & paths) {
+  auto merge_expanded_path_polys = [&](const std::vector<Path> & paths, const double expansion) {
     std::vector<Polygon2d> merged_expanded_path_polygons;
     for (const auto & path : paths) {
-      generatePathFootprint(
-        path, expand_width_ + path_footprint_extra_margin_, merged_expanded_path_polygons);
+      generatePathFootprint(path, expansion, merged_expanded_path_polygons);
     }
     return merged_expanded_path_polygons;
   };
 
   auto get_objects_on_path = [&](
-                               const auto & path, PointCloud::Ptr points_belonging_to_cluster_hulls,
-                               const colorTuple & debug_colors, const std::string & debug_ns) {
+                               const auto & path, const std::vector<Polygon2d> & merged_polygons,
+                               PointCloud::Ptr points_belonging_to_cluster_hulls) {
     // Check which points of the cropped point cloud are on the ego path, and get the closest one
-    const auto ego_polys = generatePathFootprint(path, expand_width_);
     std::vector<ObjectData> objects;
     // Crop out Pointcloud using an extra wide ego path
     if (use_pointcloud_data_ && !points_belonging_to_cluster_hulls->empty()) {
       const auto current_time = obstacle_ros_pointcloud_ptr_->header.stamp;
       getClosestObjectsOnPath(
-        path, ego_polys, current_time, points_belonging_to_cluster_hulls, objects);
+        path, merged_polygons, current_time, points_belonging_to_cluster_hulls, objects);
     }
     if (use_predicted_object_data_) {
-      createObjectDataUsingPredictedObjects(path, ego_polys, objects);
-    }
-
-    // Add debug markers
-    if (publish_debug_markers_) {
-      const auto [color_r, color_g, color_b, color_a] = debug_colors;
-      addMarker(
-        this->get_clock()->now(), path, ego_polys, objects, collision_data_keeper_.get(), color_r,
-        color_g, color_b, color_a, debug_ns, debug_markers);
+      createObjectDataUsingPredictedObjects(path, merged_polygons, objects);
     }
     return objects;
   };
 
   auto check_collision = [&](
-                           const Path & path, const colorTuple & debug_colors,
-                           const std::string & debug_ns,
-                           PointCloud::Ptr points_belonging_to_cluster_hulls) {
+                           const Path & path, const std::string & debug_ns,
+                           const colorTuple debug_colors, std::vector<ObjectData> objects) {
     time_keeper_->start_track("has_collision_with_" + debug_ns);
-    auto objects =
-      get_objects_on_path(path, points_belonging_to_cluster_hulls, debug_colors, debug_ns);
     // Get only the closest object and calculate its speed
     const auto closest_object_point = std::invoke([&]() -> std::optional<ObjectData> {
       const auto closest_object_point_itr =
@@ -497,6 +483,7 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
                                  ? hasCollision(current_v, closest_object_point.value())
                                  : false;
 
+    addObjectMarker(now(), objects, closest_object_point, debug_colors, debug_ns, debug_markers);
     time_keeper_->end_track("has_collision_with_" + debug_ns);
     // check collision using rss distance
     return has_collision;
@@ -511,47 +498,88 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
                               ? std::nullopt
                               : generateEgoPath(*predicted_traj_ptr_);
 
+  const std::vector<Path> paths = [&]() {
+    std::vector<Path> paths;
+    if (use_imu_path_) paths.push_back(ego_imu_path);
+    if (ego_mpc_path.has_value()) {
+      paths.push_back(ego_mpc_path.value());
+    }
+    return paths;
+  }();
+
   PointCloud::Ptr filtered_objects = pcl::make_shared<PointCloud>();
   if (use_pointcloud_data_) {
-    const std::vector<Path> paths = [&]() {
-      std::vector<Path> paths;
-      if (use_imu_path_) paths.push_back(ego_imu_path);
-      if (ego_mpc_path.has_value()) {
-        paths.push_back(ego_mpc_path.value());
-      }
-      return paths;
-    }();
-
     if (paths.empty()) return false;
-    const std::vector<Polygon2d> merged_path_polygons = merge_expanded_path_polys(paths);
+    const std::vector<Polygon2d> expanded_merged_path_polygons =
+      merge_expanded_path_polys(paths, expand_width_ + path_footprint_extra_margin_);
     // Data of filtered point cloud
-    cropPointCloudWithEgoFootprintPath(merged_path_polygons, filtered_objects);
+    cropPointCloudWithEgoFootprintPath(expanded_merged_path_polygons, filtered_objects);
   }
 
   PointCloud::Ptr points_belonging_to_cluster_hulls = pcl::make_shared<PointCloud>();
   getPointsBelongingToClusterHulls(filtered_objects, points_belonging_to_cluster_hulls);
 
-  const auto has_collision_imu_path =
-    [&](const PointCloud::Ptr points_belonging_to_cluster_hulls) -> bool {
+  auto get_merged_paths = [&ego_imu_path, &ego_mpc_path]() {
+    Path merged_paths;
+    if (!ego_imu_path.empty()) {
+      merged_paths.insert(merged_paths.end(), ego_imu_path.begin(), ego_imu_path.end());
+    }
+    if (ego_mpc_path.has_value()) {
+      merged_paths.insert(merged_paths.end(), ego_mpc_path->begin(), ego_mpc_path->end());
+    }
+    return merged_paths;
+  };
+
+  auto get_merged_path_polygons = [&](
+                                    std::vector<Polygon2d> & imu_footprint_polygons,
+                                    std::vector<Polygon2d> & mpc_footprint_polygons) {
+    std::vector<Polygon2d> merged_path_polygons;
+    if (!ego_imu_path.empty()) {
+      imu_footprint_polygons = generatePathFootprint(ego_imu_path, expand_width_);
+      merged_path_polygons.insert(
+        merged_path_polygons.end(), imu_footprint_polygons.begin(), imu_footprint_polygons.end());
+    }
+    if (ego_mpc_path.has_value()) {
+      mpc_footprint_polygons = generatePathFootprint(ego_mpc_path.value(), expand_width_);
+      merged_path_polygons.insert(
+        merged_path_polygons.end(), mpc_footprint_polygons.begin(), mpc_footprint_polygons.end());
+    }
+    return merged_path_polygons;
+  };
+
+  const auto merged_paths = get_merged_paths();
+  std::vector<Polygon2d> imu_footprint_polygons;
+  std::vector<Polygon2d> mpc_footprint_polygons;
+  const auto merged_path_polygons =
+    get_merged_path_polygons(imu_footprint_polygons, mpc_footprint_polygons);
+
+  auto objects =
+    get_objects_on_path(merged_paths, merged_path_polygons, points_belonging_to_cluster_hulls);
+
+  const auto has_collision_imu_path = [&]() -> bool {
     if (!use_imu_path_ || !angular_velocity_ptr_) return false;
-    constexpr colorTuple debug_color = {0.0 / 256.0, 148.0 / 256.0, 205.0 / 256.0, 0.999};
+    //  Add debug markers
     const std::string ns = "imu";
-    return check_collision(ego_imu_path, debug_color, ns, points_belonging_to_cluster_hulls);
+    constexpr colorTuple debug_colors = {0.0 / 256.0, 148.0 / 256.0, 205.0 / 256.0, 0.999};
+    addPathMarker(
+      this->get_clock()->now(), ego_imu_path, imu_footprint_polygons, debug_colors, ns,
+      debug_markers);
+    return check_collision(ego_imu_path, ns, debug_colors, objects);
   };
 
   // step4. make function to check collision with predicted trajectory from control module
-  const auto has_collision_mpc_path =
-    [&](const PointCloud::Ptr points_belonging_to_cluster_hulls) -> bool {
+  const auto has_collision_mpc_path = [&]() -> bool {
     if (!use_predicted_trajectory_ || !ego_mpc_path.has_value()) return false;
-    constexpr colorTuple debug_color = {0.0 / 256.0, 100.0 / 256.0, 0.0 / 256.0, 0.999};
     const std::string ns = "mpc";
-    return check_collision(
-      ego_mpc_path.value(), debug_color, ns, points_belonging_to_cluster_hulls);
+    constexpr colorTuple debug_colors = {0.0 / 256.0, 100.0 / 256.0, 0.0 / 256.0, 0.999};
+    addPathMarker(
+      this->get_clock()->now(), ego_mpc_path.value(), mpc_footprint_polygons, debug_colors, ns,
+      debug_markers);
+    return check_collision(ego_mpc_path.value(), ns, debug_colors, objects);
   };
 
   // evaluate if there is a collision for both paths
-  const bool has_collision = has_collision_imu_path(points_belonging_to_cluster_hulls) ||
-                             has_collision_mpc_path(points_belonging_to_cluster_hulls);
+  const bool has_collision = has_collision_mpc_path() || has_collision_imu_path();
 
   // Debug print
   if (!filtered_objects->empty() && publish_debug_pointcloud_) {
@@ -890,13 +918,14 @@ void AEB::cropPointCloudWithEgoFootprintPath(
   filtered_objects->header.stamp = full_points_ptr->header.stamp;
 }
 
-void AEB::addMarker(
+void AEB::addPathMarker(
   const rclcpp::Time & current_time, const Path & path, const std::vector<Polygon2d> & polygons,
-  const std::vector<ObjectData> & objects, const std::optional<ObjectData> & closest_object,
-  const double color_r, const double color_g, const double color_b, const double color_a,
-  const std::string & ns, MarkerArray & debug_markers)
+  const colorTuple debug_colors, const std::string & ns, MarkerArray & debug_markers)
 {
   autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  if (!publish_debug_markers_) return;
+  const auto [color_r, color_g, color_b, color_a] = debug_colors;
+
   auto path_marker = autoware::universe_utils::createDefaultMarker(
     "base_link", current_time, ns + "_path", 0L, Marker::LINE_STRIP,
     autoware::universe_utils::createMarkerScale(0.2, 0.2, 0.2),
@@ -924,7 +953,16 @@ void AEB::addMarker(
     }
   }
   debug_markers.markers.push_back(polygon_marker);
+}
 
+void AEB::addObjectMarker(
+  const rclcpp::Time & current_time, const std::vector<ObjectData> & objects,
+  const std::optional<ObjectData> & closest_object, const colorTuple debug_colors,
+  const std::string & ns, MarkerArray & debug_markers)
+{
+  autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  if (!publish_debug_markers_) return;
+  const auto [color_r, color_g, color_b, color_a] = debug_colors;
   auto object_data_marker = autoware::universe_utils::createDefaultMarker(
     "base_link", current_time, ns + "_objects", 0, Marker::SPHERE_LIST,
     autoware::universe_utils::createMarkerScale(0.5, 0.5, 0.5),
