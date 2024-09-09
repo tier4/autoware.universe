@@ -22,12 +22,15 @@
 #include "autoware/mpc_lateral_controller/vehicle_model/vehicle_model_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "autoware_control_msgs/msg/control.hpp"
+#include "autoware_control_msgs/msg/control_horizon.hpp"
 #include "autoware_control_msgs/msg/lateral.hpp"
 #include "autoware_planning_msgs/msg/trajectory.hpp"
 #include "autoware_vehicle_msgs/msg/steering_report.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "tier4_debug_msgs/msg/float32_multi_array_stamped.hpp"
+#include <autoware_control_msgs/msg/detail/control_horizon__struct.hpp>
 
 #include <deque>
 #include <memory>
@@ -38,6 +41,8 @@
 namespace autoware::motion::control::mpc_lateral_controller
 {
 
+using autoware_control_msgs::msg::Control;
+using autoware_control_msgs::msg::ControlHorizon;
 using autoware_control_msgs::msg::Lateral;
 using autoware_planning_msgs::msg::Trajectory;
 using autoware_vehicle_msgs::msg::SteeringReport;
@@ -442,7 +447,8 @@ public:
    */
   bool calculateMPC(
     const SteeringReport & current_steer, const Odometry & current_kinematics, Lateral & ctrl_cmd,
-    Trajectory & predicted_trajectory, Float32MultiArrayStamped & diagnostic);
+    Trajectory & predicted_trajectory, Float32MultiArrayStamped & diagnostic,
+    ControlHorizon & control_horizon);
 
   /**
    * @brief Set the reference trajectory to be followed.

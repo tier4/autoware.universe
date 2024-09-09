@@ -141,6 +141,9 @@ MpcLateralController::MpcLateralController(rclcpp::Node & node)
     node.create_publisher<Float32MultiArrayStamped>("~/output/lateral_diagnostic", 1);
   m_pub_steer_offset = node.create_publisher<Float32Stamped>("~/output/estimated_steer_offset", 1);
 
+  m_pub_control_horizon = node.create_publisher<ControlHorizon>(
+    "/control/trajectory_follower/lateral/debug/control_horizon", 1);
+
   declareMPCparameters(node);
 
   /* get parameter updates */
@@ -242,6 +245,7 @@ trajectory_follower::LateralOutput MpcLateralController::run(
   Lateral ctrl_cmd;
   Trajectory predicted_traj;
   Float32MultiArrayStamped debug_values;
+  ControlHorizon control_horizon;  // vehicle_adaptor開発用のテンポラリ実装
 
   const bool is_under_control = input_data.current_operation_mode.is_autoware_control_enabled &&
                                 input_data.current_operation_mode.mode ==
@@ -253,7 +257,8 @@ trajectory_follower::LateralOutput MpcLateralController::run(
   }
 
   const bool is_mpc_solved = m_mpc->calculateMPC(
-    m_current_steering, m_current_kinematic_state, ctrl_cmd, predicted_traj, debug_values);
+    m_current_steering, m_current_kinematic_state, ctrl_cmd, predicted_traj, debug_values,
+    control_horizon);
 
   // reset previous MPC result
   // Note: When a large deviation from the trajectory occurs, the optimization stops and
@@ -275,6 +280,9 @@ trajectory_follower::LateralOutput MpcLateralController::run(
 
   publishPredictedTraj(predicted_traj);
   publishDebugValues(debug_values);
+
+  control_horizon.stamp = clock_->now();
+  m_pub_control_horizon->publish(control_horizon);
 
   const auto createLateralOutput = [this](const auto & cmd, const bool is_mpc_solved) {
     trajectory_follower::LateralOutput output;

@@ -101,10 +101,9 @@ RawVehicleCommandConverterNode::RawVehicleCommandConverterNode(
 
   // NOTE: some vehicles do not publish actuation status. To handle this, subscribe only when the
   // option is specified.
-  const bool use_vgr = convert_steer_cmd_method_.has_value() &&
-    convert_steer_cmd_method_.value() == "vgr";
-  need_to_subscribe_actuation_status_ =
-    convert_actuation_to_steering_status_ || use_vgr;
+  const bool use_vgr =
+    convert_steer_cmd_method_.has_value() && convert_steer_cmd_method_.value() == "vgr";
+  need_to_subscribe_actuation_status_ = convert_actuation_to_steering_status_ || use_vgr;
   if (need_to_subscribe_actuation_status_) {
     sub_actuation_status_ = create_subscription<ActuationStatusStamped>(
       "~/input/actuation_status", 1,
@@ -141,11 +140,13 @@ void RawVehicleCommandConverterNode::publishActuationCmd()
 
   const auto current_accel = sub_accel_.takeData();
   const auto current_operation_mode = sub_operation_mode_.takeData();
+  const auto control_horizon = sub_control_horizon_.takeData();
   if (use_vehicle_adaptor_) {
-    if (!current_accel || !current_operation_mode) {
+    if (!current_accel || !current_operation_mode || !control_horizon) {
       RCLCPP_WARN_EXPRESSION(
-        get_logger(), is_debugging_, "some pointers are null: %s, %s",
-        !current_accel ? "accel" : "", !current_operation_mode ? "operation_mode" : "");
+        get_logger(), is_debugging_, "some pointers are null: %s, %s %s",
+        !current_accel ? "accel" : "", !current_operation_mode ? "operation_mode" : "",
+        !control_horizon ? "control_horizon" : "");
       return;
     }
   }
@@ -154,7 +155,7 @@ void RawVehicleCommandConverterNode::publishActuationCmd()
   const Control control_cmd = use_vehicle_adaptor_
                                 ? vehicle_adaptor_.compensate(
                                     *control_cmd_ptr_, *current_odometry_, *current_accel,
-                                    *current_steer_ptr_, *current_operation_mode)
+                                    *current_steer_ptr_, *current_operation_mode, *control_horizon)
                                 : *control_cmd_ptr_;
 
   /* calculate actuation command */

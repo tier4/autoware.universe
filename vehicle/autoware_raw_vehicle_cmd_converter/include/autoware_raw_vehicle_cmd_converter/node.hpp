@@ -28,6 +28,7 @@
 
 #include <autoware_adapi_v1_msgs/msg/operation_mode_state.hpp>
 #include <autoware_control_msgs/msg/control.hpp>
+#include <autoware_control_msgs/msg/control_horizon.hpp>
 #include <autoware_vehicle_msgs/msg/steering_report.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -42,6 +43,7 @@
 namespace autoware::raw_vehicle_cmd_converter
 {
 using Control = autoware_control_msgs::msg::Control;
+using autoware_control_msgs::msg::ControlHorizon;
 using tier4_debug_msgs::msg::Float32MultiArrayStamped;
 using tier4_vehicle_msgs::msg::ActuationCommandStamped;
 using tier4_vehicle_msgs::msg::ActuationStatusStamped;
@@ -93,6 +95,9 @@ public:
     this, "~/input/accel"};
   autoware::universe_utils::InterProcessPollingSubscriber<OperationModeState> sub_operation_mode_{
     this, "~/input/operation_mode_state"};
+  // vehicle_adaptor開発用のテンポラリ実装
+  autoware::universe_utils::InterProcessPollingSubscriber<ControlHorizon> sub_control_horizon_{
+    this, "~/input/control_horizon"};
 
   rclcpp::TimerBase::SharedPtr timer_;
 
