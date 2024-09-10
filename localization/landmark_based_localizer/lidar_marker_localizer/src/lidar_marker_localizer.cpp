@@ -40,6 +40,9 @@ LidarMarkerLocalizer::LidarMarkerLocalizer() : Node("lidar_marker_localizer"), i
   using std::placeholders::_1;
   using std::placeholders::_2;
 
+  param_.enable_read_all_target_ids = this->declare_parameter<bool>("enable_read_all_target_ids");
+  param_.target_ids = this->declare_parameter<std::vector<std::string>>("target_ids");
+
   param_.marker_name = this->declare_parameter<std::string>("marker_name");
   param_.resolution = this->declare_parameter<double>("resolution");
   param_.intensity_pattern = this->declare_parameter<std::vector<int64_t>>("intensity_pattern");
@@ -69,6 +72,7 @@ LidarMarkerLocalizer::LidarMarkerLocalizer() : Node("lidar_marker_localizer"), i
   param_.savefile_directory_path = this->declare_parameter<std::string>("savefile_directory_path");
   param_.savefile_name = this->declare_parameter<std::string>("savefile_name");
   param_.save_frame_id = this->declare_parameter<std::string>("save_frame_id");
+
 
   ekf_pose_buffer_ = std::make_unique<SmartPoseBuffer>(
     this->get_logger(), param_.self_pose_timeout_sec, param_.self_pose_distance_tolerance_m);
@@ -133,7 +137,13 @@ void LidarMarkerLocalizer::initialize_diagnostics()
 
 void LidarMarkerLocalizer::map_bin_callback(const HADMapBin::ConstSharedPtr & msg)
 {
-  landmark_manager_.parse_landmarks(msg, param_.marker_name);
+  if (param_.enable_read_all_target_ids) {
+    landmark_manager_.parse_landmarks(msg, param_.marker_name);
+  }
+  else {
+    landmark_manager_.parse_landmarks(msg, param_.marker_name, param_.target_ids);
+  }
+
   const MarkerArray marker_msg = landmark_manager_.get_landmarks_as_marker_array_msg();
   pub_marker_mapped_->publish(marker_msg);
 }
@@ -275,9 +285,9 @@ void LidarMarkerLocalizer::main_process(const PointCloud2::ConstSharedPtr & poin
     return;
   }
 
-  if (distance_from_self_pose_to_nearest_marker < 2.0) {
-    save_intensity(points_msg_ptr, detected_landmarks.at(0).pose);
-  }
+  const landmark_manager::Landmark nearest_detected_landmark =
+    get_nearest_landmark(self_pose, detected_landmarks);
+  save_intensity(points_msg_ptr, nearest_detected_landmark.pose);
 
   // (5) Apply diff pose to self pose
   // only x and y is changed

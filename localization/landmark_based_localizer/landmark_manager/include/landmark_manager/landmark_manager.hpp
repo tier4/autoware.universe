@@ -44,6 +44,10 @@ public:
     const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr & msg,
     const std::string & target_subtype);
 
+  void parse_landmarks(
+    const autoware_auto_mapping_msgs::msg::HADMapBin::ConstSharedPtr & msg,
+    const std::string & target_subtype, const std::vector<std::string> target_ids);
+
   [[nodiscard]] std::vector<landmark_manager::Landmark> get_landmarks() const;
 
   [[nodiscard]] visualization_msgs::msg::MarkerArray get_landmarks_as_marker_array_msg() const;
