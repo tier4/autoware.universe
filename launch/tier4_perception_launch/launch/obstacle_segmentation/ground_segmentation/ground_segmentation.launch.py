@@ -94,24 +94,43 @@ class GroundSegmentationPipeline:
             )
         )
 
-        components.append(
-            ComposableNode(
-                package="ground_segmentation",
-                plugin=self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"],
-                name=f"{lidar_name}_ground_filter",
-                remappings=[
-                    ("input", f"{lidar_name}/range_cropped/pointcloud"),
-                    ("output", f"{lidar_name}/pointcloud"),
-                ],
-                parameters=[
-                    self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["parameters"]
-                ],
-                extra_arguments=[
-                    {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
-                ],
+        if self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"] == "LinefitGroundSegmentation" \
+            or self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"] == "RayGroundSegmentation":
+            components.append(
+                ComposableNode(
+                    package="ros2_ground_segmentation",
+                    plugin=self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"],
+                    name=f"{lidar_name}_ground_filter",
+                    remappings=[
+                        ("input/topic", f"{lidar_name}/range_cropped/pointcloud"),
+                        ("output/topic", f"{lidar_name}/pointcloud"),
+                    ],
+                    parameters=[
+                        self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["parameters"]
+                    ],
+                    extra_arguments=[
+                        {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
+                    ],
+                )
             )
-        )
-
+        else:
+            components.append(
+                ComposableNode(
+                    package="ground_segmentation",
+                    plugin=self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["plugin"],
+                    name=f"{lidar_name}_ground_filter",
+                    remappings=[
+                        ("input", f"{lidar_name}/range_cropped/pointcloud"),
+                        ("output", f"{lidar_name}/pointcloud"),
+                    ],
+                    parameters=[
+                        self.ground_segmentation_param[f"{lidar_name}_ground_filter"]["parameters"]
+                    ],
+                    extra_arguments=[
+                        {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
+                    ],
+                )
+            )
         return components
 
     def create_ransac_pipeline(self):
@@ -230,26 +249,48 @@ class GroundSegmentationPipeline:
             )
         )
 
-        components.append(
-            ComposableNode(
-                package="ground_segmentation",
-                plugin=self.ground_segmentation_param["common_ground_filter"]["plugin"],
-                name="common_ground_filter",
-                remappings=[
-                    ("input", "range_cropped/pointcloud"),
-                    ("output", output_topic),
-                ],
-                parameters=[
-                    self.ground_segmentation_param["common_ground_filter"]["parameters"],
-                    self.vehicle_info,
-                    {"input_frame": "base_link"},
-                    {"output_frame": "base_link"},
-                ],
-                extra_arguments=[
-                    {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
-                ],
+        if self.ground_segmentation_param["common_ground_filter"]["plugin"] == "LinefitGroundSegmentation" \
+            or self.ground_segmentation_param["common_ground_filter"]["plugin"] == "RayGroundSegmentation":
+            components.append(
+                ComposableNode(
+                    package="ros2_ground_segmentation",
+                    plugin=self.ground_segmentation_param["common_ground_filter"]["plugin"],
+                    name="common_ground_filter",
+                    remappings=[
+                        ("input/topic", "range_cropped/pointcloud"),
+                        ("output/topic", output_topic),
+                    ],
+                    parameters=[
+                        self.ground_segmentation_param["common_ground_filter"]["parameters"],
+                        self.vehicle_info,
+                        {"output_frame": "base_link"},
+                    ],
+                    extra_arguments=[
+                        {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
+                    ],
+                )
             )
-        )
+        else:
+            components.append(
+                ComposableNode(
+                    package="ground_segmentation",
+                    plugin=self.ground_segmentation_param["common_ground_filter"]["plugin"],
+                    name="common_ground_filter",
+                    remappings=[
+                        ("input", "range_cropped/pointcloud"),
+                        ("output", output_topic),
+                    ],
+                    parameters=[
+                        self.ground_segmentation_param["common_ground_filter"]["parameters"],
+                        self.vehicle_info,
+                        {"input_frame": "base_link"},
+                        {"output_frame": "base_link"},
+                    ],
+                    extra_arguments=[
+                        {"use_intra_process_comms": LaunchConfiguration("use_intra_process")}
+                    ],
+                )
+            )
         return components
 
     def create_single_frame_obstacle_segmentation_components(self, input_topic, output_topic):
