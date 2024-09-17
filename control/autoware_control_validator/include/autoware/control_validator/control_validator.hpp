@@ -22,6 +22,7 @@
 
 #include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <signal_processing/lowpass_filter_1d.hpp>
 
 #include <autoware_planning_msgs/msg/trajectory.hpp>
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
@@ -90,6 +91,10 @@ private:
 
   ControlValidatorStatus validation_status_;
   ValidationParams validation_params_;  // for thresholds
+  bool is_velocity_valid_{true};
+  LowpassFilter1d vehicle_vel_{0.0};
+  LowpassFilter1d target_vel_{0.0};
+  bool hold_velocity_error_until_stop_{false};
 
   // ego nearest index search
   double ego_nearest_dist_threshold_;
