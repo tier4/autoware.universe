@@ -469,12 +469,15 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
   };
 
   auto check_collision = [&](const Path & path, std::vector<ObjectData> & objects) {
-    time_keeper_->start_track("has_collision");
+    autoware::universe_utils::ScopedTimeTrack st("has_collision", *time_keeper_);
     const auto closest_object_point = std::invoke([&]() -> std::optional<ObjectData> {
       // Attempt to find the closest target object
       const auto closest_target_object_itr =
         std::min_element(objects.begin(), objects.end(), [](const auto & o1, const auto & o2) {
-          return (o1.is_target && (!o2.is_target || o1.distance_to_object < o2.distance_to_object));
+          if (o1.is_target != o2.is_target) {
+            return o1.is_target;
+          }
+          return o1.distance_to_object < o2.distance_to_object;
         });
 
       if (closest_target_object_itr != objects.end()) {
@@ -515,7 +518,6 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
         ? hasCollision(current_v, closest_object_point.value())
         : false;
 
-    time_keeper_->end_track("has_collision");
     // check collision using rss distance
     return has_collision;
   };
@@ -556,11 +558,12 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
                                       ego_imu_path, points_belonging_to_cluster_hulls,
                                       {0.0 / 256.0, 148.0 / 256.0, 205.0 / 256.0, 0.999}, "imu");
 
-  const auto mpc_path_objects = (!use_predicted_trajectory_ || !predicted_traj_ptr_)
-                                  ? std::vector<ObjectData>{}
-                                  : get_objects_on_path(
-                                      ego_mpc_path.value(), points_belonging_to_cluster_hulls,
-                                      {0.0 / 256.0, 100.0 / 256.0, 0.0 / 256.0, 0.999}, "mpc");
+  const auto mpc_path_objects =
+    (!use_predicted_trajectory_ || !predicted_traj_ptr_ || !ego_mpc_path.has_value())
+      ? std::vector<ObjectData>{}
+      : get_objects_on_path(
+          ego_mpc_path.value(), points_belonging_to_cluster_hulls,
+          {0.0 / 256.0, 100.0 / 256.0, 0.0 / 256.0, 0.999}, "mpc");
 
   // merge object data which comes from the ego (imu) path and predicted path
   auto merge_objects =
@@ -891,6 +894,17 @@ void AEB::getClosestObjectsOnPath(
 
     // If the object is behind the ego, we need to use the backward long offset. The distance should
     // be a positive number in any case
+    // calculate the lateral offset between the ego vehicle and the object
+    const double lateral_offset =
+      std::abs(autoware::motion_utils::calcLateralOffset(ego_path, obj_position));
+
+    // Object is outside region of interest
+    if (
+      lateral_offset >
+      vehicle_info_.vehicle_width_m / 2.0 + expand_width_ + speed_calculation_expansion_margin_) {
+      continue;
+    }
+
     const bool is_object_in_front_of_ego = obj_arc_length > 0.0;
     const double dist_ego_to_object = (is_object_in_front_of_ego)
                                         ? obj_arc_length - vehicle_info_.max_longitudinal_offset_m
@@ -901,24 +915,8 @@ void AEB::getClosestObjectsOnPath(
     obj.position = obj_position;
     obj.velocity = 0.0;
     obj.distance_to_object = std::abs(dist_ego_to_object);
-
-    const Point2d obj_point(p.x, p.y);
-
-    // calculate the lateral offset between the ego vehicle and the object
-    const double lateral_offset =
-      std::abs(autoware::motion_utils::calcLateralOffset(ego_path, obj.position));
-
-    // check if the object is in the target area
-    if (lateral_offset > vehicle_info_.vehicle_width_m / 2.0 + expand_width_) {
-      obj.is_target = false;
-    }
-
-    // add all objects located in the speed calculation margin to the object list
-    if (
-      lateral_offset <
-      vehicle_info_.vehicle_width_m / 2.0 + expand_width_ + speed_calculation_expansion_margin_) {
-      objects.push_back(obj);
-    }
+    obj.is_target = (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_);
+    objects.push_back(obj);
   }
 }
 
