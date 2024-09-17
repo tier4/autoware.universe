@@ -353,6 +353,7 @@ std::vector<landmark_manager::Landmark> LidarMarkerLocalizer::detect_landmarks(
   // initialize variables
   std::vector<int> vote(bin_num, 0);
   std::vector<float> min_y(bin_num, std::numeric_limits<float>::max());
+  std::vector<float> reference_ring_y(bin_num, std::numeric_limits<float>::max());
 
   // for each ring
   for (const pcl::PointCloud<autoware_point_types::PointXYZIRADRT> & one_ring : ring_points) {
@@ -365,6 +366,9 @@ std::vector<landmark_manager::Landmark> LidarMarkerLocalizer::detect_landmarks(
       intensity_sum[bin_index] += point.intensity;
       intensity_num[bin_index]++;
       min_y[bin_index] = std::min(min_y[bin_index], point.y);
+      if (point.ring == 12) {
+        reference_ring_y[bin_index] = std::min(reference_ring_y[bin_index], point.y);
+      }
     }
 
     // calc average
@@ -438,7 +442,7 @@ std::vector<landmark_manager::Landmark> LidarMarkerLocalizer::detect_landmarks(
         static_cast<double>(i) + static_cast<double>(param_.intensity_pattern.size()) / 2.0;
       Pose marker_pose_on_base_link;
       marker_pose_on_base_link.position.x = bin_position * param_.resolution + min_x;
-      marker_pose_on_base_link.position.y = min_y[i];
+      marker_pose_on_base_link.position.y = reference_ring_y[i];
       marker_pose_on_base_link.position.z = param_.marker_height_from_ground;
       marker_pose_on_base_link.orientation =
         tier4_autoware_utils::createQuaternionFromRPY(M_PI_2, 0.0, 0.0);  // TODO(YamatoAndo)
