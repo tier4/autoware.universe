@@ -72,13 +72,6 @@ Control VehicleAdaptor::compensate(
   if (!is_applying_control) {
     proxima_vehicle_adaptor_.send_initialized_flag();
   }
-  std::cerr << "controller steer input" << input_control_cmd.lateral.steering_tire_angle << std::endl;
-  for (int i = 0;i<int(control_horizon.controls.size());i++) {
-    Eigen::VectorXd states(6);
-    std::cerr << "index: " << i << std::endl;
-    std::cerr << "control_horizon.controls[i].stamp: " << control_horizon.controls[i].stamp.sec + control_horizon.controls[i].stamp.nanosec * 1e-9 << std::endl;
-    std::cerr << "control_horizon.controls[i].lateral.steering_tire_angle: " << control_horizon.controls[i].lateral.steering_tire_angle << std::endl;
-  }
   // std::cerr << "vehicle adaptor: compensate control command" << std::endl;
    //std::cerr << "Build path is: " << BUILD_PATH << std::endl;
   return output_control_cmd;
