@@ -8,3 +8,7 @@ pure_pursuit_parameter:
     min_lookahead: 1.5
     steer_kp_param: 2.0
     steer_kd_param: 2.0
+    lon_acc_lim: 2.0
+    lon_jerk_lim: 5.0
+    steer_lim: 2.0
+    steer_rate_lim: 2.0

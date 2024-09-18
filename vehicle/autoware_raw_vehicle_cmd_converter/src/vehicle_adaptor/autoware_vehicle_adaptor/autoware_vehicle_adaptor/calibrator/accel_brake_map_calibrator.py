@@ -20,6 +20,8 @@ import seaborn as sns
 from matplotlib.colors import TwoSlopeNorm
 import csv
 from scipy.spatial import ConvexHull
+from autoware_vehicle_adaptor.training.early_stopping import EarlyStopping
+
 
 control_dt = 0.033
 default_map_accel = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
@@ -83,7 +85,7 @@ class AddDataFromCSV:
         if self.polynomial_regression_performed:
            self.polynomial_regression_performed = False
            print("polynomial regression as a preprocessing for GP and NN is reset")
-    def add_data_from_csv(self, dir_name,smoothing_window = 10, acc_change_threshold=0.2, base_map_dir=None):
+    def add_data_from_csv(self, dir_name,smoothing_window = 10, acc_change_threshold=0.2, base_map_dir=None, control_cmd_mode=None):
         localization_kinematic_state = np.loadtxt(
             dir_name + "/localization_kinematic_state.csv", delimiter=",", usecols=[0, 1, 4, 5, 7, 8, 9, 10, 47]
         )
@@ -139,20 +141,44 @@ class AddDataFromCSV:
                 ]
             )
         else:
-            if os.path.exists(dir_name + "/vehicle_command_control_cmd.csv"):
+            if control_cmd_mode == "compensated_control_cmd":
                 control_cmd = np.loadtxt(
-                    dir_name + "/vehicle_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                    dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
                 )
-            elif os.path.exists(dir_name + '/control_trajectory_follower_control_cmd.csv'):
+            elif control_cmd_mode == "control_command":
+                control_cmd = np.loadtxt(
+                    dir_name + "/control_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                )
+            elif control_cmd_mode == "control_trajectory_follower":
                 control_cmd = np.loadtxt(
                     dir_name + "/control_trajectory_follower_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
                 )
-            elif os.path.exists(dir_name + '/external_selected_control_cmd.csv'):
+            elif control_cmd_mode == "external_selected":
                 control_cmd = np.loadtxt(
                     dir_name + "/external_selected_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
                 )
+            elif control_cmd_mode is None:
+                if os.path.exists(dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv"):
+                    control_cmd = np.loadtxt(
+                        dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                    )
+                elif os.path.exists(dir_name + '/control_command_control_cmd.csv'):
+                    control_cmd = np.loadtxt(
+                        dir_name + "/control_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                    )
+                elif os.path.exists(dir_name + '/control_trajectory_follower_control_cmd.csv'):
+                    control_cmd = np.loadtxt(
+                        dir_name + "/control_trajectory_follower_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                    )
+                elif os.path.exists(dir_name + '/external_selected_control_cmd.csv'):
+                    control_cmd = np.loadtxt(
+                        dir_name + "/external_selected_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                    )
+                else:
+                    print("control command csv is not found")
+                    return
             else:
-                print("control command csv is not found")
+                print("control_cmd_mode is invalid")
                 return
             acc_cmd = control_cmd[:, [0,1,3]]
             min_time_stamp = max(
@@ -511,30 +537,7 @@ class CalibratorByGaussianProcessRegression(AddDataFromCSV):
                         )
                         if self.dataloader_weights_brake is not None:
                             self.dataloader_weights_brake.append(np.array(self.dataloader_weights_brake).max())
-class EarlyStopping:
-    """Class for early stopping in NN training."""
-
-    def __init__(self, initial_loss, tol=0.01, patience=30):
-        self.epoch = 0  # Initialise the counter for the number of epochs being monitored.
-        self.best_loss = float("inf")  # Initialise loss of comparison with infinity 'inf'.
-        self.patience = patience  # Initialise the number of epochs to be monitored with a parameter
-        self.initial_loss = initial_loss
-        self.tol = tol
-
-    def __call__(self, current_loss):
-        current_loss_num = current_loss
-        if current_loss_num + self.tol * self.initial_loss > self.best_loss:
-            self.epoch += 1
-        else:
-            self.epoch = 0
-        if current_loss_num < self.best_loss:
-            self.best_loss = current_loss_num
-        if self.epoch >= self.patience:
-            return True
-        return False
-
-    def reset(self):
-        self.epoch = 0
+                            
 def calc_monotone_constraint_cost(model, test_points, map_matrix, mode, monotone_margin=1e-3):
     if mode == "accel":
         cost = torch.relu(model(test_points[:, :-1]) - model(test_points[:, 1:]) + map_matrix[:-1] - map_matrix[1:] + monotone_margin).sum()

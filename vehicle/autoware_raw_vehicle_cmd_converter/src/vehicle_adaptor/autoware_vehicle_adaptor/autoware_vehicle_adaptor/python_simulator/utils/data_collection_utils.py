@@ -1,7 +1,6 @@
 from enum import Enum
 import csv
 
-from numba import njit
 import numpy as np
 
 RANDOM_SEED_STEP_RESPONSE = 42
@@ -559,7 +558,7 @@ class driving_log_updater:
                 system_operation_mode_state_plus_true.append("True")
                 writer.writerow(system_operation_mode_state_plus_true)
         if self.data_collection_mode == "autonomous_driving_with_vehicle_adaptor":
-            np.savetxt(save_dir + "/vehicle_command_control_cmd.csv",
+            np.savetxt(save_dir + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv",
                 np.array(self.vehicle_command_control_cmd_list),
                 delimiter=","
             )

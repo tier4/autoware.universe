@@ -11,14 +11,15 @@ import scipy.interpolate
 from scipy.ndimage import gaussian_filter
 from scipy.spatial.transform import Rotation
 import os
+from autoware_vehicle_adaptor.param import parameters
 
-wheel_base = 2.79
-acc_queue_size = 15
-steer_queue_size = 15
-acc_delay_step = 3
-acc_time_delay = 0.1
-steer_delay_step = 8
-steer_time_delay = 0.27
+wheel_base = parameters.wheel_base
+acc_queue_size = parameters.acc_queue_size
+steer_queue_size = parameters.steer_queue_size
+acc_delay_step = parameters.acc_delay_step
+acc_time_delay = parameters.acc_time_delay
+steer_delay_step = parameters.steer_delay_step
+steer_time_delay = parameters.steer_time_delay
 x_index = 0
 y_index = 1
 vel_index = 2
@@ -28,12 +29,12 @@ steer_index = 5
 acc_input_indices = np.arange(6, 6 + acc_queue_size)
 steer_input_indices = np.arange(6 + acc_queue_size, 6 + acc_queue_size + steer_queue_size)
 
-control_dt = 0.033
+control_dt = parameters.control_dt
 predict_step = 3
 predict_dt = predict_step * control_dt
 
-acc_time_constant = 0.1
-steer_time_constant = 0.27
+acc_time_constant = parameters.acc_time_constant
+steer_time_constant = parameters.steer_time_constant
 
 x_error_sigma_for_training = 30.0
 y_error_sigma_for_training = 30.0
@@ -70,8 +71,12 @@ class add_data_from_csv:
         self.X_val_list = []
         self.Y_val_list = []
         self.Z_val_list = []
+        self.X_test_list = []
+        self.Y_test_list = []
+        self.Z_test_list = []
         self.division_indices_train = []
         self.division_indices_val = []
+        self.division_indices_test = []
         self.nominal_dynamics = utils.NominalDynamics()
         self.nominal_dynamics.set_params(
             wheel_base,
@@ -91,9 +96,13 @@ class add_data_from_csv:
         self.X_val_list = []
         self.Y_val_list = []
         self.Z_val_list = []
+        self.X_test_list = []
+        self.Y_test_list = []
+        self.Z_test_list = []
         self.division_indices_train = []
         self.division_indices_val = []
-    def add_data_from_csv(self, dir_name: str, add_mode="divide",map_dir=None) -> None:
+        self.division_indices_test = []
+    def add_data_from_csv(self, dir_name: str, add_mode="divide",map_dir=None,control_cmd_mode=None) -> None:
         localization_kinematic_state = np.loadtxt(
             dir_name + "/localization_kinematic_state.csv", delimiter=",", usecols=[0, 1, 4, 5, 7, 8, 9, 10, 47]
         )
@@ -110,24 +119,44 @@ class add_data_from_csv:
             dir_name + "/vehicle_status_steering_status.csv", delimiter=",", usecols=[0, 1, 2]
         )
         steer = vehicle_status_steering_status[:, 2]
-        if os.path.exists(dir_name + "/control_command_control_cmd.csv"):
+        if control_cmd_mode == "compensated_control_cmd":
+            control_cmd = np.loadtxt(
+                dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+            )
+        elif control_cmd_mode == "control_command":
             control_cmd = np.loadtxt(
                 dir_name + "/control_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
             )
-        elif os.path.exists(dir_name + "/vehicle_command_control_cmd.csv"):
-            control_cmd = np.loadtxt(
-                dir_name + "/vehicle_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
-            )
-        elif os.path.exists(dir_name + "/control_trajectory_follower_control_cmd.csv"):
+        elif control_cmd_mode == "control_trajectory_follower":
             control_cmd = np.loadtxt(
                 dir_name + "/control_trajectory_follower_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
             )
-        elif os.path.exists(dir_name + "/external_selected_control_cmd.csv"):
+        elif control_cmd_mode == "external_selected":
             control_cmd = np.loadtxt(
                 dir_name + "/external_selected_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
             )
+        elif control_cmd_mode is None:
+            if os.path.exists(dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv"):
+                control_cmd = np.loadtxt(
+                    dir_name + "/vehicle_raw_vehicle_cmd_converter_debug_compensated_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                )
+            elif os.path.exists(dir_name + '/control_command_control_cmd.csv'):
+                control_cmd = np.loadtxt(
+                    dir_name + "/control_command_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                )
+            elif os.path.exists(dir_name + '/control_trajectory_follower_control_cmd.csv'):
+                control_cmd = np.loadtxt(
+                    dir_name + "/control_trajectory_follower_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                )
+            elif os.path.exists(dir_name + '/external_selected_control_cmd.csv'):
+                control_cmd = np.loadtxt(
+                    dir_name + "/external_selected_control_cmd.csv", delimiter=",", usecols=[0, 1, 8, 16]
+                )
+            else:
+                print("control command csv is not found")
+                return
         else:
-            print("control_cmd file not found")
+            print("control_cmd_mode is invalid")
             return
         acc_cmd = control_cmd[:, [0,1,3]]
         steer_cmd = control_cmd[:, 2]
@@ -312,10 +341,18 @@ class add_data_from_csv:
                 self.Z_train_list.append(Z_list[i])
 
             self.division_indices_train.append(len(self.X_train_list))
-        if add_mode == "as_val":
+        elif add_mode == "as_val":
             for i in range(len(X_list)):
                 self.X_val_list.append(X_list[i])
                 self.Y_val_list.append(Y_smooth[i])
                 self.Z_val_list.append(Z_list[i])
 
             self.division_indices_val.append(len(self.X_val_list))
+        elif add_mode == "as_test":
+            for i in range(len(X_list)):
+                self.X_test_list.append(X_list[i])
+                self.Y_test_list.append(Y_smooth[i])
+                self.Z_test_list.append(Z_list[i])
+
+            self.division_indices_test.append(len(self.X_test_list))
+        

@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <vector>
+#include "inputs_prediction.h"
 
 class PolynomialRegression
 {
@@ -390,6 +391,10 @@ public:
     Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat
   );
   Eigen::VectorXd get_compensation_bias();
+  Eigen::VectorXd F_with_model_for_calc_controller_prediction_error(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
+    const Eigen::VectorXd & steer_input_history_concat, 
+    Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm, Eigen::VectorXd & previous_error, const int horizon);
   Eigen::VectorXd F_with_model_for_compensation(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat, 
@@ -429,8 +434,9 @@ public:
   void calc_forward_trajectory_with_diff(Eigen::VectorXd states, Eigen::VectorXd acc_input_history,
                                          Eigen::VectorXd steer_input_history, std::vector<Eigen::VectorXd> d_inputs_schedule,
                                          const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-                                         Eigen::VectorXd & previous_error, std::vector<Eigen::VectorXd> & states_prediction,
-                                         std::vector<Eigen::MatrixXd> & dF_d_states, std::vector<Eigen::MatrixXd> & dF_d_inputs);
+                                         const Eigen::VectorXd & previous_error, std::vector<Eigen::VectorXd> & states_prediction,
+                                         std::vector<Eigen::MatrixXd> & dF_d_states, std::vector<Eigen::MatrixXd> & dF_d_inputs,
+                                         std::vector<Eigen::Vector2d> & inputs_schedule);
 };
 class AdaptorILQR
 {
@@ -502,9 +508,15 @@ private:
   std::vector<std::string> state_component_ilqr_ = {"vel", "acc", "steer"};
   std::vector<int> state_component_ilqr_index_;
   int num_state_component_ilqr_;
+  std::vector<double> acc_input_weight_vel_error_target_table_, acc_input_weight_vel_error_domain_table_;
+  std::vector<double> acc_input_weight_acc_error_target_table_, acc_input_weight_acc_error_domain_table_;
+  std::vector<double> steer_input_weight_lateral_error_target_table_, steer_input_weight_lateral_error_domain_table_;
+  std::vector<double> steer_input_weight_yaw_error_target_table_, steer_input_weight_yaw_error_domain_table_;
+  std::vector<double> steer_input_weight_steer_error_target_table_, steer_input_weight_steer_error_domain_table_;
 public:
   AdaptorILQR();
   virtual ~AdaptorILQR();
+  void set_params();
   void set_states_cost(
     double x_cost, double y_cost, double vel_cost, double yaw_cost, double acc_cost, double steer_cost
   );
@@ -562,7 +574,16 @@ public:
     const Eigen::VectorXd & c_lstm,
     const Eigen::VectorXd & previous_error, std::vector<Eigen::MatrixXd> & states_prediction,
     const std::vector<Eigen::VectorXd> & states_ref,
-    const std::vector<Eigen::VectorXd> & d_input_ref, Eigen::VectorXd & Cost);
+    const std::vector<Eigen::VectorXd> & d_input_ref, 
+    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight,
+    Eigen::VectorXd & Cost);
+  void calc_inputs_ref_info(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history,
+    const Eigen::VectorXd & steer_input_history, const Eigen::VectorXd & h_lstm,
+    const Eigen::VectorXd & c_lstm, 
+    const Eigen::VectorXd & previous_error, const std::vector<Eigen::VectorXd> & states_ref,
+    const Eigen::VectorXd & acc_controller_input_schedule, const Eigen::VectorXd & steer_controller_input_schedule,
+    std::vector<Eigen::Vector2d> & inputs_ref, double & acc_input_weight, double & steer_input_weight);
   Eigen::MatrixXd extract_dF_d_state(Eigen::MatrixXd dF_d_state_with_history);
   Eigen::MatrixXd extract_dF_d_input(Eigen::MatrixXd dF_d_input);
   Eigen::MatrixXd right_action_by_state_diff_with_history(Eigen::MatrixXd Mat, Eigen::MatrixXd dF_d_state_with_history);
@@ -574,6 +595,7 @@ public:
     const std::vector<Eigen::VectorXd> & states_prediction, const std::vector<Eigen::VectorXd> & d_inputs_schedule,
     const std::vector<Eigen::VectorXd> & states_ref,
     const std::vector<Eigen::VectorXd> & d_input_ref, const double prev_acc_rate, const double prev_steer_rate,
+    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight, const std::vector<Eigen::Vector2d> & inputs_schedule,
     std::vector<Eigen::MatrixXd> & K, std::vector<Eigen::VectorXd> & k);
   std::vector<Eigen::MatrixXd> calc_line_search_candidates(std::vector<Eigen::MatrixXd> K, std::vector<Eigen::VectorXd> k, std::vector<Eigen::MatrixXd> dF_d_states, std::vector<Eigen::MatrixXd> dF_d_inputs,  std::vector<Eigen::VectorXd> d_inputs_schedule, Eigen::VectorXd ls_points);
   void compute_optimal_control(Eigen::VectorXd states, Eigen::VectorXd acc_input_history,
@@ -582,6 +604,7 @@ public:
                               const std::vector<Eigen::VectorXd> & states_ref,
                               const std::vector<Eigen::VectorXd> & d_input_ref, Eigen::VectorXd & previous_error,
                               std::vector<Eigen::VectorXd> & states_prediction,
+                              const Eigen::VectorXd & acc_controller_input_schedule, const Eigen::VectorXd & steer_controller_input_schedule,
                               double & acc_input, double & steer_input);
 
 };
@@ -595,6 +618,7 @@ private:
   SgFilter sg_filter_for_d_inputs_schedule_;
   ButterworthFilter butterworth_filter_;
   PolynomialFilter polynomial_filter_for_acc_inputs_, polynomial_filter_for_steer_inputs_;
+  InputsSchedulePrediction inputs_schedule_prediction_;
   int sg_window_size_for_d_inputs_schedule_, sg_deg_for_d_inputs_schedule_;
   bool use_sg_for_d_inputs_schedule_;
   double wheel_base_ = 2.79;
@@ -701,6 +725,7 @@ private:
   std::string input_filter_mode_ = "none";
   bool steer_controller_prediction_aided_ = false;
   double start_time_;
+  bool use_inputs_schedule_prediction_ = false;
 public:
   bool use_controller_steer_input_schedule_ = false;
   VehicleAdaptor();

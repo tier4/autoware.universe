@@ -16,6 +16,12 @@ acc_time_constant = float(nominal_param["nominal_parameter"]["acceleration"]["ac
 steer_time_delay = float(nominal_param["nominal_parameter"]["steering"]["steer_time_delay"])
 steer_time_constant = float(nominal_param["nominal_parameter"]["steering"]["steer_time_constant"])
 
+
+
+
+
+
+
 mpc_param_path = (
     package_path["path"] + "/autoware_vehicle_adaptor/param/nominal_ilqr/mpc_param.yaml"
 )
@@ -42,3 +48,15 @@ add_yaw_to_prediction = bool(trained_model_param["trained_model_parameter"]["set
 integrate_states = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_states"])
 integrate_vel = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_vel"])
 integrate_yaw = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_yaw"])
+optimization_param_path = (
+    package_path["path"] + "/autoware_vehicle_adaptor/param/optimization_param.yaml"
+)
+
+
+with open(optimization_param_path, "r") as yml:
+    optimization_param = yaml.safe_load(yml)
+acc_queue_size = int(trained_model_param["trained_model_parameter"]["queue_size"]["acc_queue_size"])
+steer_queue_size = int(trained_model_param["trained_model_parameter"]["queue_size"]["steer_queue_size"])
+control_dt = 0.033
+acc_delay_step = round(acc_time_delay / control_dt)
+steer_delay_step = round(steer_time_delay / control_dt)

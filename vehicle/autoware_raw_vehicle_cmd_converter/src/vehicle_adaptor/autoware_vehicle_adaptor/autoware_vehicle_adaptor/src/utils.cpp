@@ -14,28 +14,28 @@
 
 namespace py = pybind11;
 using namespace Proxima;
-Eigen::VectorXd tanh(const Eigen::VectorXd & v)
-{
-  return v.array().tanh();
-}
+//Eigen::VectorXd tanh(const Eigen::VectorXd & v)
+//{
+//  return v.array().tanh();
+//}
 Eigen::VectorXd d_tanh(const Eigen::VectorXd & v)
 {
   return 1 / (v.array().cosh() * v.array().cosh());
 }
-Eigen::VectorXd sigmoid(const Eigen::VectorXd & v)
-{
-  return 0.5 * (0.5 * v).array().tanh() + 0.5;
-}
-Eigen::VectorXd relu(const Eigen::VectorXd & x)
-{
-  Eigen::VectorXd x_ = x;
-  for (int i = 0; i < x.size(); i++) {
-    if (x[i] < 0) {
-      x_[i] = 0;
-    }
-  }
-  return x_;
-}
+//Eigen::VectorXd sigmoid(const Eigen::VectorXd & v)
+//{
+//  return 0.5 * (0.5 * v).array().tanh() + 0.5;
+//}
+//Eigen::VectorXd relu(const Eigen::VectorXd & x)
+//{
+ // Eigen::VectorXd x_ = x;
+//  for (int i = 0; i < x.size(); i++) {
+//    if (x[i] < 0) {
+//      x_[i] = 0;
+//    }
+//  }
+//  return x_;
+//}
 Eigen::VectorXd d_relu(const Eigen::VectorXd & x)
 {
   Eigen::VectorXd result = Eigen::VectorXd::Ones(x.size());
@@ -142,7 +142,7 @@ std::string get_param_dir_path()
   std::string param_dir_path = build_path + "/autoware_vehicle_adaptor/param";
   return param_dir_path;
 }
-
+/*
 Eigen::VectorXd interpolate_eigen(Eigen::VectorXd y, std::vector<double> time_stamp_obs, std::vector<double> time_stamp_new)
 {
   Eigen::VectorXd y_new = Eigen::VectorXd(time_stamp_new.size());
@@ -181,6 +181,7 @@ std::vector<Eigen::VectorXd> interpolate_vector(std::vector<Eigen::VectorXd> y, 
   }
   return y_new;
 }
+*/
 Eigen::VectorXd states_vehicle_to_world(Eigen::VectorXd states_vehicle, double yaw)
 {
   Eigen::VectorXd states_world = states_vehicle;
@@ -195,7 +196,7 @@ Eigen::VectorXd states_world_to_vehicle(Eigen::VectorXd states_world, double yaw
   states_vehicle[1] = -states_world[0] * std::sin(yaw) + states_world[1] * std::cos(yaw);
   return states_vehicle;
 }
-
+/*
 Eigen::MatrixXd read_csv(std::string file_path)
 {
   std::string build_path = BUILD_PATH;
@@ -225,6 +226,7 @@ Eigen::MatrixXd read_csv(std::string file_path)
   }
   return data;
 }
+*/
 ///////////////// Polynomial Regression ///////////////////////
 
   PolynomialRegression::PolynomialRegression() {}
@@ -1352,6 +1354,44 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
   Eigen::VectorXd TrainedDynamics::get_compensation_bias(){
     return linear_regression_compensation_.get_bias();
   }
+  Eigen::VectorXd TrainedDynamics::F_with_model_for_calc_controller_prediction_error(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
+    const Eigen::VectorXd & steer_input_history_concat, 
+    Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm, Eigen::VectorXd & previous_error, const int horizon)
+  {
+    Eigen::VectorXd states_next = nominal_dynamics_.F_with_input_history(
+      states, acc_input_history_concat, steer_input_history_concat);
+
+    Eigen::VectorXd NN_input = Eigen::VectorXd::Zero(3 + acc_queue_size_ + steer_queue_size_+2*predict_step_ );
+    NN_input << states[vel_index_], states[acc_index_], states[steer_index_],
+      acc_input_history_concat, steer_input_history_concat;
+    
+    Eigen::VectorXd h_lstm_next, c_lstm_next, NN_output;
+    transform_model_to_eigen_.error_prediction(
+      NN_input, h_lstm, c_lstm, h_lstm_next, c_lstm_next, NN_output);
+    if (horizon == 0) {
+      previous_error = error_decay_rate_* previous_error +
+                       (1 - error_decay_rate_) * NN_output;
+    } else {
+      previous_error =
+        double_power(error_decay_rate_, predict_step_) * previous_error +
+        (1.0 - double_power(error_decay_rate_, predict_step_)) * NN_output;
+    }
+    double yaw = states[yaw_index_];
+    for (int i = 0; i< int(state_component_predicted_index_.size()); i++) {
+      if (state_component_predicted_index_[i] == x_index_) {
+        states_next[x_index_] += previous_error[i] * predict_dt_ * std::cos(yaw) - previous_error[i+1] * predict_dt_ * std::sin(yaw);
+      } else if (state_component_predicted_index_[i] == y_index_) {
+        states_next[y_index_] += previous_error[i-1] * predict_dt_ * std::sin(yaw) + previous_error[i] * predict_dt_ * std::cos(yaw);
+      } else {
+        states_next[state_component_predicted_index_[i]] += previous_error[i] * predict_dt_;
+      }
+    }
+    h_lstm = h_lstm_next;
+    c_lstm = c_lstm_next;
+
+    return states_next;
+  }
   Eigen::VectorXd TrainedDynamics::F_with_model_for_compensation(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat, 
@@ -1621,13 +1661,16 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
   void TrainedDynamics::calc_forward_trajectory_with_diff(Eigen::VectorXd states, Eigen::VectorXd acc_input_history,
                                          Eigen::VectorXd steer_input_history, std::vector<Eigen::VectorXd> d_inputs_schedule,
                                          const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-                                         Eigen::VectorXd & previous_error, std::vector<Eigen::VectorXd> & states_prediction,
-                                         std::vector<Eigen::MatrixXd> & dF_d_states, std::vector<Eigen::MatrixXd> & dF_d_inputs)
+                                         const Eigen::VectorXd & previous_error, std::vector<Eigen::VectorXd> & states_prediction,
+                                         std::vector<Eigen::MatrixXd> & dF_d_states, std::vector<Eigen::MatrixXd> & dF_d_inputs,
+                                         std::vector<Eigen::Vector2d> & inputs_schedule)
   {
     int horizon_len = d_inputs_schedule.size();
+    Eigen::VectorXd previous_error_tmp = previous_error;
     states_prediction = std::vector<Eigen::VectorXd>(horizon_len + 1);
     dF_d_states = std::vector<Eigen::MatrixXd>(horizon_len);
     dF_d_inputs = std::vector<Eigen::MatrixXd>(horizon_len);
+    inputs_schedule = std::vector<Eigen::Vector2d>(horizon_len);
     std::vector<Eigen::MatrixXd> A_vec(horizon_len), B_vec(horizon_len), C_vec(horizon_len);
     states_prediction[0] = states;
     Eigen::VectorXd acc_input_history_tmp, steer_input_history_tmp, h_lstm_tmp, c_lstm_tmp;
@@ -1643,7 +1686,9 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
       states_prediction[i + 1] = F_with_model_diff(
         states_prediction[i], acc_input_history_tmp, steer_input_history_tmp,
         d_inputs, h_lstm_tmp, c_lstm_tmp,
-        previous_error, i, A, B, C);
+        previous_error_tmp, i, A, B, C);
+      inputs_schedule[i][0] = acc_input_history_tmp[acc_input_history_tmp.size() - predict_step_];
+      inputs_schedule[i][1] = steer_input_history_tmp[steer_input_history_tmp.size() - predict_step_];
 
       A_vec[i] = A;
       B_vec[i] = B;
@@ -1654,6 +1699,11 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
 ///////////////// AdaptorILQR ///////////////////////
   
   AdaptorILQR::AdaptorILQR() {
+    set_params();
+  }
+  AdaptorILQR::~AdaptorILQR() {}
+  void AdaptorILQR::set_params()
+  {
     YAML::Node optimization_param_node = YAML::LoadFile(get_param_dir_path() + "/optimization_param.yaml");
     bool add_position_to_ilqr = optimization_param_node["optimization_parameter"]["ilqr"]["add_position_to_ilqr"].as<bool>();
     bool add_yaw_to_ilqr = optimization_param_node["optimization_parameter"]["ilqr"]["add_yaw_to_ilqr"].as<bool>();
@@ -1664,8 +1714,17 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
       state_component_ilqr_.insert(state_component_ilqr_.begin(), "y");
       state_component_ilqr_.insert(state_component_ilqr_.begin(), "x");
     }
+    acc_input_weight_vel_error_target_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["acc_input_weight_vel_error_target_table"].as<std::vector<double>>();
+    acc_input_weight_vel_error_domain_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["acc_input_weight_vel_error_domain_table"].as<std::vector<double>>();
+    acc_input_weight_acc_error_target_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["acc_input_weight_acc_error_target_table"].as<std::vector<double>>();
+    acc_input_weight_acc_error_domain_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["acc_input_weight_acc_error_domain_table"].as<std::vector<double>>();
+    steer_input_weight_lateral_error_target_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_lateral_error_target_table"].as<std::vector<double>>();
+    steer_input_weight_lateral_error_domain_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_lateral_error_domain_table"].as<std::vector<double>>();
+    steer_input_weight_yaw_error_target_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_yaw_error_target_table"].as<std::vector<double>>();
+    steer_input_weight_yaw_error_domain_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_yaw_error_domain_table"].as<std::vector<double>>();
+    steer_input_weight_steer_error_target_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_steer_error_target_table"].as<std::vector<double>>();
+    steer_input_weight_steer_error_domain_table_ = optimization_param_node["optimization_parameter"]["weight_parameter"]["steer_input_weight_steer_error_domain_table"].as<std::vector<double>>();
   }
-  AdaptorILQR::~AdaptorILQR() {}
   void AdaptorILQR::set_states_cost(
     double x_cost, double y_cost, double vel_cost, double yaw_cost, double acc_cost, double steer_cost
   )
@@ -1824,8 +1883,9 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     std::vector<Eigen::MatrixXd> D_inputs_schedule, const Eigen::VectorXd & h_lstm,
     const Eigen::VectorXd & c_lstm,
     const Eigen::VectorXd & previous_error, std::vector<Eigen::MatrixXd> & states_prediction,
-    const std::vector<Eigen::VectorXd> & states_ref,
-    const std::vector<Eigen::VectorXd> & d_input_ref, Eigen::VectorXd & Cost)
+    const std::vector<Eigen::VectorXd> & states_ref, const std::vector<Eigen::VectorXd> & d_input_ref, 
+    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight,
+    Eigen::VectorXd & Cost)
   {
     int sample_size = D_inputs_schedule[0].cols();
     Cost = Eigen::VectorXd::Zero(sample_size);
@@ -1886,6 +1946,8 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
       if (i > 0){
         Cost += 0.5 * acc_rate_rate_cost_ * (D_inputs.row(0).array() - D_inputs_schedule[i-1].row(0).array()).square().matrix();
         Cost += 0.5 * steer_rate_rate_cost_ * (D_inputs.row(1).array() - D_inputs_schedule[i-1].row(1).array()).square().matrix();
+        Cost += 0.5 * acc_input_weight * (Acc_input_history.row(acc_queue_size_ - predict_step_).array() - inputs_ref[i - 1][0]).square().matrix();
+        Cost += 0.5 * steer_input_weight * (Steer_input_history.row(steer_queue_size_ - predict_step_).array() - inputs_ref[i - 1][1]).square().matrix();
       }
       states_prediction[i + 1] = trained_dynamics_.F_with_model_for_candidates(
         states_prediction[i], Acc_input_history, Steer_input_history, 
@@ -1912,6 +1974,76 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     //Cost += 0.5 * acc_terminal_cost_ * (states_prediction[horizon_len_].row(acc_index_).array() - states_ref[horizon_len_][acc_index_]).square().matrix();
 
     //Cost += 0.5 * steer_terminal_cost_ * (states_prediction[horizon_len_].row(steer_index_).array() - states_ref[horizon_len_][steer_index_]).square().matrix();
+  }
+  void AdaptorILQR::calc_inputs_ref_info(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history,
+    const Eigen::VectorXd & steer_input_history, const Eigen::VectorXd & h_lstm,
+    const Eigen::VectorXd & c_lstm, 
+    const Eigen::VectorXd & previous_error, const std::vector<Eigen::VectorXd> & states_ref,
+    const Eigen::VectorXd & acc_controller_input_schedule, const Eigen::VectorXd & steer_controller_input_schedule,
+    std::vector<Eigen::Vector2d> & inputs_ref, double & acc_input_weight, double & steer_input_weight)
+  {
+    Eigen::VectorXd acc_input_history_concat(acc_queue_size_ + predict_step_);
+    Eigen::VectorXd steer_input_history_concat(steer_queue_size_ + predict_step_);
+    acc_input_history_concat.head(acc_queue_size_) = acc_input_history;
+    steer_input_history_concat.head(steer_queue_size_) = steer_input_history;
+    acc_input_history_concat.tail(predict_step_) = acc_controller_input_schedule.head(predict_step_);
+    steer_input_history_concat.tail(predict_step_) = steer_controller_input_schedule.head(predict_step_);
+    std::vector<Eigen::VectorXd> states_prediction_by_controller_inputs(horizon_len_ + 1);
+    states_prediction_by_controller_inputs[0] = states;
+    Eigen::VectorXd previous_error_tmp = previous_error;
+    Eigen::VectorXd h_lstm_tmp = h_lstm;
+    Eigen::VectorXd c_lstm_tmp = c_lstm;
+    inputs_ref = std::vector<Eigen::Vector2d>(horizon_len_);
+    double max_vel_error = 0.0;
+    double max_lateral_error = 0.0;
+    double max_acc_error = 0.0;
+    double max_steer_error = 0.0;
+    double max_yaw_error = 0.0;
+    for (int i = 0; i< horizon_len_; i++) {
+      if (i > 0){
+        acc_input_history_concat.head(acc_queue_size_) = acc_input_history_concat.tail(acc_queue_size_);
+        steer_input_history_concat.head(steer_queue_size_) = steer_input_history_concat.tail(steer_queue_size_);
+        acc_input_history_concat.tail(predict_step_) = acc_controller_input_schedule.segment(i*predict_step_, predict_step_);
+        steer_input_history_concat.tail(predict_step_) = steer_controller_input_schedule.segment(i*predict_step_, predict_step_);        
+      }
+      inputs_ref[i][0] = acc_controller_input_schedule[i*predict_step_];
+      inputs_ref[i][1] = steer_controller_input_schedule[i*predict_step_];
+      states_prediction_by_controller_inputs[i + 1] = trained_dynamics_.F_with_model_for_calc_controller_prediction_error(
+        states_prediction_by_controller_inputs[i], acc_input_history_concat, steer_input_history_concat,
+        h_lstm_tmp, c_lstm_tmp, previous_error_tmp, i);
+      double vel_error = std::abs(states_ref[i+1][vel_index_] - states_prediction_by_controller_inputs[i + 1][vel_index_]);
+      double acc_error = std::abs(states_ref[i+1][acc_index_] - states_prediction_by_controller_inputs[i + 1][acc_index_]);
+      double steer_error = std::abs(states_ref[i+1][steer_index_] - states_prediction_by_controller_inputs[i + 1][steer_index_]);
+      double yaw = states_ref[i+1][yaw_index_];
+      double lateral_error = std::abs(- std::sin(yaw) * (states_ref[i+1][x_index_] - states_prediction_by_controller_inputs[i + 1][x_index_])
+                                 + std::cos(yaw) * (states_ref[i+1][y_index_] - states_prediction_by_controller_inputs[i + 1][y_index_]));
+      double yaw_error = std::abs(states_ref[i+1][yaw_index_] - states_prediction_by_controller_inputs[i + 1][yaw_index_]);
+      if (vel_error > max_vel_error) {
+        max_vel_error = vel_error;
+      }
+      if (lateral_error > max_lateral_error) {
+        max_lateral_error = lateral_error;
+      }
+      if (acc_error > max_acc_error) {
+        max_acc_error = acc_error;
+      }
+      if (steer_error > max_steer_error) {
+        max_steer_error = steer_error;
+      }
+      if (yaw_error > max_yaw_error) {
+        max_yaw_error = yaw_error;
+      }
+    }
+    acc_input_weight = std::min(
+      calc_table_value(max_vel_error, acc_input_weight_vel_error_domain_table_, acc_input_weight_vel_error_target_table_),
+      calc_table_value(max_acc_error, acc_input_weight_acc_error_domain_table_, acc_input_weight_acc_error_target_table_));
+    steer_input_weight = std::min(
+      {
+      calc_table_value(max_lateral_error, steer_input_weight_lateral_error_domain_table_, steer_input_weight_lateral_error_target_table_),
+      calc_table_value(max_steer_error, steer_input_weight_steer_error_domain_table_, steer_input_weight_steer_error_target_table_),
+      calc_table_value(max_yaw_error, steer_input_weight_yaw_error_domain_table_, steer_input_weight_yaw_error_target_table_)
+      });
   }
   Eigen::MatrixXd AdaptorILQR::extract_dF_d_state(Eigen::MatrixXd dF_d_state_with_history)
   {
@@ -2002,6 +2134,7 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     const std::vector<Eigen::VectorXd> & states_prediction, const std::vector<Eigen::VectorXd> & d_inputs_schedule,
     const std::vector<Eigen::VectorXd> & states_ref,
     const std::vector<Eigen::VectorXd> & d_input_ref, const double prev_acc_rate, const double prev_steer_rate,
+    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight, const std::vector<Eigen::Vector2d> & inputs_schedule,
     std::vector<Eigen::MatrixXd> & K, std::vector<Eigen::VectorXd> & k)
   {
     K = std::vector<Eigen::MatrixXd>(horizon_len_);
@@ -2030,6 +2163,13 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
         w(2*h_dim_ + j) = steer_terminal_cost_ * (states_prediction[horizon_len_][steer_index_] - states_ref[horizon_len_][steer_index_]);
       } 
     }
+
+    P(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_, 2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_) = acc_input_weight;
+    P(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_, 2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_) = steer_input_weight;
+    w(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_) = acc_input_weight * (inputs_schedule[horizon_len_-1][0] - inputs_ref[horizon_len_-1][0]);
+    w(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_) = steer_input_weight * (inputs_schedule[horizon_len_-1][1] - inputs_ref[horizon_len_-1][1]);
+    //P(num_state_component_ilqr_ + 2*h_dim_ + acc_queue_size_ - predict_step_, num_state_component_ilqr_ + 2*h_dim_ + acc_queue_size_ - predict_step_) = acc_input_weight;
+    //P(num_state_component_ilqr_ + 2*h_dim_ + acc_queue_size_ + steer_queue_size_ - predict_step_, num_state_component_ilqr_ + 2*h_dim_ + acc_queue_size_ + steer_queue_size_ - predict_step_) = steer_input_weight;
 
     //P(2*h_dim_ + 1, 2*h_dim_ + 1) = acc_terminal_cost_;
     //P(2*h_dim_ + 2, 2*h_dim_ + 2) = steer_terminal_cost_;
@@ -2100,6 +2240,12 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
           w(2*h_dim_ + j) += steer_cost * (states_prediction[i][steer_index_] - states_ref[i][steer_index_]);
         }
       }
+      if (i>0){
+        P(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_, 2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_) += acc_input_weight;
+        P(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_, 2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_) += steer_input_weight;
+        w(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ - predict_step_) += acc_input_weight * (inputs_schedule[i-1][0] - inputs_ref[i-1][0]);
+        w(2*h_dim_ + num_state_component_ilqr_ + acc_queue_size_ + steer_queue_size_ - predict_step_) += steer_input_weight * (inputs_schedule[i-1][1] - inputs_ref[i-1][1]);
+      }
       //P(2*h_dim_ + 1, 2*h_dim_ + 1) += acc_cost;
       //P(2*h_dim_ + 2, 2*h_dim_ + 2) += steer_cost;
       //w(2*h_dim_ + 1) += acc_cost * (states_prediction[i][acc_index_] - states_ref[i][acc_index_]);
@@ -2138,21 +2284,32 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
                               const std::vector<Eigen::VectorXd> & states_ref,
                               const std::vector<Eigen::VectorXd> & d_input_ref, Eigen::VectorXd & previous_error,
                               std::vector<Eigen::VectorXd> & states_prediction,
+                              const Eigen::VectorXd & acc_controller_input_schedule, const Eigen::VectorXd & steer_controller_input_schedule,
                               double & acc_input, double & steer_input)
   {
+    std::vector<Eigen::Vector2d> inputs_ref;
+    double acc_input_weight, steer_input_weight;
+    calc_inputs_ref_info(
+      states, acc_input_history, steer_input_history, h_lstm, c_lstm, previous_error, states_ref,
+      acc_controller_input_schedule, steer_controller_input_schedule,
+      inputs_ref, acc_input_weight, steer_input_weight);
     std::vector<Eigen::MatrixXd> dF_d_states, dF_d_inputs;
-    trained_dynamics_.calc_forward_trajectory_with_diff(states, acc_input_history, steer_input_history, d_inputs_schedule, h_lstm, c_lstm, previous_error, states_prediction, dF_d_states, dF_d_inputs);
+    std::vector<Eigen::Vector2d> inputs_schedule;
+    trained_dynamics_.calc_forward_trajectory_with_diff(states, acc_input_history, steer_input_history, d_inputs_schedule,
+                      h_lstm, c_lstm, previous_error, states_prediction, dF_d_states, dF_d_inputs, inputs_schedule);
     std::vector<Eigen::MatrixXd> K;
     std::vector<Eigen::VectorXd> k;
     double prev_acc_rate = (acc_input_history[acc_queue_size_ - 1] - acc_input_history[acc_queue_size_ - 2])/control_dt_;
     double prev_steer_rate = (steer_input_history[steer_queue_size_ - 1] - steer_input_history[steer_queue_size_ - 2])/control_dt_;
-    compute_ilqr_coefficients(dF_d_states, dF_d_inputs, states_prediction, d_inputs_schedule, states_ref, d_input_ref, prev_acc_rate, prev_steer_rate, K, k);
+    compute_ilqr_coefficients(dF_d_states, dF_d_inputs, states_prediction, d_inputs_schedule, states_ref, d_input_ref, prev_acc_rate, prev_steer_rate,
+    inputs_ref, acc_input_weight, steer_input_weight, inputs_schedule,K, k);
     Eigen::VectorXd ls_points = Eigen::VectorXd::LinSpaced(11, 0.0, 1.0);
 
     std::vector<Eigen::MatrixXd> D_inputs_schedule = calc_line_search_candidates(K, k, dF_d_states, dF_d_inputs, d_inputs_schedule, ls_points);
     Eigen::VectorXd Cost;
     std::vector<Eigen::MatrixXd> States_prediction;
-    calc_forward_trajectory_with_cost(states, acc_input_history, steer_input_history, D_inputs_schedule, h_lstm, c_lstm, previous_error, States_prediction, states_ref, d_input_ref, Cost);
+    calc_forward_trajectory_with_cost(states, acc_input_history, steer_input_history, D_inputs_schedule, h_lstm, c_lstm, previous_error, States_prediction, states_ref, d_input_ref,
+      inputs_ref, acc_input_weight, steer_input_weight, Cost);
     int min_index;
     Cost.minCoeff(&min_index);
     
@@ -2182,6 +2339,7 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
   VehicleAdaptor::~VehicleAdaptor() {}
   void VehicleAdaptor::set_params()
   {
+    adaptor_ilqr_.set_params();
     std::string param_dir_path = get_param_dir_path();
     YAML::Node nominal_param_node = YAML::LoadFile(param_dir_path + "/nominal_param.yaml");
     wheel_base_ = nominal_param_node["nominal_parameter"]["vehicle_info"]["wheel_base"].as<double>();
@@ -2291,7 +2449,6 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
 
     reflect_controller_d_input_ratio_ = optimization_param_node["optimization_parameter"]["ilqr"]["reflect_controller_d_input_ratio"].as<double>();
     use_controller_inputs_as_target_ = optimization_param_node["optimization_parameter"]["ilqr"]["use_controller_inputs_as_target"].as<bool>();
-    butterworth_filter_.set_params();
     int deg_for_acc_inputs_polynomial_filter = optimization_param_node["optimization_parameter"]["input_filter"]["deg_for_acc_inputs_polynomial_filter"].as<int>();
     int sample_num_for_acc_inputs_polynomial_filter = optimization_param_node["optimization_parameter"]["input_filter"]["sample_num_for_acc_inputs_polynomial_filter"].as<int>();
     double lam_for_acc_inputs_polynomial_filter = optimization_param_node["optimization_parameter"]["input_filter"]["lam_for_acc_inputs_polynomial_filter"].as<double>();
@@ -2309,8 +2466,15 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     lam_for_steer_inputs_polynomial_filter,
     minimum_decay_for_steer_inputs_polynomial_filter);
     input_filter_mode_ = optimization_param_node["optimization_parameter"]["input_filter"]["input_filter_mode"].as<std::string>();
-
+    if (input_filter_mode_ == "butterworth"){
+      butterworth_filter_.set_params();
+    }
     use_controller_steer_input_schedule_ = optimization_param_node["optimization_parameter"]["autoware_alignment"]["use_controller_steer_input_schedule"].as<bool>();
+
+    use_inputs_schedule_prediction_ = optimization_param_node["optimization_parameter"]["inputs_schedule_prediction_NN"]["use_inputs_schedule_prediction"].as<bool>();
+    if (use_inputs_schedule_prediction_){
+      inputs_schedule_prediction_.set_params(horizon_len_*predict_step_, horizon_len_ * predict_step_ -1 , control_dt_, "inputs_schedule_prediction_model");
+    }
   }
   void VehicleAdaptor::set_NN_params(
     const Eigen::MatrixXd & weight_acc_layer_1, const Eigen::MatrixXd & weight_steer_layer_1,
@@ -2400,6 +2564,11 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
   }
   void VehicleAdaptor::set_controller_steer_input_schedule(double timestamp, const std::vector<double> & steer_controller_input_schedule)
   {
+    if (int(steer_controller_input_schedule.size()) < horizon_len_ + 1)
+    {
+      std::cerr << "steer_controller_input_schedule size is smaller than horizon_len" << std::endl;
+      return;
+    }
     Eigen::VectorXd steer_schedule(steer_controller_input_schedule.size());
     std::vector<double> timestamp_horizon(steer_controller_input_schedule.size());
     std::vector<double> timestamp_new(steer_controller_input_schedule.size() - 1);
@@ -2440,7 +2609,6 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     steer_controller_prediction_ = steer_controller_prediction;
     if (!initialized_)
     {
-
       set_params();
       states_ref_mode_ = "controller_prediction";
       YAML::Node optimization_param_node = YAML::LoadFile(get_param_dir_path() + "/optimization_param.yaml"); 
@@ -2580,16 +2748,113 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
       //state_history_lstm_.push_back(states);
     }
 
-    double acc_rate_cost, steer_rate_cost;
+    // update lstm states //
+    Eigen::VectorXd h_lstm = Eigen::VectorXd::Zero(h_dim_);
+    Eigen::VectorXd c_lstm = Eigen::VectorXd::Zero(h_dim_);
+    Eigen::VectorXd h_lstm_compensation = Eigen::VectorXd::Zero(h_dim_);
+    Eigen::VectorXd c_lstm_compensation = Eigen::VectorXd::Zero(h_dim_);
+    for (int i = 0; i<update_lstm_len_; i++) {
+
+      Eigen::VectorXd states_tmp = state_history_lstm_[predict_step_*i];
+      Eigen::VectorXd acc_input_history_concat = Eigen::VectorXd::Zero(acc_queue_size_ + predict_step_);
+      Eigen::VectorXd steer_input_history_concat = Eigen::VectorXd::Zero(steer_queue_size_ + predict_step_);
+      acc_input_history_concat.head(acc_queue_size_) = acc_input_history_lstm_[predict_step_*i];
+      steer_input_history_concat.head(steer_queue_size_) = steer_input_history_lstm_[predict_step_*i];
+
+
+      for (int j = 0; j < predict_step_; j++) {
+        acc_input_history_concat[acc_queue_size_ + j] = acc_input_history_lstm_[predict_step_*i + j + 1][acc_queue_size_ - 1];
+        steer_input_history_concat[steer_queue_size_ + j] = steer_input_history_lstm_[predict_step_*i + j + 1][steer_queue_size_ - 1];
+      }
+      if (i == update_lstm_len_ - compensation_lstm_len_){
+        h_lstm_compensation = h_lstm;
+        c_lstm_compensation = c_lstm;
+      }
+      adaptor_ilqr_.update_lstm_states(states_tmp, acc_input_history_concat, steer_input_history_concat, h_lstm, c_lstm);
+    }
+
+///////// calculate states_ref /////////
+    double acc_rate_cost = acc_rate_cost_;
+    double steer_rate_cost = steer_rate_cost_;
     std::vector<Eigen::VectorXd> states_ref(horizon_len_ + 1);
-    if (states_ref_mode_ == "predict_by_polynomial_regression" || states_ref_mode_ == "controller_d_inputs_schedule" || states_ref_mode_ == "controller_d_steer_schedule")
+
+    // calculate controller input history with schedule //
+    Eigen::VectorXd acc_controller_input_history_with_schedule = Eigen::VectorXd::Zero(controller_acc_input_history_len_+predict_step_*horizon_len_-1);
+    Eigen::VectorXd steer_controller_input_history_with_schedule = Eigen::VectorXd::Zero(controller_steer_input_history_len_+predict_step_*horizon_len_-1);
+    acc_controller_input_history_with_schedule.head(controller_acc_input_history_len_) = acc_controller_input_history_;
+    steer_controller_input_history_with_schedule.head(controller_steer_input_history_len_) = steer_controller_input_history_;
+
+    Eigen::VectorXd acc_controller_inputs_prediction_by_NN(horizon_len_*predict_step_-1);
+    Eigen::VectorXd steer_controller_inputs_prediction_by_NN(horizon_len_*predict_step_-1);
+    Eigen::VectorXd inputs_schedule_predictor_states(5);
+    inputs_schedule_predictor_states << states[vel_index_], states[acc_index_], states[steer_index_], acc_controller_input, steer_controller_input;
+    if (use_inputs_schedule_prediction_)
     {
-      Eigen::VectorXd acc_controller_input_history_with_schedule = Eigen::VectorXd::Zero(controller_acc_input_history_len_+predict_step_*horizon_len_-1);
-      Eigen::VectorXd steer_controller_input_history_with_schedule = Eigen::VectorXd::Zero(controller_steer_input_history_len_+predict_step_*horizon_len_-1);
-      acc_controller_input_history_with_schedule.head(controller_acc_input_history_len_) = acc_controller_input_history_;
-      steer_controller_input_history_with_schedule.head(controller_steer_input_history_len_) = steer_controller_input_history_;
+      std::vector<Eigen::VectorXd> controller_inputs_prediction_by_NN = inputs_schedule_prediction_.get_inputs_schedule_predicted(inputs_schedule_predictor_states, time_stamp);
+      for (int i = 0; i < horizon_len_ * predict_step_ - 1; i++)
+      {
+        acc_controller_inputs_prediction_by_NN[i] = controller_inputs_prediction_by_NN[i][0];
+        steer_controller_inputs_prediction_by_NN[i] = controller_inputs_prediction_by_NN[i][1];
+      }
+    }
+    
 
 
+
+    if (states_ref_mode_ == "controller_d_steer_schedule")
+    {
+      for (int i = 0; i<int(d_inputs_schedule_.size()); i++){
+        d_inputs_schedule_[i][1] = (1 - reflect_controller_d_input_ratio_)*d_inputs_schedule_[i][1];
+        d_inputs_schedule_[i][1] += reflect_controller_d_input_ratio_*steer_controller_d_inputs_schedule_[i];
+      }
+      Eigen::VectorXd acc_controller_input_history_diff = (acc_controller_input_history_.tail(acc_controller_input_history_.size() - 1) - acc_controller_input_history_.head(acc_controller_input_history_.size() - 1))/control_dt_;
+      Eigen::VectorXd abs_acc_controller_input_history_diff = acc_controller_input_history_diff.cwiseAbs();
+      Eigen::VectorXd abs_steer_controller_d_inputs_schedule = steer_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
+
+      acc_rate_cost = calc_table_value(abs_acc_controller_input_history_diff.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
+      steer_rate_cost = calc_table_value(abs_steer_controller_d_inputs_schedule.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
+
+      Eigen::VectorXd acc_controller_input_prediction;
+      if (use_inputs_schedule_prediction_)
+      {
+        acc_controller_input_prediction = acc_controller_inputs_prediction_by_NN; 
+      }
+      else{
+        acc_controller_input_prediction = polynomial_reg_for_predict_acc_input_.predict(acc_controller_input_history_);
+      }
+      acc_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = acc_controller_input_prediction;
+      for (int i = 0; i< horizon_len_; i++) {
+        for (int j = 0; j< predict_step_; j++) {
+          if (i != 0 || j != 0)
+          {
+            steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j] = steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * steer_controller_d_inputs_schedule_[i];
+          }
+        }
+      }
+    }
+    else if (states_ref_mode_ == "controller_d_inputs_schedule")
+    {
+      for (int i = 0; i<int(d_inputs_schedule_.size()); i++){
+        d_inputs_schedule_[i] = (1 - reflect_controller_d_input_ratio_)*d_inputs_schedule_[i];
+        d_inputs_schedule_[i][0] += reflect_controller_d_input_ratio_*acc_controller_d_inputs_schedule_[i];
+        d_inputs_schedule_[i][1] += reflect_controller_d_input_ratio_*steer_controller_d_inputs_schedule_[i];
+      }
+      Eigen::VectorXd abs_acc_controller_d_inputs_schedule = acc_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
+      Eigen::VectorXd abs_steer_controller_d_inputs_schedule = steer_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
+      acc_rate_cost = calc_table_value(abs_acc_controller_d_inputs_schedule.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
+      steer_rate_cost = calc_table_value(abs_steer_controller_d_inputs_schedule.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
+      for (int i = 0; i< horizon_len_; i++) {
+        for (int j = 0; j< predict_step_; j++) {
+          if (i != 0 || j != 0)
+          {
+            acc_controller_input_history_with_schedule[controller_acc_input_history_len_ - 1 + i*predict_step_ + j] = acc_controller_input_history_with_schedule[controller_acc_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * acc_controller_d_inputs_schedule_[i];
+            steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j] = steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * steer_controller_d_inputs_schedule_[i];
+          }
+        }
+      }
+    }
+    else
+    {
       if (states_ref_mode_ == "predict_by_polynomial_regression")
       {
         Eigen::VectorXd acc_controller_input_history_diff = (acc_controller_input_history_.tail(acc_controller_input_history_.size() - 1) - acc_controller_input_history_.head(acc_controller_input_history_.size() - 1))/control_dt_;
@@ -2598,57 +2863,31 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
         Eigen::VectorXd abs_steer_controller_input_history_diff = steer_controller_input_history_diff.cwiseAbs();
         acc_rate_cost = calc_table_value(abs_acc_controller_input_history_diff.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
         steer_rate_cost = calc_table_value(abs_steer_controller_input_history_diff.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
-
-        Eigen::VectorXd acc_controller_input_prediction = polynomial_reg_for_predict_acc_input_.predict(acc_controller_input_history_);    
-        Eigen::VectorXd steer_controller_input_prediction = polynomial_reg_for_predict_steer_input_.predict(steer_controller_input_history_);
-        acc_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = acc_controller_input_prediction;
-        steer_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = steer_controller_input_prediction;
-      }
-      else if (states_ref_mode_ == "controller_d_steer_schedule")
-      {
-        for (int i = 0; i<int(d_inputs_schedule_.size()); i++){
-          d_inputs_schedule_[i][1] = (1 - reflect_controller_d_input_ratio_)*d_inputs_schedule_[i][1];
-          d_inputs_schedule_[i][1] += reflect_controller_d_input_ratio_*steer_controller_d_inputs_schedule_[i];
-        }
-        Eigen::VectorXd acc_controller_input_history_diff = (acc_controller_input_history_.tail(acc_controller_input_history_.size() - 1) - acc_controller_input_history_.head(acc_controller_input_history_.size() - 1))/control_dt_;
-        Eigen::VectorXd abs_acc_controller_input_history_diff = acc_controller_input_history_diff.cwiseAbs();
-        Eigen::VectorXd abs_steer_controller_d_inputs_schedule = steer_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
-
-        acc_rate_cost = calc_table_value(abs_acc_controller_input_history_diff.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
-        steer_rate_cost = calc_table_value(abs_steer_controller_d_inputs_schedule.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
-
-        Eigen::VectorXd acc_controller_input_prediction = polynomial_reg_for_predict_acc_input_.predict(acc_controller_input_history_);    
-        acc_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = acc_controller_input_prediction;
-        for (int i = 0; i< horizon_len_; i++) {
-          for (int j = 0; j< predict_step_; j++) {
-            if (i != 0 || j != 0)
-            {
-              steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j] = steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * steer_controller_d_inputs_schedule_[i];
-            }
-          }
-        }
       }
       else{
-        for (int i = 0; i<int(d_inputs_schedule_.size()); i++){
-          d_inputs_schedule_[i] = (1 - reflect_controller_d_input_ratio_)*d_inputs_schedule_[i];
-          d_inputs_schedule_[i][0] += reflect_controller_d_input_ratio_*acc_controller_d_inputs_schedule_[i];
-          d_inputs_schedule_[i][1] += reflect_controller_d_input_ratio_*steer_controller_d_inputs_schedule_[i];
-        }
-        Eigen::VectorXd abs_acc_controller_d_inputs_schedule = acc_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
-        Eigen::VectorXd abs_steer_controller_d_inputs_schedule = steer_controller_d_inputs_schedule_.head(horizon_len_).cwiseAbs();
-        acc_rate_cost = calc_table_value(abs_acc_controller_d_inputs_schedule.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
-        steer_rate_cost = calc_table_value(abs_steer_controller_d_inputs_schedule.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
-        for (int i = 0; i< horizon_len_; i++) {
-          for (int j = 0; j< predict_step_; j++) {
-            if (i != 0 || j != 0)
-            {
-              acc_controller_input_history_with_schedule[controller_acc_input_history_len_ - 1 + i*predict_step_ + j] = acc_controller_input_history_with_schedule[controller_acc_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * acc_controller_d_inputs_schedule_[i];
-              steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j] = steer_controller_input_history_with_schedule[controller_steer_input_history_len_ - 1 + i*predict_step_ + j -1] + control_dt_ * steer_controller_d_inputs_schedule_[i];
-            }
-          }
-        }
+        Eigen::VectorXd acc_controller_prediction_diff = (acc_controller_prediction_.tail(acc_controller_prediction_.size() - 1) - acc_controller_prediction_.head(acc_controller_prediction_.size() - 1))/predict_dt_;
+        Eigen::VectorXd steer_controller_prediction_diff = (steer_controller_prediction_.tail(steer_controller_prediction_.size() - 1) - steer_controller_prediction_.head(steer_controller_prediction_.size() - 1))/predict_dt_;
+        Eigen::VectorXd abs_acc_controller_prediction_diff = acc_controller_prediction_diff.head(horizon_len_).cwiseAbs();
+        Eigen::VectorXd abs_steer_controller_prediction_diff = steer_controller_prediction_diff.head(horizon_len_).cwiseAbs();
+        acc_rate_cost = calc_table_value(abs_acc_controller_prediction_diff.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
+        steer_rate_cost = calc_table_value(abs_steer_controller_prediction_diff.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
       }
-
+      Eigen::VectorXd acc_controller_input_prediction, steer_controller_input_prediction;
+      if (use_inputs_schedule_prediction_)
+      {
+        acc_controller_input_prediction = acc_controller_inputs_prediction_by_NN; 
+        steer_controller_input_prediction = steer_controller_inputs_prediction_by_NN;
+      }
+      else{
+        acc_controller_input_prediction = polynomial_reg_for_predict_acc_input_.predict(acc_controller_input_history_);
+        steer_controller_input_prediction = polynomial_reg_for_predict_steer_input_.predict(steer_controller_input_history_);
+      }
+      acc_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = acc_controller_input_prediction;
+      steer_controller_input_history_with_schedule.tail(predict_step_*horizon_len_ - 1) = steer_controller_input_prediction;
+    }
+      // calculate states_ref by controller inputs history with schedule //
+    if (states_ref_mode_ == "predict_by_polynomial_regression" || states_ref_mode_ == "controller_d_inputs_schedule" || states_ref_mode_ == "controller_d_steer_schedule")
+    {
       states_ref[0] = states;
       Eigen::VectorXd states_ref_tmp = states;
       for (int i = 0; i < horizon_len_; i++) {
@@ -2665,13 +2904,9 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
         states_ref[i + 1] = states_ref_tmp;
       }
     }
-    else{
-      Eigen::VectorXd acc_controller_prediction_diff = (acc_controller_prediction_.tail(acc_controller_prediction_.size() - 1) - acc_controller_prediction_.head(acc_controller_prediction_.size() - 1))/predict_dt_;
-      Eigen::VectorXd steer_controller_prediction_diff = (steer_controller_prediction_.tail(steer_controller_prediction_.size() - 1) - steer_controller_prediction_.head(steer_controller_prediction_.size() - 1))/predict_dt_;
-      Eigen::VectorXd abs_acc_controller_prediction_diff = acc_controller_prediction_diff.head(horizon_len_).cwiseAbs();
-      Eigen::VectorXd abs_steer_controller_prediction_diff = steer_controller_prediction_diff.head(horizon_len_).cwiseAbs();
-      acc_rate_cost = calc_table_value(abs_acc_controller_prediction_diff.maxCoeff(), acc_rate_input_table_, acc_rate_cost_coef_table_)*acc_rate_cost_;
-      steer_rate_cost = calc_table_value(abs_steer_controller_prediction_diff.maxCoeff(), steer_rate_input_table_, steer_rate_cost_coef_table_)*steer_rate_cost_;
+    if (states_ref_mode_ == "controller_prediction")
+    {//calculate states_ref by controller prediction
+
       states_ref = std::vector<Eigen::VectorXd>(horizon_len_ + 1,states);
       for (int i = 0; i< horizon_len_+1; i++) {
         states_ref[i][x_index_] = x_controller_prediction_[i];
@@ -2687,32 +2922,9 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
                               steer_rate_cost);
 
     std::vector<Eigen::VectorXd> d_input_ref(horizon_len_, Eigen::VectorXd::Zero(2));
-    Eigen::VectorXd h_lstm = Eigen::VectorXd::Zero(h_dim_);
-    Eigen::VectorXd c_lstm = Eigen::VectorXd::Zero(h_dim_);
-    Eigen::VectorXd h_lstm_compensation = Eigen::VectorXd::Zero(h_dim_);
-    Eigen::VectorXd c_lstm_compensation = Eigen::VectorXd::Zero(h_dim_);
-    // update lstm states //
-    for (int i = 0; i<update_lstm_len_; i++) {
 
-      Eigen::VectorXd states_tmp = state_history_lstm_[predict_step_*i];
-      Eigen::VectorXd acc_input_history_concat = Eigen::VectorXd::Zero(acc_queue_size_ + predict_step_);
-      Eigen::VectorXd steer_input_history_concat = Eigen::VectorXd::Zero(steer_queue_size_ + predict_step_);
-      acc_input_history_concat.head(acc_queue_size_) = acc_input_history_lstm_[predict_step_*i];
-      steer_input_history_concat.head(steer_queue_size_) = steer_input_history_lstm_[predict_step_*i];
-
-
-      for (int j = 0; j < predict_step_; j++) {
-        Eigen::Vector2d inputs_tmp;
-        acc_input_history_concat[acc_queue_size_ + j] = acc_input_history_lstm_[predict_step_*i + j + 1][acc_queue_size_ - 1];
-        steer_input_history_concat[steer_queue_size_ + j] = steer_input_history_lstm_[predict_step_*i + j + 1][steer_queue_size_ - 1];
-      }
-      if (i == update_lstm_len_ - compensation_lstm_len_){
-        h_lstm_compensation = h_lstm;
-        c_lstm_compensation = c_lstm;
-      }
-      adaptor_ilqr_.update_lstm_states(states_tmp, acc_input_history_concat, steer_input_history_concat, h_lstm, c_lstm);
-    }
     Eigen::VectorXd states_tmp_compensation = state_history_lstm_[predict_step_*(update_lstm_len_ - compensation_lstm_len_)];
+    Eigen::VectorXd previous_error_tmp = Eigen::VectorXd::Zero(previous_error_.size());
     for (int i = 0; i<compensation_lstm_len_; i++) {
       Eigen::VectorXd acc_input_history_concat = Eigen::VectorXd::Zero(acc_queue_size_ + predict_step_);
       Eigen::VectorXd steer_input_history_concat = Eigen::VectorXd::Zero(steer_queue_size_ + predict_step_);
@@ -2723,7 +2935,6 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
         steer_input_history_concat[steer_queue_size_ + j] = steer_input_history_lstm_[predict_step_*(update_lstm_len_ - compensation_lstm_len_ + i) + j + 1][steer_queue_size_ - 1];
       }
       adaptor_ilqr_.update_input_queue_for_compensation(states_tmp_compensation,acc_input_history_concat, steer_input_history_concat);
-      Eigen::VectorXd previous_error_tmp = Eigen::VectorXd::Zero(previous_error_.size());
       Eigen::VectorXd compensation = adaptor_ilqr_.prediction_for_compensation(states_tmp_compensation, acc_input_history_concat, steer_input_history_concat);
       states_tmp_compensation = adaptor_ilqr_.F_with_model_for_compensation(states_tmp_compensation, acc_input_history_concat, steer_input_history_concat, h_lstm_compensation, c_lstm_compensation, previous_error_tmp, i) + compensation;
     }
@@ -2736,7 +2947,11 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
         d_input_ref[i][1] = steer_controller_d_inputs_schedule_[i];
       }
     }
-    adaptor_ilqr_.compute_optimal_control(states, acc_input_history_, steer_input_history_, d_inputs_schedule_, h_lstm, c_lstm, states_ref, d_input_ref, previous_error_, states_prediction_, acc_input, steer_input);
+    adaptor_ilqr_.compute_optimal_control(
+      states, acc_input_history_, steer_input_history_, d_inputs_schedule_, h_lstm, c_lstm, states_ref, d_input_ref, previous_error_, states_prediction_, 
+      acc_controller_input_history_with_schedule.tail(predict_step_*horizon_len_), steer_controller_input_history_with_schedule.tail(predict_step_*horizon_len_),
+      acc_input, steer_input
+      );
 
     if (input_filter_mode_ == "butterworth"){
       Eigen::Vector2d inputs_tmp = Eigen::Vector2d(acc_input, steer_input);

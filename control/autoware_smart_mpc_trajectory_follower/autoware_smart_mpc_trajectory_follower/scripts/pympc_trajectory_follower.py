@@ -49,7 +49,7 @@ from tier4_debug_msgs.msg import Float32MultiArrayStamped
 from tier4_debug_msgs.msg import Float32Stamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
-from autoware_vehicle_adaptor.scripts import utils
+from autoware_vehicle_adaptor.src import utils
 from rclpy.parameter import Parameter
 class ControlStatus(Enum):
     DRIVE = 0

@@ -21,8 +21,11 @@ ament_auto_add_library(actuation_map_converter SHARED
 ament_auto_add_library(vehicle_adaptor SHARED
   src/vehicle_adaptor/vehicle_adaptor.cpp
   src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/utils.cpp
+  src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/inputs_prediction.cpp
 )
-
+target_include_directories(vehicle_adaptor PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/include
+)
 ament_auto_add_library(autoware_raw_vehicle_cmd_converter_node_component SHARED
   src/node.cpp
 )

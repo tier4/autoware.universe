@@ -209,6 +209,7 @@ class PythonSimulator:
         if "adaptive_gear_ratio_coef_sim_obs" in self.sim_setting_dict:
             self.adaptive_gear_ratio_coef_sim_obs = self.sim_setting_dict["adaptive_gear_ratio_coef_sim_obs"]
             self.use_adaptive_gear_ratio_obs = True
+        self.pure_pursuit_controller.initialize(self.sim_dt * self.control_step)
     def initialize_mpc_drive(self,initial_error,course_csv_data,use_vehicle_adaptor):
         self.common_initialization()
         #self.trajectory_data = np.loadtxt("supporting_data/slalom_course_data.csv", delimiter=",")
