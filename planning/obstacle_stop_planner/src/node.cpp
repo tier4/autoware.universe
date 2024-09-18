@@ -448,6 +448,7 @@ ObstacleStopPlannerNode::ObstacleStopPlannerNode(const rclcpp::NodeOptions & nod
     lpf_acc_ = std::make_shared<LowpassFilter1d>(0.0, p.lowpass_gain);
     const double max_yaw_deviation_deg = declare_parameter("max_yaw_deviation_deg", 90.0);
     p.max_yaw_deviation_rad = tier4_autoware_utils::deg2rad(max_yaw_deviation_deg);
+    p.enable_obstacle_detection = declare_parameter("enable_obstacle_detection", false);
   }
 
   {
@@ -753,7 +754,7 @@ void ObstacleStopPlannerNode::insertVelocity(
   const std_msgs::msg::Header & trajectory_header, const VehicleInfo & vehicle_info,
   const double current_acc, const double current_vel, const StopParam & stop_param)
 {
-  if (planner_data.stop_require && false) {
+  if (planner_data.stop_require && node_param_.enable_obstacle_detection) {
     // insert stop point
     const auto traj_end_idx = output.size() - 1;
     const auto idx = planner_data.decimate_trajectory_index_map.at(
@@ -772,7 +773,7 @@ void ObstacleStopPlannerNode::insertVelocity(
     }
   }
 
-  if (planner_data.slow_down_require && false) {
+  if (planner_data.slow_down_require && node_param_.enable_obstacle_detection) {
     // insert slow down point
     const auto traj_end_idx = output.size() - 1;
     const auto idx = planner_data.decimate_trajectory_index_map.at(
