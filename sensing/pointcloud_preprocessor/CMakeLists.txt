@@ -85,6 +85,7 @@ ament_auto_add_library(pointcloud_preprocessor_filter SHARED
   src/polygon_remover/polygon_remover.cpp
   src/vector_map_filter/vector_map_inside_area_filter.cpp
   src/utility/geometry.cpp
+  src/ring_filter/ring_filter.cpp
 )
 
 target_link_libraries(pointcloud_preprocessor_filter
@@ -200,6 +201,12 @@ target_link_libraries(polygon_remover_node gmp CGAL CGAL::CGAL CGAL::CGAL_Core)
 rclcpp_components_register_node(pointcloud_preprocessor_filter
   PLUGIN "pointcloud_preprocessor::VectorMapInsideAreaFilterComponent"
   EXECUTABLE vector_map_inside_area_filter_node)
+
+# ========== Ring Filter ===========
+rclcpp_components_register_node(pointcloud_preprocessor_filter
+  PLUGIN "pointcloud_preprocessor::RingFilterComponent"
+  EXECUTABLE ring_filter_node)
+
 
 install(
   TARGETS pointcloud_preprocessor_filter_base EXPORT export_${PROJECT_NAME}
