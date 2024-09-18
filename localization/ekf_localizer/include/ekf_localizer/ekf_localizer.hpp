@@ -128,6 +128,9 @@ private:
   double proc_cov_vx_d_;        //!< @brief  discrete process noise in d_vx=0
   double proc_cov_wz_d_;        //!< @brief  discrete process noise in d_wz=0
 
+  /* yaw_offset */
+  double yaw_offset_;        //!< @brief  yaw offset
+
   enum IDX {
     X = 0,
     Y = 1,

@@ -63,6 +63,8 @@ EKFLocalizer::EKFLocalizer(const std::string & node_name, const rclcpp::NodeOpti
     proc_stddev_yaw_bias_c_ = 0.0;
   }
 
+  yaw_offset_ = declare_parameter("yaw_offset", 0.0);
+
   /* convert to continuous to discrete */
   proc_cov_vx_d_ = std::pow(proc_stddev_vx_c_ * ekf_dt_, 2.0);
   proc_cov_wz_d_ = std::pow(proc_stddev_wz_c_ * ekf_dt_, 2.0);
@@ -332,6 +334,7 @@ void EKFLocalizer::callbackTwistWithCovariance(
   geometry_msgs::msg::TwistStamped twist;
   twist.header = msg->header;
   twist.twist = msg->twist.twist;
+  twist.twist.angular.z = twist.twist.angular.z + yaw_offset_; // add yaw_offset_
   current_twist_ptr_ = std::make_shared<geometry_msgs::msg::TwistStamped>(twist);
   current_twist_covariance_ = msg->twist.covariance;
 }

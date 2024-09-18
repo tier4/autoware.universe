@@ -26,6 +26,9 @@
   <arg name="proc_stddev_vx_c" default="5.0"/>
   <arg name="proc_stddev_wz_c" default="1.0"/>
 
+  <!-- yaw offset -->
+  <arg name="yaw_offset" default="0.0"/>
+
   <!-- output topic name -->
   <arg name="output_odom_name" default="ekf_odom"/>
   <arg name="output_pose_name" default="ekf_pose"/>
