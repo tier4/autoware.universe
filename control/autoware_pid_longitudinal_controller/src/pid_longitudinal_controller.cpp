@@ -877,7 +877,7 @@ PidLongitudinalController::Motion PidLongitudinalController::calcCtrlCmd(
       raw_ctrl_cmd.acc, control_data.current_motion.acc, acc_cmd);
 
     ctrl_cmd_as_pedal_pos.acc =
-      applySlopeCompensation(acc_cmd, control_data.slope_angle, control_data.shift);
+      applySlopeCompensation(acc_cmd, control_data.slope_angle * 1.0, control_data.shift) * 1.0;
     m_debug_values.setValues(DebugValues::TYPE::ACC_CMD_SLOPE_APPLIED, ctrl_cmd_as_pedal_pos.acc);
     ctrl_cmd_as_pedal_pos.vel = raw_ctrl_cmd.vel;
   }
