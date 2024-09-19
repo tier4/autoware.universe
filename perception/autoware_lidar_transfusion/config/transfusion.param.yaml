@@ -3,8 +3,8 @@
     # network
     trt_precision: fp16
     cloud_capacity: 2000000
-    onnx_path: "$(var model_path)/transfusion.onnx"
-    engine_path: "$(var model_path)/transfusion.engine"
+    onnx_path: "$(var model_path)/$(var model_name).onnx"
+    engine_path: "$(var model_path)/$(var model_name).engine"
     # pre-process params
     densification_num_past_frames: 1
     densification_world_frame_id: map
