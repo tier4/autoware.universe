@@ -929,6 +929,9 @@ void AEB::getClosestObjectsOnPath(
     obj.distance_to_object = std::abs(dist_ego_to_object);
     obj.is_target = (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_);
     objects.push_back(obj);
+    if (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_)
+      std::cerr << "The object pos is x: " << obj.position.x << ", y: " << obj.position.y
+                << " z: " << obj.position.z << "\n";
   }
 }
 
