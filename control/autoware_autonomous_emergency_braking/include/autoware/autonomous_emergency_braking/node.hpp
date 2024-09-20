@@ -88,6 +88,7 @@ struct ObjectData
   double velocity{0.0};
   double rss{0.0};
   double distance_to_object{0.0};
+  double lateral_offset{0.0};
   bool is_target{true};
 };
 

@@ -899,8 +899,9 @@ void AEB::getClosestObjectsOnPath(
 
   for (const auto & p : *points_belonging_to_cluster_hulls) {
     const auto obj_position = autoware::universe_utils::createPoint(p.x, p.y, p.z);
+    const auto obj_position_2d = autoware::universe_utils::createPoint(p.x, p.y, 0.0);
     const double obj_arc_length =
-      autoware::motion_utils::calcSignedArcLength(ego_path, current_p, obj_position);
+      autoware::motion_utils::calcSignedArcLength(ego_path, current_p, obj_position_2d);
     if (std::isnan(obj_arc_length)) continue;
 
     // calculate the lateral offset between the ego vehicle and the object
@@ -929,11 +930,17 @@ void AEB::getClosestObjectsOnPath(
     obj.velocity = 0.0;
     obj.distance_to_object = std::abs(dist_ego_to_object);
     obj.is_target = (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_);
+    obj.lateral_offset = lateral_offset;
     objects.push_back(obj);
-    if (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_)
+    if((lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_)){
+      std::cerr << "WHYYYYYYYYYYYYYYYYYYYYY "<< lateral_offset << "\n";
+std::cerr << "vehicle_info_.vehicle_width_m / 2.0  " << vehicle_info_.vehicle_width_m / 2.0 << "\n";
+std::cerr << "expand width" << expand_width_ << "\n";
       std::cerr << "The object pos is x: " << obj.position.x << ", y: " << obj.position.y
                 << " z: " << obj.position.z << "\n";
-    std::cerr << "---Finish Getting lat offset in AEB----\n";
+    }
+        std::cerr << "---Finish Getting lat offset in AEB----\n";
+
   }
 }
 
@@ -1034,6 +1041,8 @@ void AEB::addMarker(
       " [m/s]\n";
     closest_object_velocity_marker_array.text +=
       "Object distance to ego: " + std::to_string(obj.distance_to_object) + " [m]\n";
+      closest_object_velocity_marker_array.text +=
+      "Object lateral distance to ego path: " + std::to_string(obj.lateral_offset) + " [m]\n";
     closest_object_velocity_marker_array.text +=
       "RSS distance: " + std::to_string(obj.rss) + " [m]";
     debug_markers.markers.push_back(closest_object_velocity_marker_array);
