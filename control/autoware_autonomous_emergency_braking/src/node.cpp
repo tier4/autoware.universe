@@ -904,6 +904,7 @@ void AEB::getClosestObjectsOnPath(
     if (std::isnan(obj_arc_length)) continue;
 
     // calculate the lateral offset between the ego vehicle and the object
+    std::cerr << "---Getting lat offset in AEB----\n";
     const double lateral_offset =
       std::abs(autoware::motion_utils::calcLateralOffset(ego_path, obj_position));
     if (std::isnan(lateral_offset)) continue;
@@ -932,6 +933,7 @@ void AEB::getClosestObjectsOnPath(
     if (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_)
       std::cerr << "The object pos is x: " << obj.position.x << ", y: " << obj.position.y
                 << " z: " << obj.position.z << "\n";
+    std::cerr << "---Finish Getting lat offset in AEB----\n";
   }
 }
 

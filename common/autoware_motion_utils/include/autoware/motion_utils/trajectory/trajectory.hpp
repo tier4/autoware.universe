@@ -621,6 +621,11 @@ double calcLateralOffset(
   const Eigen::Vector3d target_vec{p_target.x - p_front.x, p_target.y - p_front.y, 0.0};
 
   const Eigen::Vector3d cross_vec = segment_vec.cross(target_vec);
+
+  std::cerr << "p_front_idx " << p_front_idx << " p_back_idx " << p_back_idx << "\n";
+  std::cerr << "p_front.x , p_front.y " << p_front.x << "," << p_front.y << "\n";
+  std::cerr << "p_back.x , p_back.y " << p_back.x << "," << p_back.y << "\n";
+  std::cerr << "p_target.x , p_target.y " << p_target.x << "," << p_target.y << "\n";
   return cross_vec(2) / segment_vec.norm();
 }
 
