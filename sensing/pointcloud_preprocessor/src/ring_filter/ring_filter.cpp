@@ -34,11 +34,11 @@ sensor_msgs::msg::PointCloud2 filterPointCloudByRing(const sensor_msgs::msg::Poi
 
     sensor_msgs::PointCloud2ConstIterator<uint16_t> ring_iter(input_cloud, "channel");
 
-    for (sensor_msgs::PointCloud2ConstIterator<float> iter(input_cloud, "x"); iter != iter.end(); ++iter, ++ring_iter) {
+    for (sensor_msgs::PointCloud2ConstIterator<uint8_t> iter(input_cloud, "x"); iter != iter.end(); ++iter, ++ring_iter) {
       const bool remove_condition = remove_interval_ring ? (*ring_iter % ring_interval) == 0 : (*ring_iter % ring_interval) != 0;
         if (!remove_condition) {
             // Add points according to the ring interval
-            const float* point_ptr = &(*iter);
+            const uint8_t* point_ptr = &(*iter);
             output_data.insert(output_data.end(), point_ptr, point_ptr + input_cloud.point_step);
         }
     }
