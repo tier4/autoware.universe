@@ -87,6 +87,7 @@ struct ObjectData
   geometry_msgs::msg::Point position;
   double velocity{0.0};
   double rss{0.0};
+  double arc_length{0.0};
   double distance_to_object{0.0};
   bool is_target{true};
 };
@@ -438,15 +439,13 @@ public:
   /**
    * @brief Create object data using point cloud clusters
    * @param ego_path Ego vehicle path
-   * @param ego_polys Polygons representing the ego vehicle footprint
-   * @param speed_calc_ego_polys Polygons representing the expanded ego vehicle footprint for speed
-   * calculation area
    * @param stamp Timestamp of the data
-   * @param objects Vector to store the created object data
-   * @param obstacle_points_ptr Pointer to the point cloud of obstacles
+   * @param is_ego_moving_forward boolean representing the ego movement direction
+   * @param points_belonging_to_cluster_hulls Point cloud representing convex hull vertices
+   * @param objects Vector to store the convex hull vertices that are inside the ego path
    */
   void getClosestObjectsOnPath(
-    const Path & ego_path, const rclcpp::Time & stamp,
+    const Path & ego_path, const rclcpp::Time & stamp, const bool is_ego_moving_forward,
     const PointCloud::Ptr points_belonging_to_cluster_hulls, std::vector<ObjectData> & objects);
 
   /**
@@ -463,11 +462,12 @@ public:
    * @brief Create object data using predicted objects
    * @param ego_path Ego vehicle path
    * @param ego_polys Polygons representing the ego vehicle footprint
+   * @param is_ego_moving_forward boolean representing the ego movement direction
    * @param objects Vector to store the created object data
    */
   void createObjectDataUsingPredictedObjects(
     const Path & ego_path, const std::vector<Polygon2d> & ego_polys,
-    std::vector<ObjectData> & objects);
+    const bool is_ego_moving_forward, std::vector<ObjectData> & objects);
 
   /**
    * @brief Crop the point cloud with the ego vehicle footprint path

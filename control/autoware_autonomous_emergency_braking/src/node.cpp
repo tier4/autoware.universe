@@ -461,14 +461,17 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
     const auto ego_polys = generatePathFootprint(path, expand_width_);
     std::vector<ObjectData> objects;
     // Crop out Pointcloud using an extra wide ego path
+    const bool ego_moves_forward = current_v > 0.0;
+
     if (
       use_pointcloud_data_ && points_belonging_to_cluster_hulls &&
       !points_belonging_to_cluster_hulls->empty()) {
       const auto current_time = obstacle_ros_pointcloud_ptr_->header.stamp;
-      getClosestObjectsOnPath(path, current_time, points_belonging_to_cluster_hulls, objects);
+      getClosestObjectsOnPath(
+        path, current_time, ego_moves_forward, points_belonging_to_cluster_hulls, objects);
     }
     if (use_predicted_object_data_) {
-      createObjectDataUsingPredictedObjects(path, ego_polys, objects);
+      createObjectDataUsingPredictedObjects(path, ego_polys, ego_moves_forward, objects);
     }
 
     // Add debug markers
@@ -739,7 +742,7 @@ std::vector<Polygon2d> AEB::generatePathFootprint(
 }
 
 void AEB::createObjectDataUsingPredictedObjects(
-  const Path & ego_path, const std::vector<Polygon2d> & ego_polys,
+  const Path & ego_path, const std::vector<Polygon2d> & ego_polys, const bool is_ego_moving_forward,
   std::vector<ObjectData> & object_data_vector)
 {
   autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
@@ -801,10 +804,9 @@ void AEB::createObjectDataUsingPredictedObjects(
 
         // If the object is behind the ego, we need to use the backward long offset. The
         // distance should be a positive number in any case
-        const bool is_object_in_front_of_ego = obj_arc_length > 0.0;
         const double dist_ego_to_object =
-          (is_object_in_front_of_ego) ? obj_arc_length - vehicle_info_.max_longitudinal_offset_m
-                                      : obj_arc_length + vehicle_info_.min_longitudinal_offset_m;
+          (is_ego_moving_forward) ? obj_arc_length - vehicle_info_.max_longitudinal_offset_m
+                                  : obj_arc_length + vehicle_info_.min_longitudinal_offset_m;
 
         ObjectData obj;
         obj.stamp = stamp;
@@ -878,7 +880,7 @@ void AEB::getPointsBelongingToClusterHulls(
 }
 
 void AEB::getClosestObjectsOnPath(
-  const Path & ego_path, const rclcpp::Time & stamp,
+  const Path & ego_path, const rclcpp::Time & stamp, const bool is_ego_moving_forward,
   const PointCloud::Ptr points_belonging_to_cluster_hulls, std::vector<ObjectData> & objects)
 {
   autoware::universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
@@ -915,16 +917,19 @@ void AEB::getClosestObjectsOnPath(
 
     // If the object is behind the ego, we need to use the backward long offset. The distance should
     // be a positive number in any case
-    const bool is_object_in_front_of_ego = obj_arc_length > 0.0;
-    const double dist_ego_to_object = (is_object_in_front_of_ego)
+    const double dist_ego_to_object = (is_ego_moving_forward)
                                         ? obj_arc_length - vehicle_info_.max_longitudinal_offset_m
                                         : obj_arc_length + vehicle_info_.min_longitudinal_offset_m;
-
+    const bool object_is_too_close = dist_ego_to_object < 0.0;
+    if (object_is_too_close) {
+      continue;
+    }
     ObjectData obj;
     obj.stamp = stamp;
     obj.position = obj_position;
     obj.velocity = 0.0;
-    obj.distance_to_object = std::abs(dist_ego_to_object);
+    obj.arc_length = obj_arc_length;
+    obj.distance_to_object = dist_ego_to_object;
     obj.is_target = (lateral_offset < vehicle_info_.vehicle_width_m / 2.0 + expand_width_);
     objects.push_back(obj);
   }
@@ -1030,6 +1035,8 @@ void AEB::addMarker(
       " [m/s]\n";
     closest_object_velocity_marker_array.text +=
       "Object distance to ego: " + std::to_string(obj.distance_to_object) + " [m]\n";
+    closest_object_velocity_marker_array.text +=
+      "Object arc length: " + std::to_string(obj.arc_length) + " [m]\n";
     closest_object_velocity_marker_array.text +=
       "RSS distance: " + std::to_string(obj.rss) + " [m]";
     debug_markers.markers.push_back(closest_object_velocity_marker_array);
