@@ -14,8 +14,6 @@
 
 #include "autoware/control_evaluator/control_evaluator_node.hpp"
 
-#include "autoware/evaluator_utils/evaluator_utils.hpp"
-
 #include <autoware_lanelet2_extension/utility/query.hpp>
 #include <autoware_lanelet2_extension/utility/utilities.hpp>
 
