@@ -35,6 +35,8 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <tier4_metric_msgs/msg/metric.hpp>
+#include <tier4_metric_msgs/msg/metric_array.hpp>
 
 #include <boost/optional.hpp>
 
@@ -76,6 +78,8 @@ using Vector3 = geometry_msgs::msg::Vector3;
 using autoware_perception_msgs::msg::PredictedObject;
 using autoware_perception_msgs::msg::PredictedObjects;
 using colorTuple = std::tuple<double, double, double, double>;
+using Metric = tier4_metric_msgs::msg::Metric;
+using MetricArray = tier4_metric_msgs::msg::MetricArray;
 
 /**
  * @brief Struct to store object data
@@ -342,6 +346,7 @@ public:
   rclcpp::Publisher<MarkerArray>::SharedPtr info_marker_publisher_;
   rclcpp::Publisher<autoware::universe_utils::ProcessingTimeDetail>::SharedPtr
     debug_processing_time_detail_pub_;
+  rclcpp::Publisher<MetricArray>::SharedPtr metrics_pub_;
   // timer
   rclcpp::TimerBase::SharedPtr timer_;
   mutable std::shared_ptr<autoware::universe_utils::TimeKeeper> time_keeper_{nullptr};
