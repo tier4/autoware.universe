@@ -216,6 +216,16 @@ bool DetectionAreaModule::modifyPathVelocity(
   // Store original path
   const auto original_path = *path;
 
+
+  if (planner_data_->current_velocity->twist.linear.x > 0.0)
+  {
+    for (auto &elem : path->points) {
+      elem.point.longitudinal_velocity_mps = 0.0;
+    }
+    return true;
+  }
+
+
   // Reset data
   debug_data_ = DebugData();
   debug_data_.base_link2front = planner_data_->vehicle_info_.max_longitudinal_offset_m;
