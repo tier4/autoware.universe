@@ -20,7 +20,7 @@ import rclpy
 from rclpy.node import Node
 from tier4_debug_msgs.msg import Float32Stamped
 
-MAX_BRAKE = 1.0  # [-]
+MAX_BRAKE = 6.0  # [-]
 MIN_BRAKE = 0.0  # [-]
 
 

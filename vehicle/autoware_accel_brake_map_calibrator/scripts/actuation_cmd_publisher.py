@@ -27,6 +27,7 @@ class ActuationCmdPublisher(Node):
         super().__init__("actuation_cmd_publisher")
         self.target_brake = 0.0
         self.target_accel = 0.0
+        self.target_sub_brake = 0.0
 
         self.sub_acc = self.create_subscription(
             Float32Stamped, "/vehicle/tester/accel", self.on_accel, 1
@@ -34,8 +35,14 @@ class ActuationCmdPublisher(Node):
         self.sub_brk = self.create_subscription(
             Float32Stamped, "/vehicle/tester/brake", self.on_brake, 1
         )
+        self.sub_sub_brk = self.create_subscription(
+            Float32Stamped, "/vehicle/tester/sub_brake", self.on_sub_brake, 1
+        )
         self.pub_actuation_cmd = self.create_publisher(
             ActuationCommandStamped, "/control/command/actuation_cmd", 1
+        )
+        self.pub_sub_actuation_cmd = self.create_publisher(
+            ActuationCommandStamped, "/control/command/sub_actuation_cmd", 1
         )
         self.pub_gear_cmd = self.create_publisher(GearCommand, "/control/command/gear_cmd", 1)
         timer_period = 0.02  # seconds
@@ -49,6 +56,10 @@ class ActuationCmdPublisher(Node):
         self.target_accel = msg.data
         print(f"Set target accel : {self.target_accel}")
 
+    def on_sub_brake(self, msg):
+        self.target_sub_brake = msg.data
+        print(f"Set target sub brake: {self.target_sub_brake}")
+
     def on_timer(self):
         msg_actuation_cmd = ActuationCommandStamped()
         msg_actuation_cmd.actuation.steer_cmd = 0.0
@@ -58,13 +69,20 @@ class ActuationCmdPublisher(Node):
         msg_actuation_cmd.actuation.brake_cmd = self.target_brake
         self.pub_actuation_cmd.publish(msg_actuation_cmd)
 
+        msg_sub_actuation_cmd = ActuationCommandStamped()
+        msg_sub_actuation_cmd.actuation.steer_cmd = 0.0
+        msg_sub_actuation_cmd.header.stamp = self.get_clock().now().to_msg()
+        msg_sub_actuation_cmd.header.frame_id = "base_link"
+        msg_sub_actuation_cmd.actuation.brake_cmd = self.target_sub_brake
+        self.pub_sub_actuation_cmd.publish(msg_sub_actuation_cmd)
+
         msg_gear_cmd = GearCommand()
         msg_gear_cmd.stamp = self.get_clock().now().to_msg()
         msg_gear_cmd.command = GearCommand.DRIVE
         self.pub_gear_cmd.publish(msg_gear_cmd)
 
         print(
-            f"publish ActuationCommand with accel: {self.target_accel}, brake: {self.target_brake}"
+            f"publish ActuationCommand with accel: {self.target_accel}, brake: {self.target_brake}, sub_brake: {self.target_sub_brake}"
         )
 
 

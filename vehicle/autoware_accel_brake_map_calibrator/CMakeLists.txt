@@ -19,6 +19,7 @@ install(
   scripts/config.py
   scripts/delay_estimator.py
   scripts/plotter.py
+  scripts/sub_brake_tester.py
   scripts/view_statistics.py
   scripts/calc_utils.py
   scripts/csv_reader.py
