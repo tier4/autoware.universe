@@ -36,9 +36,20 @@ using autoware::behavior_path_planner::utils::path_safety_checker::PredictedPath
 static constexpr const char * logger_namespace =
   "planning.scenario_planning.lane_driving.behavior_planning.behavior_path_planner.static_obstacle_"
   "avoidance.utils";
-
+/**
+ * @brief check object offset direction.
+ * @param object data.
+ * @return if the object is on right side of ego path, return true.
+ */
 bool isOnRight(const ObjectData & obj);
 
+/**
+ * @brief calculate shift length from centerline of current lane.
+ * @param object offset direction.
+ * @param distance between object polygon and centerline of current lane. (signed)
+ * @param margin distance between ego and object.
+ * @return necessary shift length. (signed)
+ */
 double calcShiftLength(
   const bool & is_object_on_right, const double & overhang_dist, const double & avoid_margin);
 
@@ -47,6 +58,13 @@ bool isWithinLanes(
 
 bool isShiftNecessary(const bool & is_object_on_right, const double & shift_length);
 
+/**
+ * @brief check if the ego has to avoid object with the trajectory whose shift direction is same as
+ * object offset.
+ * @param object offset direction.
+ * @param ego shift length.
+ * @return if the direction of shift and object offset, return true.
+ */
 bool isSameDirectionShift(const bool & is_object_on_right, const double & shift_length);
 
 size_t findPathIndexFromArclength(
@@ -98,6 +116,14 @@ lanelet::ConstLanelets getExtendLanes(
   const lanelet::ConstLanelets & lanelets, const Pose & ego_pose,
   const std::shared_ptr<const PlannerData> & planner_data);
 
+/**
+ * @brief insert taget stop/decel point.
+ * @param ego current position.
+ * @param distance between ego and stop/decel position.
+ * @param target velocity.
+ * @param target path.
+ * @param insert point.
+ */
 void insertDecelPoint(
   const Point & p_src, const double offset, const double velocity, PathWithLaneId & path,
   std::optional<Pose> & p_out);
@@ -106,10 +132,22 @@ void fillObjectEnvelopePolygon(
   ObjectData & object_data, const ObjectDataArray & registered_objects, const Pose & closest_pose,
   const std::shared_ptr<AvoidanceParameters> & parameters);
 
+/**
+ * @brief fill stopping duration.
+ * @param current detected object.
+ * @param previous stopped objects.
+ * @param threshold parameters.
+ */
 void fillObjectMovingTime(
   ObjectData & object_data, ObjectDataArray & stopped_objects,
   const std::shared_ptr<AvoidanceParameters> & parameters);
 
+/**
+ * @brief check whether ego has to avoid the objects.
+ * @param current detected object.
+ * @param previous stopped objects.
+ * @param threshold parameters.
+ */
 void fillAvoidanceNecessity(
   ObjectData & object_data, const ObjectDataArray & registered_objects, const double vehicle_width,
   const std::shared_ptr<AvoidanceParameters> & parameters);
