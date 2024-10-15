@@ -1505,6 +1505,16 @@ void AvoidanceModule::insertReturnDeadLine(
 {
   const auto & data = avoid_data_;
 
+  if (!data.valid) {
+    return;
+  }
+
+  // If the ego overruns the stop point, this module does nothing in order to prevent stuck.
+  if (data.to_stop_line < 0.0) {
+    RCLCPP_WARN(getLogger(), "ego overruns the stop point.");
+    return;
+  }
+
   if (data.to_return_point > planner_data_->parameters.forward_path_length) {
     RCLCPP_DEBUG(getLogger(), "return dead line is far enough.");
     return;
@@ -1591,6 +1601,12 @@ void AvoidanceModule::insertWaitPoint(
   }
 
   if (helper_->isShifted()) {
+    return;
+  }
+
+  // If the ego overruns the stop point, this module does nothing in order to prevent stuck.
+  if (data.to_stop_line < 0.0) {
+    RCLCPP_WARN(getLogger(), "ego overruns the stop point.");
     return;
   }
 
