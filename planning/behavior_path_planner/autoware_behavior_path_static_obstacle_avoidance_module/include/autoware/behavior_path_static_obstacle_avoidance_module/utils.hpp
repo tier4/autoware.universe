@@ -80,9 +80,23 @@ std::vector<UUID> calcParentIds(const AvoidLineArray & lines1, const AvoidLine &
 
 double lerpShiftLengthOnArc(double arc, const AvoidLine & al);
 
+/**
+ * @brief calculate distance between ego and object. object length along with the path is calculated
+ * as well.
+ * @param current path.
+ * @param ego position.
+ * @param object data.
+ */
 void fillLongitudinalAndLengthByClosestEnvelopeFootprint(
   const PathWithLaneId & path, const Point & ego_pos, ObjectData & obj);
 
+/**
+ * @brief calculate overhang distance for all of the envelope polygon outer points.
+ * @param object data.
+ * @param current path.
+ * @return first: overhang distance, second: outer point. this vector is sorted by overhang
+ * distance.
+ */
 std::vector<std::pair<double, Point>> calcEnvelopeOverhangDistance(
   const ObjectData & object_data, const PathWithLaneId & path);
 
@@ -94,12 +108,33 @@ void setStartData(
   AvoidLine & al, const double start_shift_length, const geometry_msgs::msg::Pose & start,
   const size_t start_idx, const double start_dist);
 
+/**
+ * @brief create envelope polygon which is parallel to current path.
+ * @param object polygon.
+ * @param closest point pose of the current path.
+ * @param buffer.
+ * @return envelope polygon.
+ */
 Polygon2d createEnvelopePolygon(
   const Polygon2d & object_polygon, const Pose & closest_pose, const double envelope_buffer);
 
+/**
+ * @brief create envelope polygon which is parallel to current path.
+ * @param object data.
+ * @param closest point pose of the current path.
+ * @param buffer.
+ * @return envelope polygon.
+ */
 Polygon2d createEnvelopePolygon(
   const ObjectData & object_data, const Pose & closest_pose, const double envelope_buffer);
 
+/**
+ * @brief create data structs which are used in clipping drivable area process.
+ * @param objects.
+ * @param avoidance module parameters.
+ * @param ego vehicle width.
+ * @return struct which includes expanded polygon.
+ */
 std::vector<DrivableAreaInfo::Obstacle> generateObstaclePolygonsForDrivableArea(
   const ObjectDataArray & objects, const std::shared_ptr<AvoidanceParameters> & parameters,
   const double vehicle_width);
@@ -158,6 +193,12 @@ void fillObjectStoppableJudge(
 
 void updateClipObject(ObjectDataArray & clip_objects, AvoidancePlanningData & data);
 
+/**
+ * @brief compensate lost objects until a certail time elapses.
+ * @param avoidance planning data.
+ * @param current time.
+ * @param avoidance parameters which includes duration of compensation.
+ */
 void compensateLostTargetObjects(
   ObjectDataArray & stored_objects, AvoidancePlanningData & data, const rclcpp::Time & now,
   const std::shared_ptr<const PlannerData> & planner_data,
