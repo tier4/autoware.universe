@@ -16,7 +16,8 @@
 #include "autoware/behavior_path_static_obstacle_avoidance_module/data_structs.hpp"
 #include "autoware/behavior_path_static_obstacle_avoidance_module/type_alias.hpp"
 #include "autoware/behavior_path_static_obstacle_avoidance_module/utils.hpp"
-
+#include "autoware_test_utils/autoware_test_utils.hpp"
+#include "autoware_test_utils/mock_data_parser.hpp"
 #include <autoware_perception_msgs/msg/object_classification.hpp>
 
 #include <gmock/gmock.h>
@@ -179,6 +180,33 @@ TEST(TestUtils, insertDecelPoint)
     for (size_t i = 7; i < path.points.size(); i++) {
       EXPECT_DOUBLE_EQ(path.points.at(i).point.longitudinal_velocity_mps, 1.0);
     }
+  }
+}
+
+TEST(TestUtils, filterTargetObjects)
+{
+  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filterTargetObjects;
+  using autoware::test_utils::get_absolute_path_to_lanelet_map;
+  using autoware::test_utils::get_absolute_path_to_route;
+
+  std::string autoware_test_utils_dir{"autoware_test_utils"};
+
+  const auto parameters = std::make_shared<AvoidanceParameters>();
+  const auto planner_data = std::make_shared<PlannerData>();
+
+  const auto lanelet2_path =
+    get_absolute_path_to_lanelet_map(autoware_test_utils_dir, "lanelet2_map.osm");
+  const auto map_bin_msg =
+    autoware::test_utils::make_map_bin_msg(lanelet2_path, center_line_resolution);
+  planner_data->route_handler = std::make_shared<RouteHandler>(map_bin_msg);
+
+  {
+    ObjectDataArray objects{};
+
+    AvoidancePlanningData avoidance_planning_data;
+    avoidance_planning_data.target_objects = {};
+    avoidance_planning_data.other_objects = {};
+    filterTargetObjects(objects, avoidance_planning_data, 5.0, planner_data, parameters);
   }
 }
 
