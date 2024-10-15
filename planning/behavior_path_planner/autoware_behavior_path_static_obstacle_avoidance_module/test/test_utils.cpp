@@ -610,6 +610,337 @@ TEST(TestUtils, fillLongitudinalAndLengthByClosestEnvelopeFootprint)
   }
 }
 
+TEST(TestUtils, fillObjectEnvelopePolygon)
+{
+  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
+    calcErrorEclipseLongRadius;
+  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
+  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
+    fillObjectEnvelopePolygon;
+
+  const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                           .position(createPoint(0.0, 0.0, 0.0))
+                           .orientation(createQuaternion(0.0, 0.0, 0.0, 1.0));
+
+  auto path = generatePath(edge_pose);
+
+  const auto create_params = [](const double envelope_buffer, const double th_error) {
+    ObjectParameter param{};
+    param.envelope_buffer_margin = envelope_buffer;
+    param.th_error_eclipse_long_radius = th_error;
+    return param;
+  };
+
+  const auto parameters = std::make_shared<AvoidanceParameters>();
+  parameters->object_parameters.emplace(ObjectClassification::TRUCK, create_params(0.0, 2.0));
+
+  const auto uuid = generateUUID();
+
+  const auto object_pose =
+    geometry_msgs::build<geometry_msgs::msg::Pose>()
+      .position(createPoint(2.5, 1.0, 0.0))
+      .orientation(createQuaternion(0.0, 0.0, sin(M_PI_4 * 0.5), cos(M_PI_4 * 0.5)));
+
+  ObjectData stored_object;
+  stored_object.object.object_id = uuid;
+  stored_object.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+  stored_object.object.shape.dimensions.x = 2.8284271247461901;
+  stored_object.object.shape.dimensions.y = 1.41421356237309505;
+  // clang-format off
+  stored_object.object.kinematics.initial_pose_with_covariance =
+    geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
+      {1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+       0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+       0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+       0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+       0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+       0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+  // clang-format on
+  stored_object.error_eclipse_max =
+    calcErrorEclipseLongRadius(stored_object.object.kinematics.initial_pose_with_covariance);
+  stored_object.direction = Direction::LEFT;
+  stored_object.object.classification.emplace_back(
+    autoware_perception_msgs::build<ObjectClassification>()
+      .label(ObjectClassification::TRUCK)
+      .probability(1.0));
+
+  const auto pose =
+    path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+      .point.pose;
+
+  constexpr double margin = 0.0;
+  stored_object.envelope_poly = createEnvelopePolygon(stored_object, pose, margin);
+
+  // new object.
+  {
+    ObjectData object_data;
+    object_data.object.object_id = generateUUID();
+    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    object_data.object.shape.dimensions.x = 2.8284271247461901;
+    object_data.object.shape.dimensions.y = 1.41421356237309505;
+    // clang-format off
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
+        {1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    object_data.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    const auto pose =
+      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+        .point.pose;
+
+    ObjectDataArray stored_objects{};
+
+    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+
+    constexpr auto epsilon = 1e-6;
+    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -0.5, epsilon);
+  }
+
+  // update envelope polygon by new pose.
+  {
+    const auto new_pose =
+      geometry_msgs::build<geometry_msgs::msg::Pose>()
+        .position(createPoint(3.0, 0.5, 0.0))
+        .orientation(createQuaternion(0.0, 0.0, sin(M_PI_4 * 0.5), cos(M_PI_4 * 0.5)));
+
+    ObjectData object_data;
+    object_data.object.object_id = uuid;
+    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    object_data.object.shape.dimensions.x = 2.8284271247461901;
+    object_data.object.shape.dimensions.y = 1.41421356237309505;
+    // clang-format off
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
+        {1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    object_data.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    const auto pose =
+      path.points.at(autoware::motion_utils::findNearestIndex(path.points, new_pose.position))
+        .point.pose;
+
+    ObjectDataArray stored_objects{stored_object};
+
+    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+
+    constexpr auto epsilon = 1e-6;
+    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -1.0, epsilon);
+  }
+
+  // use previous envelope polygon because new pose's error eclipse long radius is larger than
+  // threshold. error eclipse long radius: 2.1213203435596
+  {
+    const auto new_pose =
+      geometry_msgs::build<geometry_msgs::msg::Pose>()
+        .position(createPoint(3.0, 0.5, 0.0))
+        .orientation(createQuaternion(0.0, 0.0, sin(M_PI_4 * 0.5), cos(M_PI_4 * 0.5)));
+
+    ObjectData object_data;
+    object_data.object.object_id = uuid;
+    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    object_data.object.shape.dimensions.x = 2.8284271247461901;
+    object_data.object.shape.dimensions.y = 1.41421356237309505;
+    // clang-format off
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
+        {2.5, 2.0, 0.0, 0.0, 0.0, 0.0,
+         2.0, 2.5, 0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    object_data.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    const auto pose =
+      path.points.at(autoware::motion_utils::findNearestIndex(path.points, new_pose.position))
+        .point.pose;
+
+    ObjectDataArray stored_objects{stored_object};
+
+    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+
+    constexpr auto epsilon = 1e-6;
+    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -0.5, epsilon);
+  }
+
+  // use new envelope polygon because new pose's error eclipse long radius is smaller than
+  // threshold.
+  {
+    ObjectData huge_covariance_object;
+    huge_covariance_object.object.object_id = uuid;
+    huge_covariance_object.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    huge_covariance_object.object.shape.dimensions.x = 2.8284271247461901;
+    huge_covariance_object.object.shape.dimensions.y = 1.41421356237309505;
+    // clang-format off
+    huge_covariance_object.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
+          {5.0, 4.0, 0.0, 0.0, 0.0, 0.0,
+           4.0, 5.0, 0.0, 0.0, 0.0, 0.0,
+           0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+           0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+           0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+           0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    huge_covariance_object.error_eclipse_max = calcErrorEclipseLongRadius(
+      huge_covariance_object.object.kinematics.initial_pose_with_covariance);
+    huge_covariance_object.direction = Direction::LEFT;
+    huge_covariance_object.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    const auto pose =
+      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+        .point.pose;
+
+    constexpr double margin = 0.0;
+    huge_covariance_object.envelope_poly =
+      createEnvelopePolygon(huge_covariance_object, pose, margin);
+
+    const auto new_pose =
+      geometry_msgs::build<geometry_msgs::msg::Pose>()
+        .position(createPoint(3.0, 0.5, 0.0))
+        .orientation(createQuaternion(0.0, 0.0, sin(M_PI_4 * 0.5), cos(M_PI_4 * 0.5)));
+
+    ObjectData object_data;
+    object_data.object.object_id = uuid;
+    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    object_data.object.shape.dimensions.x = 2.8284271247461901;
+    object_data.object.shape.dimensions.y = 1.41421356237309505;
+    // clang-format off
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
+        {2.5, 2.0, 0.0, 0.0, 0.0, 0.0,
+         2.0, 2.5, 0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    object_data.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    ObjectDataArray stored_objects{huge_covariance_object};
+
+    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+
+    constexpr auto epsilon = 1e-6;
+    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -1.0, epsilon);
+  }
+
+  // use previous envelope polygon because the new one is within old one.
+  {
+    ObjectData object_data;
+    object_data.object.object_id = uuid;
+    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    object_data.object.shape.dimensions.x = 2.0;
+    object_data.object.shape.dimensions.y = 1.0;
+    // clang-format off
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
+        {1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    object_data.object.classification.emplace_back(
+      autoware_perception_msgs::build<ObjectClassification>()
+        .label(ObjectClassification::TRUCK)
+        .probability(1.0));
+
+    const auto pose =
+      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+        .point.pose;
+
+    ObjectDataArray stored_objects{stored_object};
+
+    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+
+    constexpr auto epsilon = 1e-6;
+    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -0.5, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
+    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -0.5, epsilon);
+  }
+}
+
 TEST(TestUtils, compensateLostTargetObjects)
 {
   using namespace std::literals::chrono_literals;
@@ -772,7 +1103,7 @@ TEST(TestUtils, compensateLostTargetObjects)
   }
 }
 
-TEST(TestUtils, DISABLED_calcErrorEclipseLongRadius)
+TEST(TestUtils, calcErrorEclipseLongRadius)
 {
   using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
     calcErrorEclipseLongRadius;
@@ -790,7 +1121,7 @@ TEST(TestUtils, DISABLED_calcErrorEclipseLongRadius)
        0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
   // clang-format on
 
-  EXPECT_DOUBLE_EQ(calcErrorEclipseLongRadius(pose_with_covariance), 1.0);
+  EXPECT_DOUBLE_EQ(calcErrorEclipseLongRadius(pose_with_covariance), 3.0);
 }
 
 }  // namespace autoware::behavior_path_planner::static_obstacle_avoidance
