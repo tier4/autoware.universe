@@ -15,6 +15,7 @@
 #include "autoware_raw_vehicle_cmd_converter/vehicle_adaptor/vehicle_adaptor.hpp"
 
 #include <iostream>
+#include <chrono>
 namespace autoware::raw_vehicle_cmd_converter
 {
 double get_current_yaw(const Odometry & odometry, double yaw_prev)
@@ -35,6 +36,12 @@ Control VehicleAdaptor::compensate(
   [[maybe_unused]] const OperationModeState & operation_mode,
   [[maybe_unused]] const ControlHorizon & control_horizon)
 {
+  auto start = std::chrono::high_resolution_clock::now();
+  if (!proxima_vehicle_adaptor_.use_vehicle_adaptor_) {
+    proxima_vehicle_adaptor_.send_initialized_flag();
+    proxima_vehicle_adaptor_.set_params();
+    return input_control_cmd;
+  }
   if (!initialized_) {
     proxima_vehicle_adaptor_.clear_NN_params();
     proxima_vehicle_adaptor_.set_NN_params_from_csv("vehicle_models/vehicle_model_1");
@@ -72,6 +79,10 @@ Control VehicleAdaptor::compensate(
   if (!is_applying_control) {
     proxima_vehicle_adaptor_.send_initialized_flag();
   }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+  //std::cerr << "処理時間: " << duration << " ミリ秒" << std::endl;
   // std::cerr << "vehicle adaptor: compensate control command" << std::endl;
    //std::cerr << "Build path is: " << BUILD_PATH << std::endl;
   return output_control_cmd;

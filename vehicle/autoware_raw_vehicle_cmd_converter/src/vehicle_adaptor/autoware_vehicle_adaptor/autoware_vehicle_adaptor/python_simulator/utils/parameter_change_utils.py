@@ -9,44 +9,7 @@ from utils.data_collection_utils import DataCollectionMode
 CHANGE_PARAM_P1 = 0.8
 CHANGE_PARAM_P2 = 1.2
 
-
-class ChangeParam(Enum):
-    """Parameters to be changed when running the simulation.
-
-    Properties:
-    * name: str - Name of the parameter.
-    * id: str - Field only to avoid duplicate values. Not used. There's no problem as long as they are different.
-    * val: value. You should use `value()` instance method to get this.
-    """
-
-    measurement_steer_bias = ("measurement_steer_bias", [
-        -1.0 * np.pi / 180.0,
-        -0.8 * np.pi / 180.0,
-        -0.6 * np.pi / 180.0,
-        -0.4 * np.pi / 180.0,
-        -0.2 * np.pi / 180.0,
-        0.0,
-        0.2 * np.pi / 180.0,
-        0.4 * np.pi / 180.0,
-        0.6 * np.pi / 180.0,
-        0.8 * np.pi / 180.0,
-        1.0 * np.pi / 180.0,
-    ])
-    """steer midpoint (soft + hard)"""
-
-    steer_rate_lim = ("steer_rate_lim", [0.020, 0.050, 0.100, 0.150, 0.200, 0.300, 0.400, 0.500])
-    """Maximum steer angular velocity"""
-
-    vel_rate_lim = ("vel_rate_lim", [0.5, 1.0, 3.0, 5.0, 7.0, 9.0])
-    """Maximum acceleration/deceleration"""
-
-    wheel_base = ("wheel_base", [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0])
-    """wheel base"""
-
-    steer_dead_band = ("steer_dead_band", [0.0000, 0.0012, 0.0025, 0.0050, 0.01])
-    """steer dead band"""
-
-    adaptive_gear_ratio_coef = ("adaptive_gear_ratio_coef", [
+adaptive_gear_ratio_coef =  [
         [15.713, 0.053, 0.042, 15.713, 0.053, 0.042],
         [15.713, 0.053, 0.042, CHANGE_PARAM_P1 * 15.713, 0.053, 0.042],
         [15.713, 0.053, 0.042, CHANGE_PARAM_P2 * 15.713, 0.053, 0.042],
@@ -130,11 +93,61 @@ class ChangeParam(Enum):
             CHANGE_PARAM_P2 * 0.053,
             CHANGE_PARAM_P2 * 0.042,
         ],
+    ]
+
+class ChangeParam(Enum):
+    """Parameters to be changed when running the simulation.
+
+    Properties:
+    * name: str - Name of the parameter.
+    * id: str - Field only to avoid duplicate values. Not used. There's no problem as long as they are different.
+    * val: value. You should use `value()` instance method to get this.
+    """
+
+    measurement_steer_bias = ("measurement_steer_bias", [
+        -1.0 * np.pi / 180.0,
+        -0.8 * np.pi / 180.0,
+        -0.6 * np.pi / 180.0,
+        -0.4 * np.pi / 180.0,
+        -0.2 * np.pi / 180.0,
+        0.0,
+        0.2 * np.pi / 180.0,
+        0.4 * np.pi / 180.0,
+        0.6 * np.pi / 180.0,
+        0.8 * np.pi / 180.0,
+        1.0 * np.pi / 180.0,
     ])
-    """velocity-dependent gear ratio"""
+    """steer midpoint (soft + hard)"""
+
+    steer_rate_lim = ("steer_rate_lim", [0.020, 0.050, 0.100, 0.150, 0.200, 0.300, 0.400, 0.500])
+    """Maximum steer angular velocity"""
+
+    vel_rate_lim = ("vel_rate_lim", [0.5, 1.0, 3.0, 5.0, 7.0, 9.0])
+    """Maximum acceleration/deceleration"""
+
+    wheel_base = ("wheel_base", [0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0])
+    """wheel base"""
+
+    steer_dead_band = ("steer_dead_band", [0.0000, 0.0012, 0.0025, 0.0050, 0.01])
+    """steer dead band"""
+
+    acc_dead_band = ("acc_dead_band", [0.0000, 0.0012, 0.0025, 0.0050, 0.01])
+    """acc dead band"""
+
+    accel_dead_band = ("accel_dead_band", [0.0000, 0.0012, 0.0025, 0.0050, 0.01])
+    """accel dead band"""
+
+    brake_dead_band = ("brake_dead_band", [0.0000, 0.0012, 0.0025, 0.0050, 0.01])
+    """brake dead band"""
 
     acc_time_delay = ("acc_time_delay", [0.00, 0.1, 0.27, 0.40, 0.60, 0.80, 1.01])
     """acc time delay"""
+
+    accel_time_delay = ("accel_time_delay", [0.00, 0.1, 0.27, 0.40, 0.60, 0.80, 1.01])
+    """accel time delay"""
+
+    brake_time_delay = ("brake_time_delay", [0.00, 0.1, 0.27, 0.40, 0.60, 0.80, 1.01])
+    """brake time delay"""
 
     steer_time_delay = ("steer_time_delay", [0.00, 0.1, 0.27, 0.40, 0.60, 0.80, 1.02])
     """steer time delay"""
@@ -144,9 +157,6 @@ class ChangeParam(Enum):
 
     steer_time_constant = ("steer_time_constant", [0.01, 0.1, 0.20, 0.24, 0.40, 0.60, 0.80, 1.02])
     """time constant"""
-
-    accel_map_scale = ("accel_map_scale", [0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0])
-    """pedal - real acceleration correspondence"""
 
     accel_brake_map_control_path = ("accel_brake_map_control_path", ["../actuation_cmd_maps/accel_brake_maps/low_quality_map"])
     """accel_brake_map_control_path"""
@@ -163,10 +173,10 @@ class ChangeParam(Enum):
     vehicle_type = ("vehicle_type", [1, 2, 3, 4])
     """change to other vehicle parameters"""
 
-    adaptive_gear_ratio_coef_control_input = ("adaptive_gear_ratio_coef_control_input", [[15.713,0.053,0.042]])
-    adaptive_gear_ratio_coef_sim_input = ("adaptive_gear_ratio_coef_sim_input", [[15.713,0.053,0.042]])
-    adaptive_gear_ratio_coef_control_obs = ("adaptive_gear_ratio_coef_control_obs", [[15.713,0.053,0.042]])
-    adaptive_gear_ratio_coef_sim_obs = ("adaptive_gear_ratio_coef_sim_obs", [[15.713,0.053,0.042]])
+    adaptive_gear_ratio_coef_control_input = ("adaptive_gear_ratio_coef_control_input", adaptive_gear_ratio_coef)
+    adaptive_gear_ratio_coef_sim_input = ("adaptive_gear_ratio_coef_sim_input", adaptive_gear_ratio_coef)
+    adaptive_gear_ratio_coef_control_obs = ("adaptive_gear_ratio_coef_control_obs", adaptive_gear_ratio_coef)
+    adaptive_gear_ratio_coef_sim_obs = ("adaptive_gear_ratio_coef_sim_obs", adaptive_gear_ratio_coef)
 
     def __init__(self, id : str, val: list[Any]):
         self.id = id

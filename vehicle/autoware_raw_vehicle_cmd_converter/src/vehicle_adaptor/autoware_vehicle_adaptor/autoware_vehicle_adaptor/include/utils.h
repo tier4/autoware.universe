@@ -5,7 +5,44 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "inputs_prediction.h"
+#include "nominal_dynamics.h"
+#include "transform_vehicle_adaptor_model.h"
+#include <pybind11/stl.h>
+#include "linear_regression_compensator.h"
 
+Eigen::VectorXd states_vehicle_to_world(Eigen::VectorXd states_vehicle, double yaw);
+Eigen::VectorXd states_world_to_vehicle(Eigen::VectorXd states_world, double yaw);
+/*
+Eigen::MatrixXd read_csv(std::string file_path)
+{
+  std::string build_path = BUILD_PATH;
+  std::string file_path_abs = build_path + "/" + file_path;
+  std::vector<std::vector<double>> csv_data;
+  std::ifstream ifs(file_path_abs);
+  if (!ifs) {
+    std::cerr << "Failed to open file." << std::endl;
+    return Eigen::MatrixXd(0, 0);
+  }
+  std::string line;
+  while (std::getline(ifs, line)) {
+    std::istringstream stream(line);
+    std::string field;
+    std::vector<double> fields;
+    while (std::getline(stream, field, ',')) {
+      fields.push_back(std::stod(field));
+    }
+    csv_data.push_back(fields);
+  }
+  ifs.close();
+  Eigen::MatrixXd data = Eigen::MatrixXd(csv_data.size(), csv_data[0].size());
+  for (int i = 0; i < int(csv_data.size()); i++) {
+    for (int j = 0; j < int(csv_data[0].size()); j++) {
+      data(i, j) = csv_data[i][j];
+    }
+  }
+  return data;
+}
+*/
 class PolynomialRegression
 {
 private:
@@ -136,7 +173,8 @@ public:
   void set_params();
   Eigen::VectorXd apply(Eigen::VectorXd input_value);
 };
-class LinearRegressionCompensation
+/*
+class LinearRegressionCompensator
 {
 private:
   double lambda_ = 0.0;
@@ -156,8 +194,8 @@ private:
   bool use_compensator_ = true;
   double max_yaw_compensation_, max_acc_compensation_, max_steer_compensation_;
 public:
-  LinearRegressionCompensation();
-  virtual ~LinearRegressionCompensation();
+  LinearRegressionCompensator();
+  virtual ~LinearRegressionCompensator();
   void initialize();
   void update_input_queue(Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat);
   void update_regression_matrix(Eigen::VectorXd error_vector);
@@ -165,153 +203,7 @@ public:
   Eigen::MatrixXd Predict(Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat);
   Eigen::VectorXd get_bias();
 };
-class NominalDynamics
-{
-private:
-  double wheel_base_ = 2.79;
-  double acc_time_delay_ = 0.1;
-  double steer_time_delay_ = 0.27;
-  double acc_time_constant_ = 0.1;
-  double steer_time_constant_ = 0.24;
-  int acc_queue_size_ = 15;
-  int steer_queue_size_ = 15;
-
-  int x_index_ = 0;
-  int y_index_ = 1;
-  int vel_index_ = 2;
-  int yaw_index_ = 3;
-  int acc_index_ = 4;
-  int steer_index_ = 5;
-  int state_size_ = 6;
-
-  int acc_input_start_index_ = 6;
-  int acc_input_end_index_ = 6 + acc_queue_size_ - 1;
-  int steer_input_start_index_ = 6 + acc_queue_size_;
-  int steer_input_end_index_ = 6 + acc_queue_size_ + steer_queue_size_ - 1;
-  double control_dt_ = 0.033;
-  int predict_step_ = 3;
-  double predict_dt_ = control_dt_ * predict_step_;
-
-  int acc_delay_step_ = std::min(int(std::round(acc_time_delay_ / control_dt_)), acc_queue_size_);
-  int steer_delay_step_ =
-    std::min(int(std::round(steer_time_delay_ / control_dt_)), steer_queue_size_);
-  double steer_dead_band_ = 0.0;
-public:
-  NominalDynamics();
-  virtual ~NominalDynamics();
-  void set_params(
-    double wheel_base, double acc_time_delay, double steer_time_delay, double acc_time_constant,
-    double steer_time_constant, int acc_queue_size, int steer_queue_size, double control_dt,
-    int predict_step);
-  void set_steer_dead_band(double steer_dead_band);
-  Eigen::VectorXd F_nominal(Eigen::VectorXd states, Eigen::VectorXd inputs);
-  Eigen::MatrixXd F_nominal_with_diff(Eigen::VectorXd states, Eigen::VectorXd inputs);
-  Eigen::VectorXd F_nominal_predict(Eigen::VectorXd states, Eigen::VectorXd Inputs);
-  Eigen::VectorXd F_nominal_predict_with_diff(
-    Eigen::VectorXd states, Eigen::VectorXd Inputs, Eigen::MatrixXd & dF_d_states,
-    Eigen::MatrixXd & dF_d_inputs);
-  Eigen::MatrixXd F_nominal_for_candidates(Eigen::MatrixXd States, Eigen::MatrixXd Inputs);
-  Eigen::MatrixXd F_nominal_predict_for_candidates(Eigen::MatrixXd States, Eigen::MatrixXd Inputs);
-  Eigen::VectorXd F_with_input_history(
-    const Eigen::VectorXd states, const Eigen::VectorXd & acc_input_history_concat,
-    const Eigen::VectorXd & steer_input_history_concat);
-  Eigen::VectorXd F_with_input_history(
-    const Eigen::VectorXd states, Eigen::VectorXd & acc_input_history,
-    Eigen::VectorXd & steer_input_history, Eigen::VectorXd & acc_input_history_concat,
-    Eigen::VectorXd & steer_input_history_concat, const Eigen::Vector2d & d_inputs);
-  Eigen::VectorXd F_with_input_history_and_diff(
-    const Eigen::VectorXd states, Eigen::VectorXd & acc_input_history,
-    Eigen::VectorXd & steer_input_history, Eigen::VectorXd & acc_input_history_concat,
-    Eigen::VectorXd & steer_input_history_concat, const Eigen::Vector2d & d_inputs,
-    Eigen::MatrixXd & A, Eigen::MatrixXd & B);
-  Eigen::MatrixXd F_with_input_history_for_candidates(
-    const Eigen::MatrixXd & States, Eigen::MatrixXd & Acc_input_history,
-    Eigen::MatrixXd & Steer_input_history, Eigen::MatrixXd & Acc_input_history_concat,
-    Eigen::MatrixXd & Steer_input_history_concat, const Eigen::MatrixXd & D_inputs);
-};
-
-
-class TransformModelToEigen
-{
-private:
-  std::vector<Eigen::MatrixXd> weight_acc_layer_1_ = {};
-  std::vector<Eigen::MatrixXd> weight_steer_layer_1_ = {};
-  std::vector<Eigen::MatrixXd> weight_acc_layer_2_ = {};
-  std::vector<Eigen::MatrixXd> weight_steer_layer_2_ = {};
-  std::vector<Eigen::MatrixXd> weight_lstm_ih_ = {};
-  std::vector<Eigen::MatrixXd> weight_lstm_hh_ = {};
-  std::vector<Eigen::MatrixXd> weight_complimentary_layer_ = {};
-  std::vector<Eigen::MatrixXd> weight_linear_relu_ = {};
-  std::vector<Eigen::MatrixXd> weight_final_layer_ = {};
-  std::vector<Eigen::VectorXd> bias_acc_layer_1_ = {};
-  std::vector<Eigen::VectorXd> bias_steer_layer_1_ = {};
-  std::vector<Eigen::VectorXd> bias_acc_layer_2_ = {};
-  std::vector<Eigen::VectorXd> bias_steer_layer_2_ = {};
-  std::vector<Eigen::VectorXd> bias_lstm_ih_ = {};
-  std::vector<Eigen::VectorXd> bias_lstm_hh_ = {};
-  std::vector<Eigen::VectorXd> bias_complimentary_layer_ = {};
-  std::vector<Eigen::VectorXd> bias_linear_relu_ = {};
-  std::vector<Eigen::VectorXd> bias_final_layer_ = {};
-  int vel_index_ = 0;
-  int acc_index_ = 1;
-  int steer_index_ = 2;
-  int acc_queue_size_ = 15;
-  int steer_queue_size_ = 15;
-  int predict_step_ = 3;
-  int acc_input_start_index_ = 3;
-  int steer_input_start_index_ = 3 + acc_queue_size_ + predict_step_;
-  int acc_input_end_index_ = 3 + acc_queue_size_ + predict_step_ - 1;
-  int steer_input_end_index_ = 3 + acc_queue_size_ + steer_queue_size_ + 2 * predict_step_ - 1;
-
-  std::vector<double> vel_scaling_;
-  std::vector<double> vel_bias_;
-
-  int model_num_ = 0;
-  int h_dim_;
-public:
-  TransformModelToEigen();
-  virtual ~TransformModelToEigen();
-  void set_params(
-    const Eigen::MatrixXd & weight_acc_layer_1, const Eigen::MatrixXd & weight_steer_layer_1,
-    const Eigen::MatrixXd & weight_acc_layer_2, const Eigen::MatrixXd & weight_steer_layer_2,
-    const Eigen::MatrixXd & weight_lstm_ih, const Eigen::MatrixXd & weight_lstm_hh,
-    const Eigen::MatrixXd & weight_complimentary_layer,
-    const Eigen::MatrixXd & weight_linear_relu, const Eigen::MatrixXd & weight_final_layer,
-    const Eigen::VectorXd & bias_acc_layer_1, const Eigen::VectorXd & bias_steer_layer_1,
-    const Eigen::VectorXd & bias_acc_layer_2, const Eigen::VectorXd & bias_steer_layer_2,
-    const Eigen::VectorXd & bias_lstm_ih, const Eigen::VectorXd & bias_lstm_hh,
-    const Eigen::VectorXd & bias_complimentary_layer,
-    const Eigen::VectorXd & bias_linear_relu, const Eigen::VectorXd & bias_final_layer,
-    double vel_scaling, double vel_bias);
-  void clear_params();
-  void update_lstm(
-    const Eigen::VectorXd & x, const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-    Eigen::VectorXd & h_lstm_next, Eigen::VectorXd & c_lstm_next,
-    std::vector<Eigen::VectorXd> & u_acc_layer_1, std::vector<Eigen::VectorXd> & u_steer_layer_1,
-    std::vector<Eigen::VectorXd> & u_acc_layer_2, std::vector<Eigen::VectorXd> & u_steer_layer_2,
-    std::vector<Eigen::VectorXd> & u_i_lstm, std::vector<Eigen::VectorXd> & u_f_lstm, std::vector<Eigen::VectorXd> & u_g_lstm,
-    std::vector<Eigen::VectorXd> & u_o_lstm, std::vector<Eigen::VectorXd> & i_lstm, std::vector<Eigen::VectorXd> & f_lstm,
-    std::vector<Eigen::VectorXd> & g_lstm, std::vector<Eigen::VectorXd> & o_lstm,
-    std::vector<Eigen::VectorXd> & u_complimentary_layer, std::vector<Eigen::VectorXd> & h_complimentary_layer);
-  void error_prediction(
-    const Eigen::VectorXd & x, const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-    Eigen::VectorXd & h_lstm_next, Eigen::VectorXd & c_lstm_next,
-    std::vector<Eigen::VectorXd> & u_acc_layer_1, std::vector<Eigen::VectorXd> & u_steer_layer_1,
-    std::vector<Eigen::VectorXd> & u_acc_layer_2, std::vector<Eigen::VectorXd> & u_steer_layer_2,
-    std::vector<Eigen::VectorXd> & u_i_lstm, std::vector<Eigen::VectorXd> & u_f_lstm, std::vector<Eigen::VectorXd> & u_g_lstm,
-    std::vector<Eigen::VectorXd> & u_o_lstm, std::vector<Eigen::VectorXd> & i_lstm, std::vector<Eigen::VectorXd> & f_lstm,
-    std::vector<Eigen::VectorXd> & g_lstm, std::vector<Eigen::VectorXd> & o_lstm, std::vector<Eigen::VectorXd> & u_complimentary_layer,
-    std::vector<Eigen::VectorXd> & h_complimentary_layer,
-    std::vector<Eigen::VectorXd> & u_linear_relu, Eigen::VectorXd & y);
-  void error_prediction(
-    const Eigen::VectorXd & x, const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-    Eigen::VectorXd & h_lstm_next, Eigen::VectorXd & c_lstm_next, Eigen::VectorXd & y);
-  void error_prediction_with_diff(
-    const Eigen::VectorXd & x, const Eigen::VectorXd & h_lstm, const Eigen::VectorXd & c_lstm,
-    Eigen::VectorXd & h_lstm_next, Eigen::VectorXd & c_lstm_next, Eigen::VectorXd & y,
-    Eigen::MatrixXd & dy_dx, Eigen::MatrixXd & dy_dhc, Eigen::MatrixXd & dhc_dhc,
-    Eigen::MatrixXd & dhc_dx);
-};
+*/
 class TrainedDynamics
 {
 private:
@@ -349,13 +241,15 @@ private:
 
   FilterDiffNN filter_diff_NN_;
   int h_dim_;
+  int h_dim_full_;
   int state_dim_ = 6;
   double minimum_steer_diff_ = 0.03;
+  double minimum_acc_diff_ = 0.1;
 
   std::vector<std::string> all_state_name_ = {"x", "y", "vel", "yaw", "acc", "steer"};
   std::vector<std::string> state_component_predicted_ = {"acc", "steer"};
   std::vector<int> state_component_predicted_index_;
-  LinearRegressionCompensation linear_regression_compensation_;
+  LinearRegressionCompensator linear_regression_compensation_;
 public:
   TrainedDynamics();
   virtual ~TrainedDynamics();
@@ -364,24 +258,50 @@ public:
     double steer_time_constant, int acc_queue_size, int steer_queue_size, double control_dt,
     int predict_step);
   void set_NN_params(
+    const Eigen::MatrixXd & weight_acc_encoder_layer_1, const Eigen::MatrixXd & weight_steer_encoder_layer_1,
+    const Eigen::MatrixXd & weight_acc_encoder_layer_2, const Eigen::MatrixXd & weight_steer_encoder_layer_2,
     const Eigen::MatrixXd & weight_acc_layer_1, const Eigen::MatrixXd & weight_steer_layer_1,
     const Eigen::MatrixXd & weight_acc_layer_2, const Eigen::MatrixXd & weight_steer_layer_2,
+    const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_ih, const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_hh,
     const Eigen::MatrixXd & weight_lstm_ih, const Eigen::MatrixXd & weight_lstm_hh,
     const Eigen::MatrixXd & weight_complimentary_layer,
     const Eigen::MatrixXd & weight_linear_relu, const Eigen::MatrixXd & weight_final_layer,
+    const Eigen::VectorXd & bias_acc_encoder_layer_1, const Eigen::VectorXd & bias_steer_encoder_layer_1,
+    const Eigen::VectorXd & bias_acc_encoder_layer_2, const Eigen::VectorXd & bias_steer_encoder_layer_2,
     const Eigen::VectorXd & bias_acc_layer_1, const Eigen::VectorXd & bias_steer_layer_1,
     const Eigen::VectorXd & bias_acc_layer_2, const Eigen::VectorXd & bias_steer_layer_2,
+    const std::vector<Eigen::VectorXd> & bias_lstm_encoder_ih, const std::vector<Eigen::VectorXd> & bias_lstm_encoder_hh,
     const Eigen::VectorXd & bias_lstm_ih, const Eigen::VectorXd & bias_lstm_hh,
     const Eigen::VectorXd & bias_complimentary_layer,
     const Eigen::VectorXd & bias_linear_relu, const Eigen::VectorXd & bias_final_layer,
-    const double vel_scaling, const double vel_bias);
+    const double vel_scaling, const double vel_bias, const std::vector<std::string> state_component_predicted);
   void clear_NN_params();
   void set_sg_filter_params(int degree, int window_size);
+  Eigen::VectorXd nominal_prediction(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
+    const Eigen::VectorXd & steer_input_history_concat);
   void update_lstm_states(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat,
-    Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm);
-  void initialize_compensation();
+    std::vector<Eigen::VectorXd> & h_lstm, std::vector<Eigen::VectorXd> & c_lstm, const Eigen::Vector2d & acc_steer_error);
+  void initialize_compensation(int acc_queue_size, int steer_queue_size, int predict_step, int h_dim);
+  void update_state_queue_for_compensation(Eigen::VectorXd states);
+  void update_one_step_for_compensation(Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat, Eigen::VectorXd h_lstm, Eigen::VectorXd c_lstm, Eigen::VectorXd error_vector);
+  void update_regression_matrix_for_compensation();
+  void save_state_queue_for_compensation();
+  void load_state_queue_for_compensation();
+  void initialize_for_candidates_compensation(int num_candidates);
+  void set_offline_data_set_for_compensation(Eigen::MatrixXd XXT, Eigen::MatrixXd YYT);  
+  void unset_offline_data_set_for_compensation();
+  void set_projection_matrix_for_compensation(Eigen::MatrixXd projection_matrix);
+  void unset_projection_matrix_for_compensation();
+  Eigen::VectorXd prediction_for_compensation(
+    Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat, Eigen::VectorXd h_lstm, Eigen::VectorXd c_lstm
+  );
+  Eigen::MatrixXd Prediction_for_compensation(
+    Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat, Eigen::MatrixXd H_lstm, Eigen::MatrixXd C_lstm
+  );
+  /*
   void update_input_queue_for_compensation(Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat);
   void update_regression_matrix_for_compensation(Eigen::VectorXd error_vector);
   Eigen::VectorXd prediction_for_compensation(
@@ -391,11 +311,12 @@ public:
     Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat
   );
   Eigen::VectorXd get_compensation_bias();
+  */
   Eigen::VectorXd F_with_model_for_calc_controller_prediction_error(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat, 
     Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm, Eigen::VectorXd & previous_error, const int horizon);
-  Eigen::VectorXd F_with_model_for_compensation(
+  Eigen::VectorXd F_with_model_without_compensation(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat, 
     Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm, Eigen::VectorXd & previous_error, const int horizon);
@@ -508,11 +429,9 @@ private:
   std::vector<std::string> state_component_ilqr_ = {"vel", "acc", "steer"};
   std::vector<int> state_component_ilqr_index_;
   int num_state_component_ilqr_;
-  std::vector<double> acc_input_weight_vel_error_target_table_, acc_input_weight_vel_error_domain_table_;
-  std::vector<double> acc_input_weight_acc_error_target_table_, acc_input_weight_acc_error_domain_table_;
-  std::vector<double> steer_input_weight_lateral_error_target_table_, steer_input_weight_lateral_error_domain_table_;
-  std::vector<double> steer_input_weight_yaw_error_target_table_, steer_input_weight_yaw_error_domain_table_;
-  std::vector<double> steer_input_weight_steer_error_target_table_, steer_input_weight_steer_error_domain_table_;
+
+  std::vector<double> acc_input_weight_target_table_, longitudinal_coef_target_table_, longitudinal_coef_by_vel_error_domain_table_, longitudinal_coef_by_acc_error_domain_table_;
+  std::vector<double> steer_input_weight_target_table_, lateral_coef_target_table_, lateral_coef_by_lateral_error_domain_table_, lateral_coef_by_yaw_error_domain_table_, lateral_coef_by_steer_error_domain_table_;
 public:
   AdaptorILQR();
   virtual ~AdaptorILQR();
@@ -537,28 +456,53 @@ public:
     double steer_time_constant, int acc_queue_size, int steer_queue_size, double control_dt,
     int predict_step);
   void set_NN_params(
+    const Eigen::MatrixXd & weight_acc_encoder_layer_1, const Eigen::MatrixXd & weight_steer_encoder_layer_1,
+    const Eigen::MatrixXd & weight_acc_encoder_layer_2, const Eigen::MatrixXd & weight_steer_encoder_layer_2,
     const Eigen::MatrixXd & weight_acc_layer_1, const Eigen::MatrixXd & weight_steer_layer_1,
     const Eigen::MatrixXd & weight_acc_layer_2, const Eigen::MatrixXd & weight_steer_layer_2,
+    const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_ih, const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_hh,
     const Eigen::MatrixXd & weight_lstm_ih, const Eigen::MatrixXd & weight_lstm_hh,
     const Eigen::MatrixXd & weight_complimentary_layer,
     const Eigen::MatrixXd & weight_linear_relu, const Eigen::MatrixXd & weight_final_layer,
+    const Eigen::VectorXd & bias_acc_encoder_layer_1, const Eigen::VectorXd & bias_steer_encoder_layer_1,
+    const Eigen::VectorXd & bias_acc_encoder_layer_2, const Eigen::VectorXd & bias_steer_encoder_layer_2,
     const Eigen::VectorXd & bias_acc_layer_1, const Eigen::VectorXd & bias_steer_layer_1,
     const Eigen::VectorXd & bias_acc_layer_2, const Eigen::VectorXd & bias_steer_layer_2,
+    const std::vector<Eigen::VectorXd> & bias_lstm_encoder_ih, const std::vector<Eigen::VectorXd> & bias_lstm_encoder_hh,
     const Eigen::VectorXd & bias_lstm_ih, const Eigen::VectorXd & bias_lstm_hh,
     const Eigen::VectorXd & bias_complimentary_layer,
     const Eigen::VectorXd & bias_linear_relu, const Eigen::VectorXd & bias_final_layer,
-    const double vel_scaling, const double vel_bias);
+    const double vel_scaling, const double vel_bias, const std::vector<std::string> state_component_predicted);
   void clear_NN_params();
   void set_sg_filter_params(int degree, int horizon_len,int window_size);
+  Eigen::VectorXd nominal_prediction(
+    const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
+    const Eigen::VectorXd & steer_input_history_concat);
   void update_lstm_states(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history_concat,
     const Eigen::VectorXd & steer_input_history_concat,
-    Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm);
-  Eigen::VectorXd F_with_model_for_compensation(
+    std::vector<Eigen::VectorXd> & h_lstm, std::vector<Eigen::VectorXd> & c_lstm, const Eigen::Vector2d & previous_error);
+  Eigen::VectorXd F_with_model_without_compensation(
     const Eigen::VectorXd & states, Eigen::VectorXd & acc_input_history_concat,
     Eigen::VectorXd & steer_input_history_concat, 
     Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm, Eigen::VectorXd & previous_error, int horizon);
-  void initialize_compensation();
+  void initialize_compensation(int acc_queue_size, int steer_queue_size, int predict_step, int h_dim);
+  void update_state_queue_for_compensation(Eigen::VectorXd states);
+  void update_one_step_for_compensation(Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat, Eigen::VectorXd & h_lstm, Eigen::VectorXd & c_lstm);
+  void update_regression_matrix_for_compensation();
+  void save_state_queue_for_compensation();
+  void load_state_queue_for_compensation();
+  void set_offline_data_set_for_compensation(Eigen::MatrixXd XXT, Eigen::MatrixXd YYT);
+  void unset_offline_data_set_for_compensation();
+  void set_projection_matrix_for_compensation(Eigen::MatrixXd projection_matrix);
+  void unset_projection_matrix_for_compensation();
+  Eigen::VectorXd prediction_for_compensation(
+    Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat, Eigen::VectorXd h_lstm, Eigen::VectorXd c_lstm
+  );
+  /*
+  Eigen::MatrixXd Prediction_for_compensation(
+    Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat, Eigen::MatrixXd H_lstm, Eigen::MatrixXd C_lstm
+  );
   void update_input_queue_for_compensation(Eigen::VectorXd states, Eigen::VectorXd acc_input_history_concat, Eigen::VectorXd steer_input_history_concat);
   void update_regression_matrix_for_compensation(Eigen::VectorXd error_vector);
   Eigen::VectorXd prediction_for_compensation(
@@ -568,6 +512,7 @@ public:
     Eigen::MatrixXd States, Eigen::MatrixXd Acc_input_history_concat, Eigen::MatrixXd Steer_input_history_concat
   );
   Eigen::VectorXd get_compensation_bias();
+  */
   void calc_forward_trajectory_with_cost(
     Eigen::VectorXd states, Eigen::VectorXd acc_input_history, Eigen::VectorXd steer_input_history,
     std::vector<Eigen::MatrixXd> D_inputs_schedule, const Eigen::VectorXd & h_lstm,
@@ -575,7 +520,7 @@ public:
     const Eigen::VectorXd & previous_error, std::vector<Eigen::MatrixXd> & states_prediction,
     const std::vector<Eigen::VectorXd> & states_ref,
     const std::vector<Eigen::VectorXd> & d_input_ref, 
-    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight,
+    std::vector<Eigen::Vector2d> inputs_ref, double longitudinal_coef, double lateral_coef, double acc_input_weight, double steer_input_weight,
     Eigen::VectorXd & Cost);
   void calc_inputs_ref_info(
     const Eigen::VectorXd & states, const Eigen::VectorXd & acc_input_history,
@@ -583,7 +528,7 @@ public:
     const Eigen::VectorXd & c_lstm, 
     const Eigen::VectorXd & previous_error, const std::vector<Eigen::VectorXd> & states_ref,
     const Eigen::VectorXd & acc_controller_input_schedule, const Eigen::VectorXd & steer_controller_input_schedule,
-    std::vector<Eigen::Vector2d> & inputs_ref, double & acc_input_weight, double & steer_input_weight);
+    std::vector<Eigen::Vector2d> & inputs_ref, double & longitudinal_coef, double & lateral_coef,  double & acc_input_weight, double & steer_input_weight);
   Eigen::MatrixXd extract_dF_d_state(Eigen::MatrixXd dF_d_state_with_history);
   Eigen::MatrixXd extract_dF_d_input(Eigen::MatrixXd dF_d_input);
   Eigen::MatrixXd right_action_by_state_diff_with_history(Eigen::MatrixXd Mat, Eigen::MatrixXd dF_d_state_with_history);
@@ -595,7 +540,7 @@ public:
     const std::vector<Eigen::VectorXd> & states_prediction, const std::vector<Eigen::VectorXd> & d_inputs_schedule,
     const std::vector<Eigen::VectorXd> & states_ref,
     const std::vector<Eigen::VectorXd> & d_input_ref, const double prev_acc_rate, const double prev_steer_rate,
-    std::vector<Eigen::Vector2d> inputs_ref, double acc_input_weight, double steer_input_weight, const std::vector<Eigen::Vector2d> & inputs_schedule,
+    std::vector<Eigen::Vector2d> inputs_ref, double longitudinal_coef, double lateral_coef, double acc_input_weight, double steer_input_weight, const std::vector<Eigen::Vector2d> & inputs_schedule,
     std::vector<Eigen::MatrixXd> & K, std::vector<Eigen::VectorXd> & k);
   std::vector<Eigen::MatrixXd> calc_line_search_candidates(std::vector<Eigen::MatrixXd> K, std::vector<Eigen::VectorXd> k, std::vector<Eigen::MatrixXd> dF_d_states, std::vector<Eigen::MatrixXd> dF_d_inputs,  std::vector<Eigen::VectorXd> d_inputs_schedule, Eigen::VectorXd ls_points);
   void compute_optimal_control(Eigen::VectorXd states, Eigen::VectorXd acc_input_history,
@@ -618,7 +563,7 @@ private:
   SgFilter sg_filter_for_d_inputs_schedule_;
   ButterworthFilter butterworth_filter_;
   PolynomialFilter polynomial_filter_for_acc_inputs_, polynomial_filter_for_steer_inputs_;
-  InputsSchedulePrediction inputs_schedule_prediction_;
+  InputsSchedulePrediction acc_input_schedule_prediction_, steer_input_schedule_prediction_;
   int sg_window_size_for_d_inputs_schedule_, sg_deg_for_d_inputs_schedule_;
   bool use_sg_for_d_inputs_schedule_;
   double wheel_base_ = 2.79;
@@ -655,6 +600,7 @@ private:
   int sg_deg_for_NN_diff_ = 2;
   int sg_window_size_for_NN_diff_ = 5;
   int h_dim_;
+  int h_dim_full_;
   int state_dim_ = 6;
   double x_cost_ = 0.0;
   double y_cost_ = 0.0;
@@ -678,6 +624,8 @@ private:
   double steer_intermediate_cost_ = 10.0;
   int intermediate_cost_index_ = 5;
 
+  int NN_prediction_target_dim_;
+
 
   std::vector<double> steer_rate_input_table_ = {0.0001,0.001,0.01};
   std::vector<double> steer_rate_cost_coef_table_ = {100000.0,100.0,1.0};
@@ -692,12 +640,19 @@ private:
   Eigen::VectorXd acc_controller_input_history_, steer_controller_input_history_;
   std::vector<Eigen::VectorXd> d_inputs_schedule_;
   std::vector<Eigen::VectorXd> state_history_lstm_, acc_input_history_lstm_, steer_input_history_lstm_;
-  double acc_input_old_, steer_input_old_;
 
   int controller_acc_input_history_len_, controller_steer_input_history_len_;
   int deg_controller_acc_input_history_, deg_controller_steer_input_history_;
   std::vector<double> lam_controller_acc_input_history_, lam_controller_steer_input_history_;
   double minimum_decay_controller_acc_input_history_, minimum_decay_controller_steer_input_history_;
+  int acc_polynomial_prediction_len_, steer_polynomial_prediction_len_;
+
+  bool use_acc_linear_extrapolation_ = false;
+  bool use_steer_linear_extrapolation_ = false;
+  int acc_linear_extrapolation_len_ = 15;
+  int steer_linear_extrapolation_len_ = 15;
+  int past_len_for_acc_linear_extrapolation_ = 3;
+  int past_len_for_steer_linear_extrapolation_ = 3;
 
 
   int update_lstm_len_ = 50;
@@ -725,26 +680,45 @@ private:
   std::string input_filter_mode_ = "none";
   bool steer_controller_prediction_aided_ = false;
   double start_time_;
-  bool use_inputs_schedule_prediction_ = false;
+  bool use_acc_input_schedule_prediction_ = false;
+  bool use_steer_input_schedule_prediction_ = false;
+  int acc_input_schedule_prediction_len_, steer_input_schedule_prediction_len_;
+
+  int num_layers_encoder_;
+  bool acc_input_schedule_prediction_initialized_ = false;
+  bool steer_input_schedule_prediction_initialized_ = false;
 public:
   bool use_controller_steer_input_schedule_ = false;
+  bool use_vehicle_adaptor_;
   VehicleAdaptor();
   virtual ~VehicleAdaptor();
   void set_params();
   void set_NN_params(
+    const Eigen::MatrixXd & weight_acc_encoder_layer_1, const Eigen::MatrixXd & weight_steer_encoder_layer_1,
+    const Eigen::MatrixXd & weight_acc_encoder_layer_2, const Eigen::MatrixXd & weight_steer_encoder_layer_2,
     const Eigen::MatrixXd & weight_acc_layer_1, const Eigen::MatrixXd & weight_steer_layer_1,
     const Eigen::MatrixXd & weight_acc_layer_2, const Eigen::MatrixXd & weight_steer_layer_2,
+    const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_ih, const std::vector<Eigen::MatrixXd> & weight_lstm_encoder_hh,
     const Eigen::MatrixXd & weight_lstm_ih, const Eigen::MatrixXd & weight_lstm_hh,
     const Eigen::MatrixXd & weight_complimentary_layer,
     const Eigen::MatrixXd & weight_linear_relu, const Eigen::MatrixXd & weight_final_layer,
+    const Eigen::VectorXd & bias_acc_encoder_layer_1, const Eigen::VectorXd & bias_steer_encoder_layer_1,
+    const Eigen::VectorXd & bias_acc_encoder_layer_2, const Eigen::VectorXd & bias_steer_encoder_layer_2,
     const Eigen::VectorXd & bias_acc_layer_1, const Eigen::VectorXd & bias_steer_layer_1,
     const Eigen::VectorXd & bias_acc_layer_2, const Eigen::VectorXd & bias_steer_layer_2,
+    const std::vector<Eigen::VectorXd> & bias_lstm_encoder_ih, const std::vector<Eigen::VectorXd> & bias_lstm_encoder_hh,
     const Eigen::VectorXd & bias_lstm_ih, const Eigen::VectorXd & bias_lstm_hh,
     const Eigen::VectorXd & bias_complimentary_layer,
     const Eigen::VectorXd & bias_linear_relu, const Eigen::VectorXd & bias_final_layer,
-    const double vel_scaling, const double vel_bias);
+    const double vel_scaling, const double vel_bias, const std::vector<std::string> state_component_predicted);
   void set_NN_params_from_csv(std::string csv_dir);
   void clear_NN_params();
+  void set_offline_data_set_for_compensation(Eigen::MatrixXd XXT, Eigen::MatrixXd YYT);
+  void set_offline_data_set_for_compensation_from_csv(std::string csv_dir);
+  void unset_offline_data_set_for_compensation();
+  void set_projection_matrix_for_compensation(Eigen::MatrixXd projection_matrix);
+  void unset_projection_matrix_for_compensation();
+  void set_projection_matrix_for_compensation_from_csv(std::string csv_dir);
   void set_controller_d_inputs_schedule(const Eigen::VectorXd & acc_controller_d_inputs_schedule, const Eigen::VectorXd & steer_controller_d_inputs_schedule);
   void set_controller_d_steer_schedule(const Eigen::VectorXd & steer_controller_d_inputs_schedule);
   void set_controller_steer_input_schedule(double timestamp, const std::vector<double> & steer_controller_input_schedule);

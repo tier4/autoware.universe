@@ -5,6 +5,7 @@ import csv
 
 import argparse
 import os
+import array
 import numpy as np
 import pandas as pd
 import re
@@ -167,6 +168,8 @@ def read_msg_recursive(m):
             return m
         elif type(m) == list:
             return m
+        elif type(m) == array.array:
+            return list(m)
         else:
             return [m]
 

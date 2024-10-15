@@ -38,9 +38,9 @@ steer_time_constant = parameters.steer_time_constant
 
 x_error_sigma_for_training = 30.0
 y_error_sigma_for_training = 30.0
-v_error_sigma_for_training = 30.0
+v_error_sigma_for_training = 10.0
 theta_error_sigma_for_training = 10.0
-acc_error_sigma_for_training = 5.0
+acc_error_sigma_for_training = 10.0
 steer_error_sigma_for_training = 5.0
 
 
@@ -299,9 +299,26 @@ class add_data_from_csv:
             u_for_predict_nom[:, 1] = steer_input_queue[
                 steer_input_queue.shape[0] - steer_delay_step - predict_step : steer_input_queue.shape[0] - steer_delay_step
             ]
-            predict_error = state_obs - self.nominal_dynamics.F_nominal_predict(
+            predicted_state = self.nominal_dynamics.F_nominal_predict(
                 state, u_for_predict_nom.flatten()
             )
+            pseudo_predicted_state = state.copy()
+            for j in range(predict_step):
+                pseudo_predicted_state = self.nominal_dynamics.F_nominal(
+                    pseudo_predicted_state, u_for_predict_nom[j]
+                )
+                pseudo_predicted_state[acc_index] = States[i + j + 1, acc_index]
+                pseudo_predicted_state[steer_index] = States[i + j + 1, steer_index]
+            predict_error = state_obs - predicted_state
+            pseudo_predict_error = pseudo_predicted_state - predicted_state
+            if not parameters.use_position_observation:
+                predict_error[x_index] = pseudo_predict_error[x_index]
+                predict_error[y_index] = pseudo_predict_error[y_index]
+            if not parameters.use_vel_observation:
+                predict_error[vel_index] = pseudo_predict_error[vel_index]
+            if not parameters.use_yaw_observation:
+                predict_error[yaw_index] = pseudo_predict_error[yaw_index]
+
             predict_error = utils.rotate_data(predict_error, state[yaw_index])
             Y_list.append(predict_error / predict_dt)
             Z_list.append(state)
@@ -325,10 +342,12 @@ class add_data_from_csv:
                 if i < 3 * len(X_list) / 4:
                     self.X_train_list.append(X_list[i])
                     self.Y_train_list.append(Y_smooth[i])
+                    #self.Y_train_list.append(Y_list[i])
                     self.Z_train_list.append(Z_list[i])
                 else:
                     self.X_val_list.append(X_list[i])
                     self.Y_val_list.append(Y_smooth[i])
+                    #self.Y_val_list.append(Y_list[i])
                     self.Z_val_list.append(Z_list[i])
 
             self.division_indices_train.append(len(self.X_train_list))
@@ -338,6 +357,7 @@ class add_data_from_csv:
             for i in range(len(X_list)):
                 self.X_train_list.append(X_list[i])
                 self.Y_train_list.append(Y_smooth[i])
+                #self.Y_train_list.append(Y_list[i])
                 self.Z_train_list.append(Z_list[i])
 
             self.division_indices_train.append(len(self.X_train_list))
@@ -345,6 +365,7 @@ class add_data_from_csv:
             for i in range(len(X_list)):
                 self.X_val_list.append(X_list[i])
                 self.Y_val_list.append(Y_smooth[i])
+                #self.Y_val_list.append(Y_list[i])
                 self.Z_val_list.append(Z_list[i])
 
             self.division_indices_val.append(len(self.X_val_list))
@@ -352,6 +373,7 @@ class add_data_from_csv:
             for i in range(len(X_list)):
                 self.X_test_list.append(X_list[i])
                 self.Y_test_list.append(Y_smooth[i])
+                #self.Y_test_list.append(Y_list[i])
                 self.Z_test_list.append(Z_list[i])
 
             self.division_indices_test.append(len(self.X_test_list))

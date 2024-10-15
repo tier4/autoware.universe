@@ -45,6 +45,9 @@ integration_weight = float(trained_model_param["trained_model_parameter"]["loss"
 add_position_to_prediction = bool(trained_model_param["trained_model_parameter"]["setting"]["add_position_to_prediction"])
 add_vel_to_prediction = bool(trained_model_param["trained_model_parameter"]["setting"]["add_vel_to_prediction"])
 add_yaw_to_prediction = bool(trained_model_param["trained_model_parameter"]["setting"]["add_yaw_to_prediction"])
+use_position_observation = bool(trained_model_param["trained_model_parameter"]["setting"]["use_position_observation"])
+use_vel_observation = bool(trained_model_param["trained_model_parameter"]["setting"]["use_vel_observation"])
+use_yaw_observation = bool(trained_model_param["trained_model_parameter"]["setting"]["use_yaw_observation"])
 integrate_states = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_states"])
 integrate_vel = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_vel"])
 integrate_yaw = bool(trained_model_param["trained_model_parameter"]["setting"]["integrate_yaw"])
@@ -60,3 +63,13 @@ steer_queue_size = int(trained_model_param["trained_model_parameter"]["queue_siz
 control_dt = 0.033
 acc_delay_step = round(acc_time_delay / control_dt)
 steer_delay_step = round(steer_time_delay / control_dt)
+
+acc_input_schedule_prediction_len = int(optimization_param["optimization_parameter"]["inputs_schedule_prediction_NN"]["acc_input_schedule_prediction_len"])
+steer_input_schedule_prediction_len = int(optimization_param["optimization_parameter"]["inputs_schedule_prediction_NN"]["steer_input_schedule_prediction_len"])
+controller_acc_input_history_len = int(optimization_param["optimization_parameter"]["inputs_schedule_prediction_NN"]["controller_acc_input_history_len"])
+controller_steer_input_history_len = int(optimization_param["optimization_parameter"]["inputs_schedule_prediction_NN"]["controller_steer_input_history_len"])
+
+fit_yaw_for_linear_compensation = bool(optimization_param["optimization_parameter"]["compensation"]["fit_yaw"])
+x_history_len_for_linear_compensation = int(optimization_param["optimization_parameter"]["compensation"]["x_history_len"])
+vel_scale_for_linear_compensation = float(optimization_param["optimization_parameter"]["compensation"]["vel_scale"])
+compensation_lstm_len = int(optimization_param["optimization_parameter"]["compensation"]["compensation_lstm_len"])

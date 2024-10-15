@@ -15,12 +15,15 @@ from utils.data_collection_utils import ControlType
 from utils import parameter_change_utils
 from utils.parameter_change_utils import ChangeParam
 from utils import data_collection_utils
+from utils import delay_compensator
 from autoware_vehicle_adaptor.controller import pure_pursuit_gain_updater
 from autoware_vehicle_adaptor.controller import pure_pursuit_controller
+
 import torch
 import pandas as pd
 import math
 import time
+import csv
 x_index = 0
 y_index = 1
 vel_index = 2
@@ -43,10 +46,17 @@ class PythonSimulator:
         self.acc_scaling = 1.0
         self.steer_scaling = 1.0
         self.steer_dead_band = 0.0012
+        self.acc_dead_band = 0.0
+        self.accel_dead_band = 0.0
+        self.brake_dead_band = 0.0
         self.measurement_steer_bias = 0.0
         self.sim_dt = 0.0033
         self.control_step = 10
         self.max_control_time = 100.0
+        self.acc_noise = 0.12
+        self.acc_smoothing_constant = 0.9
+
+
         self.control_dt = parameters.mpc_control_dt
         self.wheel_base = parameters.wheel_base
         self.horizon_len = parameters.mpc_horizon_len
@@ -89,14 +99,15 @@ class PythonSimulator:
 
         self.steer_rate_lim = 3.0
         self.vel_rate_lim = 2.0
-        self.accel_map_scale = None
-        self.adaptive_gear_ratio_coef = [15.713, 0.053, 0.042, 15.713, 0.053, 0.042]
         self.adaptive_gear_ratio_coef_control_input = [15.713, 0.053, 0.042]
         self.adaptive_gear_ratio_coef_sim_input = [15.713, 0.053, 0.042]
         self.adaptive_gear_ratio_coef_control_obs = [15.713, 0.053, 0.042]
         self.adaptive_gear_ratio_coef_sim_obs = [15.713, 0.053, 0.042]
         self.accel_brake_map_control_path = None
         self.accel_brake_map_sim_path = None
+        self.accel_time_delay = self.acc_time_delay
+        self.brake_time_delay = self.acc_time_delay
+
         if USE_SMART_MPC_PACKAGE:
             self.controller = drive_controller.drive_controller(
                 use_trained_model=False
@@ -112,7 +123,8 @@ class PythonSimulator:
         self.nominal_params = {}
         for param_name in ChangeParam.keys():
             self.nominal_params[param_name] = getattr(self,param_name)
-        
+        self.use_accel_brake_map = False
+
         default_accel_map_path = "../actuation_cmd_maps/accel_brake_maps/default_parameter/accel_map.csv"
         default_brake_map_path = "../actuation_cmd_maps/accel_brake_maps/default_parameter/brake_map.csv"
         #self.control_accel_map_path = "../actuation_cmd_maps/accel_brake_maps/low_quality_map/accel_map.csv"
@@ -123,9 +135,16 @@ class PythonSimulator:
         self.brake_map_control = actuation_map_2d.ActuationMap2D(default_brake_map_path)
         self.accel_delay_step_sim = self.acc_delay_step_sim
         self.brake_delay_step_sim = self.acc_delay_step_sim
-        self.use_accel_brake_map = False
         self.use_adaptive_gear_ratio_input = False
         self.use_adaptive_gear_ratio_obs = False
+
+
+        #self.acc_delay_extrapolator = delay_compensator.LinearExtrapolator()
+        #self.steer_delay_extrapolator = delay_compensator.LinearExtrapolator()
+        #self.acc_delay_extrapolator = delay_compensator.PolynomialExtrapolator()
+        #self.steer_delay_extrapolator = delay_compensator.PolynomialExtrapolator()
+        #self.acc_delay_extrapolator = delay_compensator.NNExtrapolator(cmd_mode="acc")
+        #self.steer_delay_extrapolator = delay_compensator.NNExtrapolator(cmd_mode="steer")
     def perturbed_sim(self, sim_setting_dict):
         self.sim_setting_dict.clear()
         self.perturbed_sim_flag = False
@@ -150,51 +169,27 @@ class PythonSimulator:
                 self.nominal_setting_dict[key] = value
                 self.sim_setting_dict[key] = sim_setting_dict[key]
                 self.perturbed_sim_flag = True
+        if any(atr in sim_setting_dict for atr in ["accel_brake_map_control_path","accel_brake_map_sim_path", "accel_time_delay", "brake_time_delay", "accel_dead_band", "brake_dead_band"]):
+            self.use_accel_brake_map = True
+        else:
+            self.use_accel_brake_map = False
         self.acc_delay_step_sim = round(self.acc_time_delay / self.sim_dt)
         self.steer_delay_step_sim = round(self.steer_time_delay / self.sim_dt)
-
-        if self.accel_map_scale is not None:
-            df = pd.read_csv("supporting_data/accel_map.csv", header=None)
-            current_vel_axis = np.array(
-                [float(df.loc[0].values[1 + i]) for i in range(len(df.loc[0].values[1:]))]
-            )
-            accel_cmd_axis = np.array(
-                [float(df[0].values[1 + i]) for i in range(len(df[0].values[1:]))]
-            )
-            accel_map_data = np.zeros((len(accel_cmd_axis), len(current_vel_axis)))
-            for i in range(len(current_vel_axis)):
-                for j in range(len(accel_cmd_axis)):
-                    accel_map_data[j, i] = float(df[1 + i].values[1 + j]) * (
-                        self.accel_map_scale ** (i * 1.0 / (len(current_vel_axis) - 1))
-                    )
-            v_acc_cmd = [(v, acc_cmd) for v in current_vel_axis for acc_cmd in accel_cmd_axis]
-            acc_obs = [
-                accel_map_data[j, i]
-                for i in range(len(current_vel_axis))
-                for j in range(len(accel_cmd_axis))
-            ]
-            accel_map_f_ = scipy.interpolate.LinearNDInterpolator(v_acc_cmd, acc_obs)
-
-            def accel_map_f(v, acc):
-                result = accel_map_f_(
-                    [np.clip(v, a_min=current_vel_axis.min(), a_max=current_vel_axis.max())],
-                    [np.clip(acc, a_min=accel_cmd_axis.min(), a_max=accel_cmd_axis.max())],
-                )
-                return result
-            self.accel_map_f = accel_map_f
+        self.accel_delay_step_sim = round(self.acc_time_delay / self.sim_dt)
+        self.brake_delay_step_sim = round(self.brake_time_delay / self.sim_dt)
+        #self.acc_delay_extrapolator.set_params(max(self.acc_time_delay - self.nominal_params["acc_time_delay"], 0.0))
+        #self.steer_delay_extrapolator.set_params(max(self.steer_time_delay - self.nominal_params["steer_time_delay"], 0.0))
+                
     def setattr(self,data):
         for key,value in data.items():
             setattr(self,key,value)
     def common_initialization(self):
-        self.use_accel_brake_map = False
         if self.accel_brake_map_control_path is not None:
             self.accel_map_control = actuation_map_2d.ActuationMap2D(self.accel_brake_map_control_path + "/accel_map.csv")
             self.brake_map_control = actuation_map_2d.ActuationMap2D(self.accel_brake_map_control_path + "/brake_map.csv")
-            self.use_accel_brake_map = True
         if self.accel_brake_map_sim_path is not None:
             self.accel_map_sim = actuation_map_2d.ActuationMap2D(self.accel_brake_map_sim_path + "/accel_map.csv")
             self.brake_map_sim = actuation_map_2d.ActuationMap2D(self.accel_brake_map_sim_path + "/brake_map.csv")
-            self.use_accel_brake_map = True
         self.use_adaptive_gear_ratio_input = False
         self.use_adaptive_gear_ratio_obs = False
         if "adaptive_gear_ratio_coef_control_input" in self.sim_setting_dict:
@@ -291,7 +286,7 @@ class PythonSimulator:
 
         self.target_vel_list = []
         self.log_updater.set_data_collection_mode("data_collection")
-    def F_sim(self, states, inputs):
+    def F_sim(self, states, inputs, mode="raw_acc"):
         v = states[vel_index]
         yaw = states[yaw_index]
         acc = states[acc_index]
@@ -305,27 +300,29 @@ class PythonSimulator:
             steer_diff = steer_diff + self.steer_dead_band
         else:
             steer_diff = 0.0
-        actual_acc_input = self.acc_scaling * acc_input
-        if self.accel_map_scale is not None:
-            #if actual_acc_input > 0:
-            actual_acc_input = self.accel_map_f(v, actual_acc_input)[0] 
-        coef_from_tire_to_wheel = (
-            20.0  # Assuming a fixed gear ratio of 20 (moving in a range of roughly 15-30)
-        )
-        steer_wheel = coef_from_tire_to_wheel * steer
-        adaptive_gear_ratio1 = self.adaptive_gear_ratio_coef[0] + self.adaptive_gear_ratio_coef[1] * v * v - self.adaptive_gear_ratio_coef[2] * abs(steer_wheel)
-        adaptive_gear_ratio2 = self.adaptive_gear_ratio_coef[3] + self.adaptive_gear_ratio_coef[4] * v * v - self.adaptive_gear_ratio_coef[5] * abs(steer_wheel)
-        actual_steer = (
-            steer * (adaptive_gear_ratio1 / adaptive_gear_ratio2)
-            - self.measurement_steer_bias
-        )
 
+        acc_diff = self.acc_scaling * acc_input - acc
+        if mode == "raw_acc":
+            acc_dead_band = self.acc_dead_band
+        elif mode == "accel":
+            acc_dead_band = self.accel_dead_band
+        elif mode == "brake":
+            acc_dead_band = self.brake_dead_band
+        else:
+            print("invalid mode")
+            return
+        if acc_diff >= acc_dead_band:
+            acc_diff = acc_diff - acc_dead_band
+        elif acc_diff <= -acc_dead_band:
+            acc_diff = acc_diff + acc_dead_band
+        else:
+            acc_diff = 0.0
         states_dot = np.zeros(6)
         states_dot[x_index] = v * np.cos(yaw)
         states_dot[y_index] = v * np.sin(yaw)
-        states_dot[vel_index] = actual_acc_input
-        states_dot[yaw_index] = v / self.wheel_base * np.tan(actual_steer)
-        states_dot[acc_index] = (actual_acc_input - acc) / self.acc_time_constant
+        states_dot[vel_index] = acc
+        states_dot[yaw_index] = v / self.wheel_base * np.tan(steer - self.measurement_steer_bias)
+        states_dot[acc_index] = acc_diff / self.acc_time_constant
         states_dot[steer_index] = steer_diff / self.steer_time_constant
         states_new = states + states_dot * self.sim_dt
         if states_new[vel_index] < 0.0:
@@ -344,6 +341,8 @@ class PythonSimulator:
         vehicle_adaptor_model_path="vehicle_model.pth",
         states_ref_mode="predict_by_polynomial_regression",
         course_csv_data="slalom_course_data.csv", # "slalom_course_data.csv" or "mpc_figure_eight_course_data.csv"
+        offline_data_dir=None,
+        projection_matrix_dir=None,
         max_lateral_accel = None):
         #if control_type != ControlType.mpc:
         #    print(f"\n[run {control_type.value}]\n")
@@ -379,11 +378,18 @@ class PythonSimulator:
             self.vehicle_adaptor.clear_NN_params()
             self.set_NN_params(vehicle_adaptor_model_path)
             self.vehicle_adaptor.send_initialized_flag()
+            self.vehicle_adaptor.unset_offline_data_set_for_compensation()
+            self.vehicle_adaptor.unset_projection_matrix_for_compensation()
+            if offline_data_dir is not None:
+                self.set_offline_data_for_linear_compensation(offline_data_dir)
+            if projection_matrix_dir is not None:
+                self.set_projection_matrix_for_linear_compensation(projection_matrix_dir)
         prev_u_actual_input = np.zeros(2)
         prev_u_actual_input[1] = self.initial_steer_input
         break_flag = False
         t_current = 0.0
         simulation_num = 0
+        prev_acc_obs = None
         while True:
             # steer_wheel_obs = steer_to_steer_wheel(states_for_controller[vel_index], states_for_controller[steer_index], self.adaptive_gear_ratio_coef_sim_obs)
             agr_obs_sim = get_adaptive_gear_ratio_by_steer(self.states_current[vel_index], self.states_current[steer_index], self.adaptive_gear_ratio_coef_sim_obs)
@@ -394,6 +400,10 @@ class PythonSimulator:
                     agr_obs_control = get_adaptive_gear_ratio_by_steer_wheel(states_for_controller[vel_index], steer_wheel_obs, self.adaptive_gear_ratio_coef_control_obs)
                     states_for_controller[steer_index] = steer_wheel_obs / agr_obs_control
                     # states_for_controller[steer_index] = steer_wheel_to_steer(states_for_controller[vel_index], steer_wheel_obs, self.adaptive_gear_ratio_coef_control_obs)
+                states_for_controller[acc_index] += self.acc_noise * np.random.randn()
+                if prev_acc_obs is not None:
+                    states_for_controller[acc_index] = self.acc_smoothing_constant * prev_acc_obs + (1.0 - self.acc_smoothing_constant) * states_for_controller[acc_index]
+                prev_acc_obs = states_for_controller[acc_index]
                 if control_type == ControlType.mpc:
                     X_des, U_des, tracking_error, break_flag = self.get_mpc_trajectory(
                         t_current, states_for_controller
@@ -533,6 +543,33 @@ class PythonSimulator:
                     # print("vehicle_adaptor time: ", time.time() - start_time)
                 else:
                     u_opt_adjusted = u_opt.copy()
+
+                    # use controller schedule
+                    #if USE_SMART_MPC_PACKAGE:
+                    #    nominal_inputs = self.controller.nominal_inputs
+                    #else:
+                    #    nominal_inputs = self.controller.get_d_inputs_schedule().T
+                    #u_opt_adjusted[1] += 2 * nominal_inputs[0,1] * self.control_dt
+                    #skip_time = 1 # 0.5sec
+                    #skip_time = 2 # 0.6sec
+                    #skip_time = 3 # 0.7sec
+                    #skip_time = 4 # 0.8sec
+                    #skip_time = 5 # 0.9sec
+                    #skip_time = 6 # 1.0sec
+
+                    # use linear extrapolator or polynomial extrapolator
+                    #for i in range(skip_time):
+                    #    u_opt_adjusted[1] += 3 * nominal_inputs[i+1,1] * self.control_dt
+                    #u_opt_adjusted[1] += 2 * nominal_inputs[skip_time+1,1] * self.control_dt
+
+                    #acc_adjusted = self.acc_delay_extrapolator.compensate(t_current, u_opt[0])
+                    #steer_adjusted = self.steer_delay_extrapolator.compensate(t_current, u_opt[1])
+                    #u_opt_adjusted = np.array([acc_adjusted, steer_adjusted])
+
+                    # use NN extrapolator
+                    # acc_adjusted = self.acc_delay_extrapolator.compensate(t_current, u_opt[0], states_for_controller[vel_index])
+                    # steer_adjusted = self.steer_delay_extrapolator.compensate(t_current, u_opt[1], states_for_controller[vel_index])
+                    # u_opt_adjusted = np.array([acc_adjusted, steer_adjusted])
                 if control_type == ControlType.mpc:
                     if t_current < 5.0:
                         u_opt_adjusted[1] = self.initial_steer_input
@@ -574,8 +611,10 @@ class PythonSimulator:
             raw_steer_input = self.steer_input_queue.pop(0)
             if (accel_input_with_delay > 0):
                 actual_acc_input = self.accel_map_sim.get_sim_actuation(self.states_current[vel_index],accel_input_with_delay)
+                mode = "accel"
             else:
                 actual_acc_input = self.brake_map_sim.get_sim_actuation(self.states_current[vel_index],brake_input_with_delay)
+                mode = "brake"
             # actual_steer_input = steer_wheel_to_steer(self.states_current[vel_index], steer_wheel_input_with_delay, self.adaptive_gear_ratio_coef_sim_input)
             agr_sim_input = get_adaptive_gear_ratio_by_steer_wheel(self.states_current[vel_index], steer_wheel_input_with_delay, self.adaptive_gear_ratio_coef_sim_input)
             actual_steer_input = steer_wheel_input_with_delay / agr_sim_input
@@ -584,6 +623,7 @@ class PythonSimulator:
                 u_actual_input[0] = actual_acc_input
             else:
                 u_actual_input[0] = raw_acc_input
+                mode = "raw_acc"
             if self.use_adaptive_gear_ratio_input:
                 u_actual_input[1] = actual_steer_input
             else:
@@ -596,7 +636,7 @@ class PythonSimulator:
                 prev_u_actual_input[1] - delta_steer_max,
                 prev_u_actual_input[1] + delta_steer_max,
             )
-            self.states_current = self.F_sim(self.states_current, u_actual_input)
+            self.states_current = self.F_sim(self.states_current, u_actual_input, mode)
             prev_u_actual_input = u_actual_input.copy()
             if control_type == ControlType.mpc and (simulation_num % 1000 == 999 or break_flag):
                 self.save_mpc_drive_record(t_current, save_dir, use_vehicle_adaptor)
@@ -620,33 +660,71 @@ class PythonSimulator:
     def set_NN_params(self, vehicle_adaptor_model_path):
         if isinstance(vehicle_adaptor_model_path, str):
             vehicle_model = torch.load(vehicle_adaptor_model_path)
-            self.set_NN_params_from_model(vehicle_model)
+            load_dir = vehicle_adaptor_model_path.replace(".pth", "")
+            self.set_NN_params_from_model(vehicle_model, load_dir)
         else:
             for path in vehicle_adaptor_model_path:
                 vehicle_model = torch.load(path)
-                self.set_NN_params_from_model(vehicle_model)
-    def set_NN_params_from_model(self, vehicle_model):
+                load_dir = path.replace(".pth", "")
+                self.set_NN_params_from_model(vehicle_model, load_dir)
+    def set_offline_data_for_linear_compensation(self, csv_dir):
+        XXT = np.loadtxt(csv_dir + "/XXT.csv", delimiter=",")
+        YXT = np.loadtxt(csv_dir + "/YXT.csv", delimiter=",")
+        self.vehicle_adaptor.set_offline_data_set_for_compensation(XXT, YXT)
+    def set_projection_matrix_for_linear_compensation(self, csv_dir):
+        P = np.loadtxt(csv_dir + "/Projection.csv", delimiter=",")
+        self.vehicle_adaptor.set_projection_matrix_for_compensation(P)
+    def set_NN_params_from_model(self, vehicle_model,load_dir):
+        
+        state_component_predicted_dir = load_dir + "/state_component_predicted.csv"
+        state_component_predicted = []
+        with open(state_component_predicted_dir, "r", newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                state_component_predicted.extend(row)
+        weight_encoder_ih = []
+        weight_encoder_hh = []
+        bias_encoder_ih = []
+        bias_encoder_hh = []
+        for i in range(vehicle_model.num_layers_encoder):
+            weight_encoder_ih.append(vehicle_model.lstm_encoder.__getattr__("weight_ih_l" + str(i)).detach().numpy().astype(np.float64))
+            weight_encoder_hh.append(vehicle_model.lstm_encoder.__getattr__("weight_hh_l" + str(i)).detach().numpy().astype(np.float64))
+            bias_encoder_ih.append(vehicle_model.lstm_encoder.__getattr__("bias_ih_l" + str(i)).detach().numpy().astype(np.float64))
+            bias_encoder_hh.append(vehicle_model.lstm_encoder.__getattr__("bias_hh_l" + str(i)).detach().numpy().astype(np.float64))
         self.vehicle_adaptor.set_NN_params(
+            vehicle_model.acc_encoder_layer_1[0].weight.detach().numpy().astype(np.float64),
+            vehicle_model.steer_encoder_layer_1[0].weight.detach().numpy().astype(np.float64),
+            vehicle_model.acc_encoder_layer_2[0].weight.detach().numpy().astype(np.float64),
+            vehicle_model.steer_encoder_layer_2[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.acc_layer_1[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.steer_layer_1[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.acc_layer_2[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.steer_layer_2[0].weight.detach().numpy().astype(np.float64),
+            weight_encoder_ih,
+            weight_encoder_hh,
             vehicle_model.lstm.weight_ih_l0.detach().numpy().astype(np.float64),
             vehicle_model.lstm.weight_hh_l0.detach().numpy().astype(np.float64),
             vehicle_model.complimentary_layer[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.linear_relu[0].weight.detach().numpy().astype(np.float64),
             vehicle_model.final_layer.weight.detach().numpy().astype(np.float64),
+            vehicle_model.acc_encoder_layer_1[0].bias.detach().numpy().astype(np.float64),
+            vehicle_model.steer_encoder_layer_1[0].bias.detach().numpy().astype(np.float64),
+            vehicle_model.acc_encoder_layer_2[0].bias.detach().numpy().astype(np.float64),
+            vehicle_model.steer_encoder_layer_2[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.acc_layer_1[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.steer_layer_1[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.acc_layer_2[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.steer_layer_2[0].bias.detach().numpy().astype(np.float64),
-            vehicle_model.lstm.bias_hh_l0.detach().numpy().astype(np.float64),
+            bias_encoder_ih,
+            bias_encoder_hh,
             vehicle_model.lstm.bias_ih_l0.detach().numpy().astype(np.float64),
+            vehicle_model.lstm.bias_hh_l0.detach().numpy().astype(np.float64),
             vehicle_model.complimentary_layer[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.linear_relu[0].bias.detach().numpy().astype(np.float64),
             vehicle_model.final_layer.bias.detach().numpy().astype(np.float64),
             vehicle_model.vel_scaling,
             vehicle_model.vel_bias,
+            state_component_predicted,
         )
 
     def save_pp_eight_record(self, t_current,save_dir):
@@ -1178,10 +1256,10 @@ class PythonSimulator:
             if not use_vehicle_adaptor:
                 save_path = save_dir + "/python_simulator_nominal_model_fig_" + str(round(t_current,3)) + ".png"
             else:
-                save_path = save_dir + "/python_simulator_vehicle_adaptor_fig_" + str(round(t_current,3)) + ".png"        
+                save_path = save_dir + "/python_simulator_vehicle_adaptor_fig_" + str(round(t_current,3)) + ".png"
             plt.savefig(save_path)
             plt.close()
-            print("save:", save_path)
+            print("save:", save_path + ", total_abs_max_lateral_deviation:", total_abs_max_lateral_deviation)
     
     def save_vel_acc_heat(self,t_current, save_dir):
         sec_t = t_current
@@ -1283,13 +1361,16 @@ class PythonSimulator:
                             brake_input = self.brake_map_control.get_actuation_cmd(tmp_states[vel_index],tmp_inputs[0])
                         if (accel_input > 0):
                             actual_acc_input = self.accel_map_sim.get_sim_actuation(tmp_states[vel_index],accel_input)
+                            mode = "accel"
                         else:
-                            actual_acc_input = self.brake_map_sim.get_sim_actuation(tmp_states[vel_index],brake_input)  
+                            actual_acc_input = self.brake_map_sim.get_sim_actuation(tmp_states[vel_index],brake_input)
+                            mode = "brake"
                         actual_tmp_inputs = tmp_inputs.copy()
                         actual_tmp_inputs[0] = actual_acc_input
                     else:
                         actual_tmp_inputs = tmp_inputs.copy()
-                    tmp_states = self.F_sim(tmp_states, actual_tmp_inputs)
+                        mode = "raw_acc"
+                    tmp_states = self.F_sim(tmp_states, actual_tmp_inputs, mode)
                     
             true_states_prediction[i + 1] = tmp_states
         return true_states_prediction

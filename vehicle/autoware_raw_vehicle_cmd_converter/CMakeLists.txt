@@ -22,6 +22,9 @@ ament_auto_add_library(vehicle_adaptor SHARED
   src/vehicle_adaptor/vehicle_adaptor.cpp
   src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/utils.cpp
   src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/inputs_prediction.cpp
+  src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/nominal_dynamics.cpp
+  src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/transform_vehicle_adaptor_model.cpp
+  src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/src/linear_regression_compensator.cpp
 )
 target_include_directories(vehicle_adaptor PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src/vehicle_adaptor/autoware_vehicle_adaptor/autoware_vehicle_adaptor/include

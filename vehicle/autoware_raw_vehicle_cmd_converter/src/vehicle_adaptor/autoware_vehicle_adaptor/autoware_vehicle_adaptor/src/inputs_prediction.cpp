@@ -5,18 +5,20 @@
 #include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <vector>
 #include <cmath>
 #include "inputs_prediction.h"
+#include <sstream>
 
 namespace py = pybind11;
+
 
 Eigen::VectorXd tanh(const Eigen::VectorXd & v)
 {
   return v.array().tanh();
+}
+Eigen::VectorXd d_tanh(const Eigen::VectorXd & v)
+{
+  return 1 / (v.array().cosh() * v.array().cosh());
 }
 Eigen::VectorXd sigmoid(const Eigen::VectorXd & v)
 {
@@ -24,14 +26,121 @@ Eigen::VectorXd sigmoid(const Eigen::VectorXd & v)
 }
 Eigen::VectorXd relu(const Eigen::VectorXd & x)
 {
-  Eigen::VectorXd x_relu = x;
+  Eigen::VectorXd x_ = x;
   for (int i = 0; i < x.size(); i++) {
     if (x[i] < 0) {
-      x_relu[i] = 0;
+      x_[i] = 0;
     }
   }
-  return x_relu;
+  return x_;
 }
+Eigen::VectorXd d_relu(const Eigen::VectorXd & x)
+{
+  Eigen::VectorXd result = Eigen::VectorXd::Ones(x.size());
+  for (int i = 0; i < x.size(); i++) {
+    if (x[i] < 0) {
+      result[i] = 0;
+    }
+  }
+  return result;
+}
+Eigen::MatrixXd d_relu_product(const Eigen::MatrixXd & m, const Eigen::VectorXd & x)
+{
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(m.rows(), m.cols());
+  for (int i = 0; i < m.cols(); i++) {
+    if (x[i] >= 0) {
+      result.col(i) = m.col(i);
+    }
+  }
+  return result;
+}
+Eigen::MatrixXd d_tanh_product(const Eigen::MatrixXd & m, const Eigen::VectorXd & x)
+{
+  Eigen::MatrixXd result = Eigen::MatrixXd(m.rows(), m.cols());
+  for (int i = 0; i < m.cols(); i++) {
+    result.col(i) = m.col(i) / (std::cosh(x[i]) * std::cosh(x[i]));
+  }
+  return result;
+}
+Eigen::VectorXd d_tanh_product_vec(const Eigen::VectorXd & v, const Eigen::VectorXd & x)
+{
+  Eigen::VectorXd result = Eigen::VectorXd(v.size());
+  for (int i = 0; i < v.size(); i++) {
+    result[i] = v[i] / (std::cosh(x[i]) * std::cosh(x[i]));
+  }
+  return result;
+}
+Eigen::MatrixXd d_sigmoid_product(const Eigen::MatrixXd & m, const Eigen::VectorXd & x)
+{
+  Eigen::MatrixXd result = Eigen::MatrixXd(m.rows(), m.cols());
+  for (int i = 0; i < m.cols(); i++) {
+    result.col(i) = 0.25 * m.col(i) / (std::cosh(0.5 * x[i]) * std::cosh(0.5 * x[i]));
+  }
+  return result;
+}
+Eigen::VectorXd d_sigmoid_product_vec(const Eigen::VectorXd & v, const Eigen::VectorXd & x)
+{
+  Eigen::VectorXd result = Eigen::VectorXd(v.size());
+  for (int i = 0; i < v.size(); i++) {
+    result[i] = 0.25 * v[i] / (std::cosh(0.5 * x[i]) * std::cosh(0.5 * x[i]));
+  }
+  return result;
+}
+
+Eigen::VectorXd rotate_data(Eigen::VectorXd states, double yaw)
+{
+  Eigen::VectorXd states_rotated = states;
+  double cos_yaw = std::cos(yaw);
+  double sin_yaw = std::sin(yaw);
+  states_rotated[0] = states[0] * cos_yaw + states[1] * sin_yaw;
+  states_rotated[1] = -states[1] * sin_yaw + states[0] * cos_yaw;
+  return states_rotated;
+}
+
+Eigen::VectorXd vector_power(Eigen::VectorXd vec, int power)
+{
+  Eigen::VectorXd result = vec;
+  for (int i = 0; i < power - 1; i++) {
+    result = result.array() * vec.array();
+  }
+  return result;
+}
+
+double double_power(double val, int power)
+{
+  double result = val;
+  for (int i = 0; i < power - 1; i++) {
+    result = result * val;
+  }
+  return result;
+}
+
+double calc_table_value(double domain_value, std::vector<double> domain_table, std::vector<double> target_table)
+{
+  if (domain_value <= domain_table[0]) {
+    return target_table[0];
+  }
+  if (domain_value >= domain_table[domain_table.size() - 1]) {
+    return target_table[target_table.size() - 1];
+  }
+  for (int i = 0; i < int(domain_table.size()) - 1; i++) {
+    if (domain_value >= domain_table[i] && domain_value <= domain_table[i + 1]) {
+      return target_table[i] +
+             (target_table[i + 1] - target_table[i]) /
+               (domain_table[i + 1] - domain_table[i]) *
+               (domain_value - domain_table[i]);
+    }
+  }
+  return 0.0;
+}
+
+std::string get_param_dir_path()
+{
+  std::string build_path = BUILD_PATH;
+  std::string param_dir_path = build_path + "/autoware_vehicle_adaptor/param";
+  return param_dir_path;
+}
+
 Eigen::MatrixXd read_csv(std::string file_path)
 {
   std::string build_path = BUILD_PATH;
@@ -61,7 +170,29 @@ Eigen::MatrixXd read_csv(std::string file_path)
   }
   return data;
 }
-
+std::vector<std::string> read_string_csv(std::string file_path)
+{
+  std::string build_path = BUILD_PATH;
+  std::string file_path_abs = build_path + "/" + file_path;
+  std::vector<std::string> csv_data;
+  std::ifstream ifs(file_path_abs);
+  if (!ifs) {
+    std::cerr << "Failed to open file." << std::endl;
+    return csv_data;
+  }
+  std::string line;
+  while (std::getline(ifs, line)) {
+    std::stringstream stream(line);
+    std::string field;
+    while (std::getline(stream, field, ',')) {
+      field.erase(field.find_last_not_of(" \n\r\t") + 1);
+      field.erase(0, field.find_first_not_of(" \n\r\t"));
+      csv_data.push_back(field);
+    }
+  }
+  ifs.close();
+  return csv_data;
+}
 Eigen::VectorXd interpolate_eigen(Eigen::VectorXd y, std::vector<double> time_stamp_obs, std::vector<double> time_stamp_new)
 {
   Eigen::VectorXd y_new = Eigen::VectorXd(time_stamp_new.size());
@@ -100,78 +231,103 @@ std::vector<Eigen::VectorXd> interpolate_vector(std::vector<Eigen::VectorXd> y, 
   }
   return y_new;
 }
+
   InputsSchedulePrediction::InputsSchedulePrediction() {}
   InputsSchedulePrediction::~InputsSchedulePrediction() {}
-  void InputsSchedulePrediction::set_params(int input_step, int output_step, double control_dt, std::string csv_dir){
-    Eigen::MatrixXd weight_pre_encoder_0 = read_csv(csv_dir + "/weight_pre_encoder_0.csv");
-    Eigen::MatrixXd weight_pre_encoder_1 = read_csv(csv_dir + "/weight_pre_encoder_1.csv");
-    Eigen::MatrixXd weight_lstm_encoder_ih = read_csv(csv_dir + "/weight_lstm_encoder_ih.csv");
-    Eigen::MatrixXd weight_lstm_encoder_hh = read_csv(csv_dir + "/weight_lstm_encoder_hh.csv");
-    Eigen::MatrixXd weight_lstm_decoder_ih = read_csv(csv_dir + "/weight_lstm_decoder_ih.csv");
-    Eigen::MatrixXd weight_lstm_decoder_hh = read_csv(csv_dir + "/weight_lstm_decoder_hh.csv");
+  void InputsSchedulePrediction::set_params(int input_step, int output_step, double control_dt, std::string csv_dir, const int & adaptive_scale_index){
+    std::cout << "csv_dir: " << csv_dir << std::endl;
+    Eigen::MatrixXd weight_lstm_encoder_ih_0 = read_csv(csv_dir + "/weight_lstm_encoder_ih_0.csv");
+    Eigen::MatrixXd weight_lstm_encoder_hh_0 = read_csv(csv_dir + "/weight_lstm_encoder_hh_0.csv");
+    Eigen::MatrixXd weight_lstm_decoder_ih_0 = read_csv(csv_dir + "/weight_lstm_decoder_ih_0.csv");
+    Eigen::MatrixXd weight_lstm_decoder_hh_0 = read_csv(csv_dir + "/weight_lstm_decoder_hh_0.csv");
+    Eigen::MatrixXd weight_lstm_encoder_ih_1 = read_csv(csv_dir + "/weight_lstm_encoder_ih_1.csv");
+    Eigen::MatrixXd weight_lstm_encoder_hh_1 = read_csv(csv_dir + "/weight_lstm_encoder_hh_1.csv");
+    Eigen::MatrixXd weight_lstm_decoder_ih_1 = read_csv(csv_dir + "/weight_lstm_decoder_ih_1.csv");
+    Eigen::MatrixXd weight_lstm_decoder_hh_1 = read_csv(csv_dir + "/weight_lstm_decoder_hh_1.csv");
     Eigen::MatrixXd weight_post_decoder_0 = read_csv(csv_dir + "/weight_post_decoder_0.csv");
     Eigen::MatrixXd weight_post_decoder_1 = read_csv(csv_dir + "/weight_post_decoder_1.csv");
     Eigen::MatrixXd weight_final_layer = read_csv(csv_dir + "/weight_final_layer.csv");
     Eigen::VectorXd bias_pre_encoder_0 = read_csv(csv_dir + "/bias_pre_encoder_0.csv").col(0);
     Eigen::VectorXd bias_pre_encoder_1 = read_csv(csv_dir + "/bias_pre_encoder_1.csv").col(0);
-    Eigen::VectorXd bias_lstm_encoder_ih = read_csv(csv_dir + "/bias_lstm_encoder_ih.csv").col(0);
-    Eigen::VectorXd bias_lstm_encoder_hh = read_csv(csv_dir + "/bias_lstm_encoder_hh.csv").col(0);
-    Eigen::VectorXd bias_lstm_decoder_ih = read_csv(csv_dir + "/bias_lstm_decoder_ih.csv").col(0);
-    Eigen::VectorXd bias_lstm_decoder_hh = read_csv(csv_dir + "/bias_lstm_decoder_hh.csv").col(0);
+    Eigen::VectorXd bias_lstm_encoder_ih_0 = read_csv(csv_dir + "/bias_lstm_encoder_ih_0.csv").col(0);
+    Eigen::VectorXd bias_lstm_encoder_hh_0 = read_csv(csv_dir + "/bias_lstm_encoder_hh_0.csv").col(0);
+    Eigen::VectorXd bias_lstm_decoder_ih_0 = read_csv(csv_dir + "/bias_lstm_decoder_ih_0.csv").col(0);
+    Eigen::VectorXd bias_lstm_decoder_hh_0 = read_csv(csv_dir + "/bias_lstm_decoder_hh_0.csv").col(0);
+    Eigen::VectorXd bias_lstm_encoder_ih_1 = read_csv(csv_dir + "/bias_lstm_encoder_ih_1.csv").col(0);
+    Eigen::VectorXd bias_lstm_encoder_hh_1 = read_csv(csv_dir + "/bias_lstm_encoder_hh_1.csv").col(0);
+    Eigen::VectorXd bias_lstm_decoder_ih_1 = read_csv(csv_dir + "/bias_lstm_decoder_ih_1.csv").col(0);
+    Eigen::VectorXd bias_lstm_decoder_hh_1 = read_csv(csv_dir + "/bias_lstm_decoder_hh_1.csv").col(0);
     Eigen::VectorXd bias_post_decoder_0 = read_csv(csv_dir + "/bias_post_decoder_0.csv").col(0);
     Eigen::VectorXd bias_post_decoder_1 = read_csv(csv_dir + "/bias_post_decoder_1.csv").col(0);
     Eigen::VectorXd bias_final_layer = read_csv(csv_dir + "/bias_final_layer.csv").col(0);
-    Eigen::VectorXd adaptive_scale = read_csv(csv_dir + "/adaptive_scale.csv").col(0);
+    Eigen::VectorXd adaptive_scale;
+    if (adaptive_scale_index < 0) {
+      adaptive_scale = read_csv(csv_dir + "/adaptive_scale.csv").col(0);
+    }
+    else {
+      adaptive_scale = read_csv(csv_dir + "/adaptive_scale_" + std::to_string(adaptive_scale_index) + "/adaptive_scale.csv").col(0);
+    }
     Eigen::MatrixXd vel_params = read_csv(csv_dir + "/vel_params.csv");
     double vel_scaling = vel_params(0, 0);
     double vel_bias = vel_params(1, 0);
-    Eigen::MatrixXd limits = read_csv(csv_dir + "/limits.csv");
-    double jerk_lim= limits(0, 0);
-    double steer_rate_lim = limits(1, 0);
+    Eigen::MatrixXd limit = read_csv(csv_dir + "/limit.csv");
+    double input_rate_lim= limit(0, 0);
     set_NN_params(
-      weight_pre_encoder_0, weight_pre_encoder_1,
-      weight_lstm_encoder_ih, weight_lstm_encoder_hh,
-      weight_lstm_decoder_ih, weight_lstm_decoder_hh,
+      weight_lstm_encoder_ih_0, weight_lstm_encoder_hh_0,
+      weight_lstm_decoder_ih_0, weight_lstm_decoder_hh_0,
+      weight_lstm_encoder_ih_1, weight_lstm_encoder_hh_1,
+      weight_lstm_decoder_ih_1, weight_lstm_decoder_hh_1,
       weight_post_decoder_0, weight_post_decoder_1,
-      weight_final_layer, bias_pre_encoder_0,
-      bias_pre_encoder_1, bias_lstm_encoder_ih,
-      bias_lstm_encoder_hh, bias_lstm_decoder_ih,
-      bias_lstm_decoder_hh, bias_post_decoder_0,
+      weight_final_layer,
+      bias_lstm_encoder_ih_0, bias_lstm_encoder_hh_0,
+      bias_lstm_decoder_ih_0, bias_lstm_decoder_hh_0,
+      bias_lstm_encoder_ih_1, bias_lstm_encoder_hh_1,
+      bias_lstm_decoder_ih_1, bias_lstm_decoder_hh_1,
+      bias_post_decoder_0,
       bias_post_decoder_1, bias_final_layer,
       adaptive_scale,
-      input_step, output_step, jerk_lim, steer_rate_lim,
+      input_step, output_step, input_rate_lim,
       vel_scaling, vel_bias, control_dt);
       initialized_ = false;
   }
   void InputsSchedulePrediction::set_NN_params(
-    const Eigen::MatrixXd & weight_pre_encoder_0, const Eigen::MatrixXd & weight_pre_encoder_1,
-    const Eigen::MatrixXd & weight_lstm_encoder_ih, const Eigen::MatrixXd & weight_lstm_encoder_hh,
-    const Eigen::MatrixXd & weight_lstm_decoder_ih, const Eigen::MatrixXd & weight_lstm_decoder_hh,
-    const Eigen::MatrixXd & weight_post_decoder_0, const Eigen::MatrixXd & weight_post_decoder_1,
-    const Eigen::MatrixXd & weight_final_layer, const Eigen::VectorXd & bias_pre_encoder_0,
-    const Eigen::VectorXd & bias_pre_encoder_1, const Eigen::VectorXd & bias_lstm_encoder_ih,
-    const Eigen::VectorXd & bias_lstm_encoder_hh, const Eigen::VectorXd & bias_lstm_decoder_ih,
-    const Eigen::VectorXd & bias_lstm_decoder_hh, const Eigen::VectorXd & bias_post_decoder_0,
-    const Eigen::VectorXd & bias_post_decoder_1, const Eigen::VectorXd & bias_final_layer,
+    const Eigen::MatrixXd & weight_lstm_encoder_ih_0, const Eigen::MatrixXd & weight_lstm_encoder_hh_0,
+    const Eigen::MatrixXd & weight_lstm_decoder_ih_0, const Eigen::MatrixXd & weight_lstm_decoder_hh_0,
+    const Eigen::MatrixXd & weight_lstm_encoder_ih_1, const Eigen::MatrixXd & weight_lstm_encoder_hh_1,
+    const Eigen::MatrixXd & weight_lstm_decoder_ih_1, const Eigen::MatrixXd & weight_lstm_decoder_hh_1,
+    const Eigen::MatrixXd & weight_post_decoder_0,
+    const Eigen::MatrixXd & weight_post_decoder_1,
+    const Eigen::MatrixXd & weight_final_layer,
+    const Eigen::VectorXd & bias_lstm_encoder_ih_0, const Eigen::VectorXd & bias_lstm_encoder_hh_0,
+    const Eigen::VectorXd & bias_lstm_decoder_ih_0, const Eigen::VectorXd & bias_lstm_decoder_hh_0,
+    const Eigen::VectorXd & bias_lstm_encoder_ih_1, const Eigen::VectorXd & bias_lstm_encoder_hh_1,
+    const Eigen::VectorXd & bias_lstm_decoder_ih_1, const Eigen::VectorXd & bias_lstm_decoder_hh_1,
+    const Eigen::VectorXd & bias_post_decoder_0,
+    const Eigen::VectorXd & bias_post_decoder_1,
+    const Eigen::VectorXd & bias_final_layer,
     const Eigen::VectorXd & adaptive_scale,
-    int input_step, int output_step, double jerk_lim, double steer_rate_lim,
+    int input_step, int output_step, double input_rate_lim,
     double vel_scaling, double vel_bias, double control_dt)
   {
-    weight_pre_encoder_0_ = weight_pre_encoder_0;
-    weight_pre_encoder_1_ = weight_pre_encoder_1;
-    weight_lstm_encoder_ih_ = weight_lstm_encoder_ih;
-    weight_lstm_encoder_hh_ = weight_lstm_encoder_hh;
-    weight_lstm_decoder_ih_ = weight_lstm_decoder_ih;
-    weight_lstm_decoder_hh_ = weight_lstm_decoder_hh;
+    weight_lstm_encoder_ih_0_ = weight_lstm_encoder_ih_0;
+    weight_lstm_encoder_hh_0_ = weight_lstm_encoder_hh_0;
+    weight_lstm_decoder_ih_0_ = weight_lstm_decoder_ih_0;
+    weight_lstm_decoder_hh_0_ = weight_lstm_decoder_hh_0;
+    weight_lstm_encoder_ih_1_ = weight_lstm_encoder_ih_1;
+    weight_lstm_encoder_hh_1_ = weight_lstm_encoder_hh_1;
+    weight_lstm_decoder_ih_1_ = weight_lstm_decoder_ih_1;
+    weight_lstm_decoder_hh_1_ = weight_lstm_decoder_hh_1;
     weight_post_decoder_0_ = weight_post_decoder_0;
     weight_post_decoder_1_ = weight_post_decoder_1;
     weight_final_layer_ = weight_final_layer;
-    bias_pre_encoder_0_ = bias_pre_encoder_0;
-    bias_pre_encoder_1_ = bias_pre_encoder_1;
-    bias_lstm_encoder_ih_ = bias_lstm_encoder_ih;
-    bias_lstm_encoder_hh_ = bias_lstm_encoder_hh;
-    bias_lstm_decoder_ih_ = bias_lstm_decoder_ih;
-    bias_lstm_decoder_hh_ = bias_lstm_decoder_hh;
+    bias_lstm_encoder_ih_0_ = bias_lstm_encoder_ih_0;
+    bias_lstm_encoder_hh_0_ = bias_lstm_encoder_hh_0;
+    bias_lstm_decoder_ih_0_ = bias_lstm_decoder_ih_0;
+    bias_lstm_decoder_hh_0_ = bias_lstm_decoder_hh_0;
+    bias_lstm_encoder_ih_1_ = bias_lstm_encoder_ih_1;
+    bias_lstm_encoder_hh_1_ = bias_lstm_encoder_hh_1;
+    bias_lstm_decoder_ih_1_ = bias_lstm_decoder_ih_1;
+    bias_lstm_decoder_hh_1_ = bias_lstm_decoder_hh_1;
     bias_post_decoder_0_ = bias_post_decoder_0;
     bias_post_decoder_1_ = bias_post_decoder_1;
     bias_final_layer_ = bias_final_layer;
@@ -180,80 +336,94 @@ std::vector<Eigen::VectorXd> interpolate_vector(std::vector<Eigen::VectorXd> y, 
     output_step_ = output_step;
     vel_scaling_ = vel_scaling;
     vel_bias_ = vel_bias;
-    jerk_lim_ = jerk_lim;
-    steer_rate_lim_ = steer_rate_lim;
-    limit_scaling_ = Eigen::VectorXd(2);
-    limit_scaling_ << jerk_lim, steer_rate_lim;
+    input_rate_lim_ = input_rate_lim;
 
-    h_dim_ = weight_lstm_encoder_hh.cols();
+    h_dim_ = weight_lstm_encoder_hh_0.cols();
+    augmented_input_size_ = weight_lstm_decoder_ih_0.cols()-1;
     control_dt_ = control_dt;
   }
   void InputsSchedulePrediction::update_encoder_cells(
-    const Eigen::VectorXd & x, Eigen::VectorXd & h_lstm_encoder, Eigen::VectorXd & c_lstm_encoder
+    const Eigen::VectorXd & x, Eigen::VectorXd & h_lstm_encoder_0, Eigen::VectorXd & h_lstm_encoder_1, Eigen::VectorXd & c_lstm_encoder_0, Eigen::VectorXd & c_lstm_encoder_1
   ){
     Eigen::VectorXd x_scaled = x;
     x_scaled[vel_index_] = (x[vel_index_] - vel_bias_) * vel_scaling_;
-    Eigen::VectorXd h_pre_encoder = relu(weight_pre_encoder_0_ * x_scaled + bias_pre_encoder_0_);
-    h_pre_encoder = relu(weight_pre_encoder_1_ * h_pre_encoder + bias_pre_encoder_1_);
-    Eigen::VectorXd i_f_g_o = weight_lstm_encoder_ih_ * h_pre_encoder + bias_lstm_encoder_ih_ + weight_lstm_encoder_hh_ * h_lstm_encoder + bias_lstm_encoder_hh_;
-    Eigen::VectorXd i_lstm_encoder = sigmoid(i_f_g_o.segment(0, h_dim_));
-    Eigen::VectorXd f_lstm_encoder = sigmoid(i_f_g_o.segment(h_dim_, h_dim_));
-    Eigen::VectorXd g_lstm_encoder = tanh(i_f_g_o.segment(2 * h_dim_, h_dim_));
-    Eigen::VectorXd o_lstm_encoder = sigmoid(i_f_g_o.segment(3 * h_dim_, h_dim_));
-    c_lstm_encoder = f_lstm_encoder.array() * c_lstm_encoder.array() + i_lstm_encoder.array() * g_lstm_encoder.array();
-    h_lstm_encoder = o_lstm_encoder.array() * tanh(c_lstm_encoder).array();
+    Eigen::VectorXd i_f_g_o_0 = weight_lstm_encoder_ih_0_ * x_scaled + bias_lstm_encoder_ih_0_ + weight_lstm_encoder_hh_0_ * h_lstm_encoder_0 + bias_lstm_encoder_hh_0_;
+    Eigen::VectorXd i_lstm_encoder_0 = sigmoid(i_f_g_o_0.segment(0, h_dim_));
+    Eigen::VectorXd f_lstm_encoder_0 = sigmoid(i_f_g_o_0.segment(h_dim_, h_dim_));
+    Eigen::VectorXd g_lstm_encoder_0 = tanh(i_f_g_o_0.segment(2 * h_dim_, h_dim_));
+    Eigen::VectorXd o_lstm_encoder_0 = sigmoid(i_f_g_o_0.segment(3 * h_dim_, h_dim_));
+    c_lstm_encoder_0 = f_lstm_encoder_0.array() * c_lstm_encoder_0.array() + i_lstm_encoder_0.array() * g_lstm_encoder_0.array();
+    h_lstm_encoder_0 = o_lstm_encoder_0.array() * tanh(c_lstm_encoder_0).array();
+
+    Eigen::VectorXd i_f_g_o_1 = weight_lstm_encoder_ih_1_ * h_lstm_encoder_0 + bias_lstm_encoder_ih_1_ + weight_lstm_encoder_hh_1_ * h_lstm_encoder_1 + bias_lstm_encoder_hh_1_;
+    Eigen::VectorXd i_lstm_encoder_1 = sigmoid(i_f_g_o_1.segment(0, h_dim_));
+    Eigen::VectorXd f_lstm_encoder_1 = sigmoid(i_f_g_o_1.segment(h_dim_, h_dim_));
+    Eigen::VectorXd g_lstm_encoder_1 = tanh(i_f_g_o_1.segment(2 * h_dim_, h_dim_));
+    Eigen::VectorXd o_lstm_encoder_1 = sigmoid(i_f_g_o_1.segment(3 * h_dim_, h_dim_));
+    c_lstm_encoder_1 = f_lstm_encoder_1.array() * c_lstm_encoder_1.array() + i_lstm_encoder_1.array() * g_lstm_encoder_1.array();
+    h_lstm_encoder_1 = o_lstm_encoder_1.array() * tanh(c_lstm_encoder_1).array();
   }
   void InputsSchedulePrediction::get_encoder_cells(
-    const std::vector<Eigen::VectorXd> & x_seq, Eigen::VectorXd & h_lstm_encoder, Eigen::VectorXd & c_lstm_encoder
+    const std::vector<Eigen::VectorXd> & x_seq, Eigen::VectorXd & h_lstm_encoder_0, Eigen::VectorXd & h_lstm_encoder_1, Eigen::VectorXd & c_lstm_encoder_0, Eigen::VectorXd & c_lstm_encoder_1
   ){
-    h_lstm_encoder = Eigen::VectorXd::Zero(h_dim_);
-    c_lstm_encoder = Eigen::VectorXd::Zero(h_dim_);
+    h_lstm_encoder_0 = Eigen::VectorXd::Zero(h_dim_);
+    c_lstm_encoder_0 = Eigen::VectorXd::Zero(h_dim_);
+    h_lstm_encoder_1 = Eigen::VectorXd::Zero(h_dim_);
+    c_lstm_encoder_1 = Eigen::VectorXd::Zero(h_dim_);
     for (int i = 0; i < int(x_seq.size()); i++) {
-      update_encoder_cells(x_seq[i], h_lstm_encoder, c_lstm_encoder);
+      update_encoder_cells(x_seq[i], h_lstm_encoder_0, h_lstm_encoder_1, c_lstm_encoder_0, c_lstm_encoder_1);
     }
   }
   Eigen::VectorXd InputsSchedulePrediction::update_decoder_cells(
-    const Eigen::VectorXd & decoder_input, Eigen::VectorXd & h_lstm_decoder, Eigen::VectorXd & c_lstm_decoder
+    const Eigen::VectorXd & decoder_input, Eigen::VectorXd & h_lstm_decoder_0, Eigen::VectorXd & h_lstm_decoder_1, Eigen::VectorXd & c_lstm_decoder_0, Eigen::VectorXd & c_lstm_decoder_1
   ){
-    Eigen::VectorXd i_f_g_o = weight_lstm_decoder_ih_ * decoder_input + bias_lstm_decoder_ih_ + weight_lstm_decoder_hh_ * h_lstm_decoder + bias_lstm_decoder_hh_;
-    Eigen::VectorXd i_lstm_decoder = sigmoid(i_f_g_o.segment(0, h_dim_));
-    Eigen::VectorXd f_lstm_decoder = sigmoid(i_f_g_o.segment(h_dim_, h_dim_));
-    Eigen::VectorXd g_lstm_decoder = tanh(i_f_g_o.segment(2 * h_dim_, h_dim_));
-    Eigen::VectorXd o_lstm_decoder = sigmoid(i_f_g_o.segment(3 * h_dim_, h_dim_));
-    c_lstm_decoder = f_lstm_decoder.array() * c_lstm_decoder.array() + i_lstm_decoder.array() * g_lstm_decoder.array();
-    h_lstm_decoder = o_lstm_decoder.array() * tanh(c_lstm_decoder).array();
-    Eigen::VectorXd h_decoder = relu(weight_post_decoder_0_ * h_lstm_decoder + bias_post_decoder_0_);
+    Eigen::VectorXd i_f_g_o_0 = weight_lstm_decoder_ih_0_ * decoder_input + bias_lstm_decoder_ih_0_ + weight_lstm_decoder_hh_0_ * h_lstm_decoder_0 + bias_lstm_decoder_hh_0_;
+    Eigen::VectorXd i_lstm_decoder_0 = sigmoid(i_f_g_o_0.segment(0, h_dim_));
+    Eigen::VectorXd f_lstm_decoder_0 = sigmoid(i_f_g_o_0.segment(h_dim_, h_dim_));
+    Eigen::VectorXd g_lstm_decoder_0 = tanh(i_f_g_o_0.segment(2 * h_dim_, h_dim_));
+    Eigen::VectorXd o_lstm_decoder_0 = sigmoid(i_f_g_o_0.segment(3 * h_dim_, h_dim_));
+    c_lstm_decoder_0 = f_lstm_decoder_0.array() * c_lstm_decoder_0.array() + i_lstm_decoder_0.array() * g_lstm_decoder_0.array();
+    h_lstm_decoder_0 = o_lstm_decoder_0.array() * tanh(c_lstm_decoder_0).array();
+    Eigen::VectorXd i_f_g_o_1 = weight_lstm_decoder_ih_1_ * h_lstm_decoder_0 + bias_lstm_decoder_ih_1_ + weight_lstm_decoder_hh_1_ * h_lstm_decoder_1 + bias_lstm_decoder_hh_1_;
+    Eigen::VectorXd i_lstm_decoder_1 = sigmoid(i_f_g_o_1.segment(0, h_dim_));
+    Eigen::VectorXd f_lstm_decoder_1 = sigmoid(i_f_g_o_1.segment(h_dim_, h_dim_));
+    Eigen::VectorXd g_lstm_decoder_1 = tanh(i_f_g_o_1.segment(2 * h_dim_, h_dim_));
+    Eigen::VectorXd o_lstm_decoder_1 = sigmoid(i_f_g_o_1.segment(3 * h_dim_, h_dim_));
+    c_lstm_decoder_1 = f_lstm_decoder_1.array() * c_lstm_decoder_1.array() + i_lstm_decoder_1.array() * g_lstm_decoder_1.array();
+    h_lstm_decoder_1 = o_lstm_decoder_1.array() * tanh(c_lstm_decoder_1).array();
+    Eigen::VectorXd h_decoder = relu(weight_post_decoder_0_ * h_lstm_decoder_1 + bias_post_decoder_0_);
     Eigen::VectorXd h_decoder_scaled = h_decoder.array() * adaptive_scale_.array();
     h_decoder_scaled = relu(weight_post_decoder_1_ * h_decoder_scaled + bias_post_decoder_1_);
     Eigen::VectorXd output = weight_final_layer_ * h_decoder_scaled + bias_final_layer_;
-    //output[0] = jerk_lim_ * output[0];
-    //output[1] = steer_rate_lim_ * output[1];
     return output;
   }
-  std::vector<Eigen::VectorXd> InputsSchedulePrediction::predict(
+  std::vector<double> InputsSchedulePrediction::predict(
     const std::vector<Eigen::VectorXd> & x_seq
   ){
-    Eigen::VectorXd h_lstm_encoder, c_lstm_encoder;
-    get_encoder_cells(x_seq, h_lstm_encoder, c_lstm_encoder);
+    Eigen::VectorXd h_lstm_encoder_0, h_lstm_encoder_1, c_lstm_encoder_0, c_lstm_encoder_1;
+    get_encoder_cells(x_seq, h_lstm_encoder_0, h_lstm_encoder_1, c_lstm_encoder_0, c_lstm_encoder_1);
     //Eigen::VectorXd decoder_output = (x_seq[x_seq.size() - 1].tail(2) - x_seq[x_seq.size() - 2].tail(2)) / control_dt_;
-    Eigen::VectorXd output(4);
-    output.head(2) = x_seq[x_seq.size() - 1].tail(2);
-    output.tail(2) = (x_seq[x_seq.size() - 1].tail(2) - x_seq[x_seq.size() - 2].tail(2)) / control_dt_;
-    Eigen::VectorXd h_lstm_decoder = h_lstm_encoder;
-    Eigen::VectorXd c_lstm_decoder = c_lstm_encoder;
-    std::vector<Eigen::VectorXd> output_seq;
+    Eigen::VectorXd output(augmented_input_size_ + 1);
+    for (int i = 0; i < augmented_input_size_; i++) {
+      output[i] = x_seq[x_seq.size() - augmented_input_size_ + i][1];
+    }
+    output[augmented_input_size_] = (x_seq[x_seq.size() - 1][1] - x_seq[x_seq.size() - 2][1]) / control_dt_;
+    Eigen::VectorXd h_lstm_decoder_0 = h_lstm_encoder_0;
+    Eigen::VectorXd c_lstm_decoder_0 = c_lstm_encoder_0;
+    Eigen::VectorXd h_lstm_decoder_1 = h_lstm_encoder_1;
+    Eigen::VectorXd c_lstm_decoder_1 = c_lstm_encoder_1;
+    std::vector<double> output_seq;
     for (int i = 0; i < output_step_; i++) {
-      Eigen::VectorXd decoder_output = tanh(update_decoder_cells(output, h_lstm_decoder, c_lstm_decoder));
-      decoder_output[0] = jerk_lim_ * decoder_output[0];
-      decoder_output[1] = steer_rate_lim_ * decoder_output[1];
-      output.head(2) += decoder_output * control_dt_;
-      output.tail(2) = decoder_output;
-      //output += decoder_output * control_dt_;
-      output_seq.push_back(output.head(2));
+      Eigen::VectorXd decoder_output = tanh(update_decoder_cells(output, h_lstm_decoder_0, h_lstm_decoder_1, c_lstm_decoder_0, c_lstm_decoder_1));
+      decoder_output[0] = input_rate_lim_ * decoder_output[0];
+      output.head(augmented_input_size_ - 1) = output.segment(1, augmented_input_size_ - 1);
+      output[augmented_input_size_ - 1] += decoder_output[0] * control_dt_;
+      output.tail(1) = decoder_output;
+      output_seq.push_back(output[augmented_input_size_-1]);
     }
     return output_seq;
   }
-  std::vector<Eigen::VectorXd> InputsSchedulePrediction::get_inputs_schedule_predicted(
+  std::vector<double> InputsSchedulePrediction::get_inputs_schedule_predicted(
     const Eigen::VectorXd & x, double timestamp
   )
   {

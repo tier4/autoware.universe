@@ -48,7 +48,7 @@ def run_parameter_change_sim(
     step_response_max_length=1.5,
     step_response_interval=5.0,
     step_response_min_length=0.5,
-    batch_size=100,
+    batch_sizes=[100]
 ):
     param_val_list = change_param.value()
     dir_generator = DirGenerator(root=root)
@@ -118,7 +118,7 @@ def run_parameter_change_sim(
         if not SKIP_TRAINING:
             #model_trainer.get_trained_model(batch_size=batch_size)
             #model_trainer.save_model(path=save_dir+"/vehicle_model.pth")
-            model_trainer.get_trained_ensemble_models(batch_size=batch_size,ensemble_size=MODEL_NUM)
+            model_trainer.get_trained_ensemble_models(batch_sizes=batch_sizes,ensemble_size=MODEL_NUM)
             model_trainer.save_ensemble_models(paths=paths)
         #load_dir = save_dir
         save_dir = dir_generator.test_dir_name(

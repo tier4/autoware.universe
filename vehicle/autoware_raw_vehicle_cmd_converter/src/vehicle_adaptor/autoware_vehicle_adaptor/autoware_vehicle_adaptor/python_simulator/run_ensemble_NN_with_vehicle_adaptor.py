@@ -56,7 +56,7 @@ if not SKIP_VEHICLE_ADAPTOR_TRAINING:
     model_trainer.add_data_from_csv(train_dir,add_mode="as_train",map_dir=train_dir)
     model_trainer.add_data_from_csv(val_dir,add_mode="as_val",map_dir=train_dir)
 
-    model_trainer.get_trained_model(batch_size=100)
+    model_trainer.get_trained_model(batch_sizes=[100])
     model_trainer.save_model(path=train_dir+"/vehicle_model.pth")
 
 simulator.drive_sim(

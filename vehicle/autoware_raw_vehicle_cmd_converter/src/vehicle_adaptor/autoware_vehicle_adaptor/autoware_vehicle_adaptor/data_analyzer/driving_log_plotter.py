@@ -120,6 +120,22 @@ class DrivingLogPlotter:
         plt.title("acceleration")
         plt.legend()
         plt.show()
+    def plot_accel_brake(self, skip_time=0.0, plot_time=None, y_lim=[-1.0,1.0]):
+        if self.control_command_actuation_cmd is None:
+            print("control_command_actuation_cmd is not available")
+            return
+        plt.plot(self.control_command_actuation_cmd[:,0]+ 1e-9*self.control_command_actuation_cmd[:,1], self.accel_cmd, label="accel_cmd")
+        plt.plot(self.control_command_actuation_cmd[:,0]+ 1e-9*self.control_command_actuation_cmd[:,1], - self.brake_cmd, label="brake_cmd")
+        if plot_time is None:
+            plt.xlim([self.start_time+skip_time, self.start_time+self.total_time])
+        else:
+            plt.xlim([self.start_time+skip_time, self.start_time+skip_time+plot_time])
+        plt.ylim(y_lim)
+        plt.xlabel("time[s]")
+        plt.ylabel("accel brake")
+        plt.title("accel brake")
+        plt.legend()
+        plt.show()
     def plot_steer(self, skip_time=0.0, plot_time=None, y_lim=[-0.5,0.5]):
         plt.plot(self.vehicle_status_steering_status[:,0]+ 1e-9*self.vehicle_status_steering_status[:,1], self.steer, label="steer_obs")
         plt.plot(self.control_cmd[:,0]+ 1e-9*self.control_cmd[:,1], self.steer_cmd, label="steer_"+self.control_cmd_mode)
@@ -133,6 +149,66 @@ class DrivingLogPlotter:
         plt.xlabel("time[s]")
         plt.ylabel("steer[rad]")
         plt.title("steer")
+        plt.legend()
+        plt.show()
+    def plot_acc_change(self, window=1, skip_time=0.0, plot_time=None, y_lim=[-1.0,1.0]):
+        acc_change = np.zeros(self.acc.shape[0]-window)
+        for i in range(self.acc.shape[0] - window):
+            acc_change[i] = (self.acc[i+window] - self.acc[i])/(self.localization_acceleration[i+window,0]+ 1e-9*self.localization_acceleration[i+window,1] - self.localization_acceleration[i,0]- 1e-9*self.localization_acceleration[i,1])
+        plt.plot(self.localization_acceleration[window:,0]+ 1e-9*self.localization_acceleration[window:,1], acc_change, label="acc_change")
+        if plot_time is None:
+            plt.xlim([self.start_time+skip_time, self.start_time+self.total_time])
+        else:
+            plt.xlim([self.start_time+skip_time, self.start_time+skip_time+plot_time])
+        plt.ylim(y_lim)
+        plt.xlabel("time[s]")
+        plt.ylabel("acceleration_change[m/s^2]")
+        plt.title("acceleration_change")
+        plt.legend()
+        plt.show()
+    def plot_steer_change(self, window=1, skip_time=0.0, plot_time=None, y_lim=[-0.5,0.5]):
+        steer_change = np.zeros(self.steer.shape[0]-window)
+        for i in range(self.steer.shape[0] - window):
+            steer_change[i] = (self.steer[i+window] - self.steer[i])/(self.vehicle_status_steering_status[i+window,0]+ 1e-9*self.vehicle_status_steering_status[i+window,1] - self.vehicle_status_steering_status[i,0]- 1e-9*self.vehicle_status_steering_status[i,1])
+        plt.plot(self.vehicle_status_steering_status[window:,0]+ 1e-9*self.vehicle_status_steering_status[window:,1], steer_change, label="steer_change")
+        if plot_time is None:
+            plt.xlim([self.start_time+skip_time, self.start_time+self.total_time])
+        else:
+            plt.xlim([self.start_time+skip_time, self.start_time+skip_time+plot_time])
+        plt.ylim(y_lim)
+        plt.xlabel("time[s]")
+        plt.ylabel("steer_change[rad/s]")
+        plt.title("steer_change")
+        plt.legend()
+        plt.show()
+    def plot_acc_cmd_change(self, window=1, skip_time=0.0, plot_time=None, y_lim=[-1.0,1.0]):
+        acc_cmd_change = np.zeros(self.acc_cmd.shape[0]-window)
+        for i in range(self.acc_cmd.shape[0] - window):
+            acc_cmd_change[i] = (self.acc_cmd[i+window] - self.acc_cmd[i])/(self.control_cmd[i+window,0]+ 1e-9*self.control_cmd[i+window,1] - self.control_cmd[i,0]- 1e-9*self.control_cmd[i,1])
+        plt.plot(self.control_cmd[window:,0]+ 1e-9*self.control_cmd[window:,1], acc_cmd_change, label="acc_cmd_change")
+        if plot_time is None:
+            plt.xlim([self.start_time+skip_time, self.start_time+self.total_time])
+        else:
+            plt.xlim([self.start_time+skip_time, self.start_time+skip_time+plot_time])
+        plt.ylim(y_lim)
+        plt.xlabel("time[s]")
+        plt.ylabel("acceleration_cmd_change[m/s^2]")
+        plt.title("acceleration_cmd_change")
+        plt.legend()
+        plt.show()
+    def plot_steer_cmd_change(self, window=1, skip_time=0.0, plot_time=None, y_lim=[-0.5,0.5]):
+        steer_cmd_change = np.zeros(self.steer_cmd.shape[0]-window)
+        for i in range(self.steer_cmd.shape[0] - window):
+            steer_cmd_change[i] = (self.steer_cmd[i+window] - self.steer_cmd[i])/(self.control_cmd[i+window,0]+ 1e-9*self.control_cmd[i+window,1] - self.control_cmd[i,0]- 1e-9*self.control_cmd[i,1])
+        plt.plot(self.control_cmd[window:,0]+ 1e-9*self.control_cmd[window:,1], steer_cmd_change, label="steer_cmd_change")
+        if plot_time is None:
+            plt.xlim([self.start_time+skip_time, self.start_time+self.total_time])
+        else:
+            plt.xlim([self.start_time+skip_time, self.start_time+skip_time+plot_time])
+        plt.ylim(y_lim)
+        plt.xlabel("time[s]")
+        plt.ylabel("steer_cmd_change[rad/s]")
+        plt.title("steer_cmd_change")
         plt.legend()
         plt.show()
     def plot_lateral_deviation(self, skip_time=0.0, plot_time=None, y_lim=[-0.8,0.8]):
