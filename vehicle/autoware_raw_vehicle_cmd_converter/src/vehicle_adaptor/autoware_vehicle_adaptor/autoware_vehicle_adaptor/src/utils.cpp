@@ -1766,7 +1766,17 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
     acc_queue_size_ = trained_model_param_node["trained_model_parameter"]["queue_size"]["acc_queue_size"].as<int>();
     steer_queue_size_ = trained_model_param_node["trained_model_parameter"]["queue_size"]["steer_queue_size"].as<int>();
     update_lstm_len_ = trained_model_param_node["trained_model_parameter"]["lstm"]["update_lstm_len"].as<int>();
-    nominal_dynamics_controller_.set_params(wheel_base_,acc_time_delay_,steer_time_delay_,acc_time_constant_,steer_time_constant_,acc_queue_size_,steer_queue_size_,control_dt_,predict_step_);
+
+    YAML::Node controller_param_node = YAML::LoadFile(param_dir_path + "/controller_param.yaml");
+
+    double acc_time_delay_controller = controller_param_node["controller_parameter"]["acceleration"]["acc_time_delay"].as<double>();
+    double acc_time_constant_controller = controller_param_node["controller_parameter"]["acceleration"]["acc_time_constant"].as<double>();
+    double steer_time_delay_controller = controller_param_node["controller_parameter"]["steering"]["steer_time_delay"].as<double>();
+    double steer_time_constant_controller = controller_param_node["controller_parameter"]["steering"]["steer_time_constant"].as<double>();
+    acc_delay_step_controller_ = std::min(int(std::round(acc_time_delay_controller / control_dt_)), acc_queue_size_);
+    steer_delay_step_controller_ = std::min(int(std::round(steer_time_delay_controller / control_dt_)), steer_queue_size_);
+
+    nominal_dynamics_controller_.set_params(wheel_base_,acc_time_delay_controller,steer_time_delay_controller,acc_time_constant_controller,steer_time_constant_controller,acc_queue_size_,steer_queue_size_,control_dt_,predict_step_);
     nominal_dynamics_controller_.set_steer_dead_band(steer_dead_band_);
 
     
@@ -2425,7 +2435,7 @@ double PolynomialFilter::fit_transform(double timestamp, double sample)
       for (int i = 0; i < horizon_len_; i++) {
         for (int j = 0; j < predict_step_; j++) {
           Eigen::Vector2d inputs_tmp;
-          inputs_tmp << acc_controller_input_history_with_schedule[controller_acc_input_history_len + i*predict_step_ + j - acc_delay_step_ - 1], steer_controller_input_history_with_schedule[controller_steer_input_history_len + i*predict_step_ + j - steer_delay_step_ - 1];
+          inputs_tmp << acc_controller_input_history_with_schedule[controller_acc_input_history_len + i*predict_step_ + j - acc_delay_step_controller_ - 1], steer_controller_input_history_with_schedule[controller_steer_input_history_len + i*predict_step_ + j - steer_delay_step_controller_ - 1];
           states_ref_tmp = nominal_dynamics_controller_.F_nominal(states_ref_tmp, inputs_tmp);
           if (steer_controller_prediction_aided_){
             states_ref_tmp[steer_index_]

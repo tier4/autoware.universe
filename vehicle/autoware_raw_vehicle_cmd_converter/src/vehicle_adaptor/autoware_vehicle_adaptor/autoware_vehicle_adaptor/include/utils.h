@@ -595,7 +595,8 @@ private:
   int acc_delay_step_ = std::min(int(std::round(acc_time_delay_ / control_dt_)), acc_queue_size_);
   int steer_delay_step_ =
     std::min(int(std::round(steer_time_delay_ / control_dt_)), steer_queue_size_);
-
+  int acc_delay_step_controller_;
+  int steer_delay_step_controller_;
   int horizon_len_ = 10;
   int sg_deg_for_NN_diff_ = 2;
   int sg_window_size_for_NN_diff_ = 5;
