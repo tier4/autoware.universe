@@ -15,6 +15,7 @@
 #include <autoware/autonomous_emergency_braking/node.hpp>
 #include <autoware/autonomous_emergency_braking/utils.hpp>
 #include <autoware/motion_utils/marker/marker_helper.hpp>
+#include <autoware/motion_utils/trajectory/trajectory.hpp>
 #include <autoware/universe_utils/geometry/boost_geometry.hpp>
 #include <autoware/universe_utils/geometry/boost_polygon_utils.hpp>
 #include <autoware/universe_utils/geometry/geometry.hpp>
@@ -42,6 +43,7 @@
 #include <tf2/utils.h>
 
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <limits>
 #include <optional>
@@ -656,6 +658,7 @@ Path AEB::generateEgoPath(const double curr_v, const double curr_w)
   double t = 0.0;
 
   bool finished_creating_path = false;
+  constexpr size_t segment_index{0};
   while (!finished_creating_path) {
     curr_x = curr_x + curr_v * std::cos(curr_yaw) * dt;
     curr_y = curr_y + curr_v * std::sin(curr_yaw) * dt;
@@ -667,9 +670,18 @@ Path AEB::generateEgoPath(const double curr_v, const double curr_w)
     t += dt;
     path_arc_length += distance_between_points;
 
+    const auto lat_offset_with_start_pose =
+      autoware::motion_utils::calcLateralOffset(path, current_pose.position, segment_index);
+
+    const bool lat_offset_threshold_reached =
+      std::isnan(lat_offset_with_start_pose)
+        ? false
+        : lat_offset_with_start_pose > vehicle_info_.vehicle_width_m / 2.0;
+
     finished_creating_path = (t > horizon) && (path_arc_length > min_generated_imu_path_length_);
-    finished_creating_path =
-      (finished_creating_path) || (path_arc_length > max_generated_imu_path_length_);
+    finished_creating_path = (finished_creating_path) ||
+                             (path_arc_length > max_generated_imu_path_length_) ||
+                             lat_offset_threshold_reached;
     path.push_back(current_pose);
   }
   return path;
