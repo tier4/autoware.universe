@@ -17,6 +17,7 @@
 #include "autoware/behavior_path_static_obstacle_avoidance_module/type_alias.hpp"
 #include "autoware/behavior_path_static_obstacle_avoidance_module/utils.hpp"
 #include "autoware/universe_utils/math/unit_conversion.hpp"
+#include "test_route_handler.hpp"
 
 #include <autoware_perception_msgs/msg/object_classification.hpp>
 
@@ -1755,4 +1756,20 @@ TEST(TestUtils, calcErrorEclipseLongRadius)
   EXPECT_DOUBLE_EQ(calcErrorEclipseLongRadius(pose_with_covariance), 3.0);
 }
 
+TEST_F(TestRouteHandler, isParkedVehicle)
+{
+  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
+    isParkedVehicle;
+
+  const auto parameters = std::make_shared<AvoidanceParameters>();
+  AvoidancePlanningData avoidance_planning_data;
+
+  ASSERT_TRUE(route_handler_->isHandlerReady());
+
+  {
+    ObjectData object_data;
+    object_data.is_within_intersection = true;
+    EXPECT_FALSE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+  }
+}
 }  // namespace autoware::behavior_path_planner::static_obstacle_avoidance
