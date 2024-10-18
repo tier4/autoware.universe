@@ -169,6 +169,7 @@ AEB::AEB(const rclcpp::NodeOptions & node_options)
   voxel_grid_z_ = declare_parameter<double>("voxel_grid_z");
   min_generated_imu_path_length_ = declare_parameter<double>("min_generated_imu_path_length");
   max_generated_imu_path_length_ = declare_parameter<double>("max_generated_imu_path_length");
+  max_generated_imu_path_lat_dev_ = declare_parameter<double>("max_generated_imu_path_lat_dev");
   expand_width_ = declare_parameter<double>("expand_width");
   longitudinal_offset_ = declare_parameter<double>("longitudinal_offset");
   t_response_ = declare_parameter<double>("t_response");
@@ -232,6 +233,8 @@ rcl_interfaces::msg::SetParametersResult AEB::onParameter(
   updateParam<double>(parameters, "voxel_grid_z", voxel_grid_z_);
   updateParam<double>(parameters, "min_generated_imu_path_length", min_generated_imu_path_length_);
   updateParam<double>(parameters, "max_generated_imu_path_length", max_generated_imu_path_length_);
+  updateParam<double>(
+    parameters, "max_generated_imu_path_lat_dev", max_generated_imu_path_lat_dev_);
   updateParam<double>(parameters, "expand_width", expand_width_);
   updateParam<double>(parameters, "longitudinal_offset", longitudinal_offset_);
   updateParam<double>(parameters, "t_response", t_response_);
@@ -676,7 +679,7 @@ Path AEB::generateEgoPath(const double curr_v, const double curr_w)
     const bool lat_offset_threshold_reached =
       std::isnan(lat_offset_with_start_pose)
         ? false
-        : lat_offset_with_start_pose > vehicle_info_.vehicle_width_m / 2.0;
+        : std::abs(lat_offset_with_start_pose) > max_generated_imu_path_lat_dev_;
 
     finished_creating_path = (t > horizon) && (path_arc_length > min_generated_imu_path_length_);
     finished_creating_path = (finished_creating_path) ||

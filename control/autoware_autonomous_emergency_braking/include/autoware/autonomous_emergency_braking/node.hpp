@@ -564,6 +564,7 @@ public:
   double voxel_grid_z_;
   double min_generated_imu_path_length_;
   double max_generated_imu_path_length_;
+  double max_generated_imu_path_lat_dev_;
   double expand_width_;
   double longitudinal_offset_;
   double t_response_;
