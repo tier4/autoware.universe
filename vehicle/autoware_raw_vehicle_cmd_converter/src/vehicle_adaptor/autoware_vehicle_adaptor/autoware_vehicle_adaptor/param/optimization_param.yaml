@@ -7,12 +7,12 @@ optimization_parameter:
         steer_cost: 0.0
         acc_cost: 0.0
         steer_rate_cost: 50.0
-        acc_rate_cost: 10.0
+        acc_rate_cost: 100.0
         steer_rate_rate_cost: 500.0
         acc_rate_rate_cost: 0.0
         x_terminal_cost: 1e+1
         y_terminal_cost: 1e+7
-        vel_terminal_cost: 1e+4
+        vel_terminal_cost: 0.0
         yaw_terminal_cost: 1e+5
         acc_terminal_cost: 1e+3
         steer_terminal_cost: 1e+10 # if steer -> yaw' dynamics is precise
@@ -32,7 +32,7 @@ optimization_parameter:
         longitudinal_coef_by_vel_error_domain_table: [0.1, 0.3, 1.0]
         longitudinal_coef_by_acc_error_domain_table: [0.001, 0.01, 0.1]
         longitudinal_coef_target_table: [1.0, 1.0, 1.0]
-        acc_input_weight_target_table: [1e+5, 1e+5, 1e+0]
+        acc_input_weight_target_table: [1e+5, 1e+5, 1e+5]
         lateral_coef_by_lateral_error_domain_table: [0.03, 0.07, 0.2]
         lateral_coef_by_yaw_error_domain_table: [0.03, 0.07, 0.2]
         lateral_coef_by_steer_error_domain_table: [0.001, 0.003, 0.005]
@@ -45,20 +45,20 @@ optimization_parameter:
         horizon_len_controller_d_inputs_schedule: 12
         horizon_len_controller_prediction: 12
     polynomial_regression: # primary
-        controller_acc_input_history_len: 7
-        deg_controller_acc_input_history: 2
-        lam_controller_acc_input_history: [1e-4,1e+1]
+        controller_acc_input_history_len: 10
+        deg_controller_acc_input_history: 1
+        lam_controller_acc_input_history: [1e-4]
         minimum_decay_controller_acc_input_history: 0.1
-        acc_polynomial_prediction_len: 8
+        acc_polynomial_prediction_len: 5
         controller_steer_input_history_len: 7
         deg_controller_steer_input_history: 2
         lam_controller_steer_input_history: [1e-4,1e+1]
         minimum_decay_controller_steer_input_history: 0.1
         steer_polynomial_prediction_len: 8
     inputs_schedule_prediction_NN: # secondary
-        use_acc_input_schedule_prediction: false
+        use_acc_input_schedule_prediction: true
         use_steer_input_schedule_prediction: false
-        acc_input_schedule_prediction_len: 20
+        acc_input_schedule_prediction_len: 10
         controller_acc_input_history_len: 150
         steer_input_schedule_prediction_len: 20
         controller_steer_input_history_len: 150
@@ -68,7 +68,7 @@ optimization_parameter:
         use_steer_linear_extrapolation: false
         acc_linear_extrapolation_len: 8
         steer_linear_extrapolation_len: 8
-        past_len_for_acc_linear_extrapolation: 6
+        past_len_for_acc_linear_extrapolation: 3
         past_len_for_steer_linear_extrapolation: 6
     minimum_diff:
         minimum_acc_diff: 0.03
@@ -120,5 +120,5 @@ optimization_parameter:
         use_controller_inputs_as_target: false
     autoware_alignment:
         use_controller_steer_input_schedule: true
-        use_vehicle_adaptor: true
+        use_vehicle_adaptor: false
     
