@@ -14,7 +14,7 @@
 
 #include "map_based_prediction/path_generator.hpp"
 
-#include <interpolation/spline_interpolation.hpp>
+#include <interpolation/linear_interpolation.hpp>
 #include <motion_utils/trajectory/trajectory.hpp>
 #include <tier4_autoware_utils/geometry/geometry.hpp>
 
@@ -223,16 +223,18 @@ FrenetPath PathGenerator::generateFrenetPath(
 
   path.reserve(static_cast<size_t>(duration / sampling_time_interval_));
   for (double t = 0.0; t <= duration; t += sampling_time_interval_) {
+    const auto t2 = t * t;
+    const auto t3 = t2 * t;
+    const auto t4 = t3 * t;
+    const auto t5 = t4 * t;
     const double current_acc =
       0.0;  // Currently we assume the object is traveling at a constant speed
-    const double d_next_ = current_point.d + current_point.d_vel * t +
-                           current_acc * 2.0 * std::pow(t, 2) + lat_coeff(0) * std::pow(t, 3) +
-                           lat_coeff(1) * std::pow(t, 4) + lat_coeff(2) * std::pow(t, 5);
+    const double d_next_ = current_point.d + current_point.d_vel * t + current_acc * 2.0 * t2 +
+                           lat_coeff(0) * t3 + lat_coeff(1) * t4 + lat_coeff(2) * t5;
     // t > lateral_duration: 0.0, else d_next_
     const double d_next = t > lateral_duration ? 0.0 : d_next_;
-    const double s_next = current_point.s + current_point.s_vel * t +
-                          2.0 * current_acc * std::pow(t, 2) + lon_coeff(0) * std::pow(t, 3) +
-                          lon_coeff(1) * std::pow(t, 4);
+    const double s_next = current_point.s + current_point.s_vel * t + 2.0 * current_acc * t2 +
+                          lon_coeff(0) * t3 + lon_coeff(1) * t4;
     if (s_next > max_length) {
       break;
     }
@@ -265,10 +267,14 @@ Eigen::Vector3d PathGenerator::calcLatCoefficients(
   // b = np.matrix([[xe - self.a0 - self.a1 * T - self.a2 * T**2],
   //                [vxe - self.a1 - 2 * self.a2 * T],
   //                [axe - 2 * self.a2]])
+  const auto T2 = T * T;
+  const auto T3 = T2 * T;
+  const auto T4 = T3 * T;
+  const auto T5 = T4 * T;
+
   Eigen::Matrix3d A_lat_inv;
-  A_lat_inv << 10 / std::pow(T, 3), -4 / std::pow(T, 2), 1 / (2 * T), -15 / std::pow(T, 4),
-    7 / std::pow(T, 3), -1 / std::pow(T, 2), 6 / std::pow(T, 5), -3 / std::pow(T, 4),
-    1 / (2 * std::pow(T, 3));
+  A_lat_inv << 10 / T3, -4 / T2, 1 / (2 * T), -15 / T4, 7 / T3, -1 / T2, 6 / T5, -3 / T4,
+    1 / (2 * T3);
   Eigen::Vector3d b_lat;
   b_lat[0] = target_point.d - current_point.d - current_point.d_vel * T;
   b_lat[1] = target_point.d_vel - current_point.d_vel;
@@ -286,9 +292,11 @@ Eigen::Vector2d PathGenerator::calcLonCoefficients(
   //                         [-1/(2*T**3), 1/(4*T**2)]])
   // b = np.matrix([[vxe - self.a1 - 2 * self.a2 * T],
   //               [axe - 2 * self.a2]])
+  const auto T2 = T * T;
+  const auto T3 = T2 * T;
+
   Eigen::Matrix2d A_lon_inv;
-  A_lon_inv << 1 / std::pow(T, 2), -1 / (3 * T), -1 / (2 * std::pow(T, 3)),
-    1 / (4 * std::pow(T, 2));
+  A_lon_inv << 1 / T2, -1 / (3 * T), -1 / (2 * T3), 1 / (4 * T2);
   Eigen::Vector2d b_lon;
   b_lon[0] = target_point.s_vel - current_point.s_vel;
   b_lon[1] = 0.0;
@@ -327,29 +335,26 @@ PosePath PathGenerator::interpolateReferencePath(
     std::reverse(resampled_s.begin(), resampled_s.end());
   }
 
-  // Spline Interpolation
-  std::vector<double> spline_ref_path_x =
-    interpolation::spline(base_path_s, base_path_x, resampled_s);
-  std::vector<double> spline_ref_path_y =
-    interpolation::spline(base_path_s, base_path_y, resampled_s);
-  std::vector<double> spline_ref_path_z =
-    interpolation::spline(base_path_s, base_path_z, resampled_s);
+  // Lerp Interpolation
+  std::vector<double> lerp_ref_path_x = interpolation::lerp(base_path_s, base_path_x, resampled_s);
+  std::vector<double> lerp_ref_path_y = interpolation::lerp(base_path_s, base_path_y, resampled_s);
+  std::vector<double> lerp_ref_path_z = interpolation::lerp(base_path_s, base_path_z, resampled_s);
 
   interpolated_path.resize(interpolate_num);
   for (size_t i = 0; i < interpolate_num - 1; ++i) {
     geometry_msgs::msg::Pose interpolated_pose;
     const auto current_point =
-      tier4_autoware_utils::createPoint(spline_ref_path_x.at(i), spline_ref_path_y.at(i), 0.0);
-    const auto next_point = tier4_autoware_utils::createPoint(
-      spline_ref_path_x.at(i + 1), spline_ref_path_y.at(i + 1), 0.0);
+      tier4_autoware_utils::createPoint(lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), 0.0);
+    const auto next_point =
+      tier4_autoware_utils::createPoint(lerp_ref_path_x.at(i + 1), lerp_ref_path_y.at(i + 1), 0.0);
     const double yaw = tier4_autoware_utils::calcAzimuthAngle(current_point, next_point);
     interpolated_pose.position = tier4_autoware_utils::createPoint(
-      spline_ref_path_x.at(i), spline_ref_path_y.at(i), spline_ref_path_z.at(i));
+      lerp_ref_path_x.at(i), lerp_ref_path_y.at(i), lerp_ref_path_z.at(i));
     interpolated_pose.orientation = tier4_autoware_utils::createQuaternionFromYaw(yaw);
     interpolated_path.at(i) = interpolated_pose;
   }
   interpolated_path.back().position = tier4_autoware_utils::createPoint(
-    spline_ref_path_x.back(), spline_ref_path_y.back(), spline_ref_path_z.back());
+    lerp_ref_path_x.back(), lerp_ref_path_y.back(), lerp_ref_path_z.back());
   interpolated_path.back().orientation = interpolated_path.at(interpolate_num - 2).orientation;
 
   return interpolated_path;
