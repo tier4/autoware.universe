@@ -34,6 +34,7 @@
 namespace autoware::behavior_path_planner
 {
 // auto msgs
+using autoware_perception_msgs::msg::ObjectClassification;
 using autoware_perception_msgs::msg::PredictedObject;
 using autoware_perception_msgs::msg::PredictedPath;
 using tier4_planning_msgs::msg::PathWithLaneId;
