@@ -325,7 +325,7 @@ bool LaneChangeInterface::canTransitFailureState()
       updateRTCStatus(
         std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), true,
         State::FAILED);
-      return module_type_->is_within_turn_direction_lanes();
+      return true;
     }
   }
 
