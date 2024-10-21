@@ -141,10 +141,12 @@ ModuleStatus LaneChangeInterface::updateState()
     return ModuleStatus::RUNNING;
   }
 
+  const auto within_turn_direction_lane = module_type_->is_within_turn_direction_lanes();
+
   if (!module_type_->isAbleToReturnCurrentLane()) {
     log_warn_throttled("Lane change path is unsafe but cannot return. Continue lane change.");
     change_state_if_stop_required();
-    return ModuleStatus::RUNNING;
+    return within_turn_direction_lane ? ModuleStatus::FAILURE : ModuleStatus::RUNNING;
   }
 
   const auto threshold = module_type_->getLaneChangeParam().backward_length_buffer_for_end_of_lane;
