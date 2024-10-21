@@ -566,6 +566,22 @@ bool NormalLaneChange::isAbleToReturnCurrentLane() const
   return true;
 }
 
+bool NormalLaneChange::is_within_turn_direction_lanes() const
+{
+  const auto & route_handler_ptr = planner_data_->route_handler;
+  const auto & ego_pose = getEgoPose();
+
+  lanelet::ConstLanelet current_lane;
+  if (!route_handler_ptr->getClosestLaneletWithinRoute(ego_pose, &current_lane)) {
+    return false;
+  }
+
+  const auto ego_polygon =
+    utils::lane_change::getEgoCurrentFootprint(getEgoPose(), getCommonParam().vehicle_info);
+
+  return utils::lane_change::isWithinTurnDirectionLanes(current_lane, ego_polygon);
+};
+
 bool NormalLaneChange::isEgoOnPreparePhase() const
 {
   const auto & start_position = status_.lane_change_path.info.shift_line.start.position;
