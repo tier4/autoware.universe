@@ -21,11 +21,12 @@
 #include "test_route_handler.hpp"
 
 #include <autoware_perception_msgs/msg/object_classification.hpp>
+#include <autoware_perception_msgs/msg/shape.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-namespace autoware::behavior_path_planner::static_obstacle_avoidance
+namespace autoware::behavior_path_planner::utils::static_obstacle_avoidance
 {
 
 using autoware::behavior_path_planner::AvoidanceParameters;
@@ -52,6 +53,32 @@ PathWithLaneId generatePath(const geometry_msgs::msg::Pose & pose)
   }
 
   return traj;
+}
+
+ObjectData createDefaultObjectData(
+  const Pose & pose, const Vector3 & velocity, const Shape & shape, const uint8_t type)
+{
+  ObjectData object_data;
+  object_data.object.shape = shape;
+  object_data.object.kinematics.initial_pose_with_covariance.pose = pose;
+  object_data.object.kinematics.initial_twist_with_covariance.twist.linear = velocity;
+  object_data.object.classification.emplace_back(
+    autoware_perception_msgs::build<ObjectClassification>().label(type).probability(1.0));
+  return object_data;
+}
+
+auto get_parameters() -> std::shared_ptr<AvoidanceParameters>
+{
+  AvoidanceParameters parameters;
+  parameters.object_check_shiftable_ratio = 0.6;
+  parameters.object_check_min_road_shoulder_width = 0.5;
+  parameters.threshold_distance_object_is_on_center = 1.0;
+  parameters.object_check_backward_distance = 1.0;
+  parameters.object_check_goal_distance = 2.0;
+  parameters.hard_drivable_bound_margin = 0.1;
+  parameters.soft_drivable_bound_margin = 0.5;
+
+  return std::make_shared<AvoidanceParameters>(parameters);
 }
 
 TEST(TestHelper, getEgoPosition)
@@ -457,9 +484,6 @@ TEST(TestUtils, isNoNeedAvoidanceBehavior)
 
 TEST(TestUtils, getAvoidMargin)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    getAvoidMargin;
-
   const auto create_params = [](
                                const double soft, const double hard, const double hard_for_parked) {
     ObjectParameter param{};
@@ -488,7 +512,7 @@ TEST(TestUtils, getAvoidMargin)
         .label(ObjectClassification::TRUCK)
         .probability(1.0));
 
-    const auto output = getAvoidMargin(object_data, planner_data, parameters);
+    const auto output = filtering_utils::getAvoidMargin(object_data, planner_data, parameters);
     ASSERT_TRUE(output.has_value());
     EXPECT_DOUBLE_EQ(output.value(), 1.9);
   }
@@ -504,7 +528,7 @@ TEST(TestUtils, getAvoidMargin)
         .label(ObjectClassification::TRUCK)
         .probability(1.0));
 
-    const auto output = getAvoidMargin(object_data, planner_data, parameters);
+    const auto output = filtering_utils::getAvoidMargin(object_data, planner_data, parameters);
     ASSERT_TRUE(output.has_value());
     EXPECT_DOUBLE_EQ(output.value(), 1.5);
   }
@@ -520,7 +544,7 @@ TEST(TestUtils, getAvoidMargin)
         .label(ObjectClassification::TRUCK)
         .probability(1.0));
 
-    const auto output = getAvoidMargin(object_data, planner_data, parameters);
+    const auto output = filtering_utils::getAvoidMargin(object_data, planner_data, parameters);
     ASSERT_TRUE(output.has_value());
     EXPECT_DOUBLE_EQ(output.value(), 1.2);
   }
@@ -536,20 +560,13 @@ TEST(TestUtils, getAvoidMargin)
         .label(ObjectClassification::TRUCK)
         .probability(1.0));
 
-    const auto output = getAvoidMargin(object_data, planner_data, parameters);
+    const auto output = filtering_utils::getAvoidMargin(object_data, planner_data, parameters);
     EXPECT_FALSE(output.has_value());
   }
 }
 
 TEST(TestUtils, isSafetyCheckTargetObjectType)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isSafetyCheckTargetObjectType;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isUnknownTypeObject;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isVehicleTypeObject;
-
   const auto create_params = [](const double is_target) {
     ObjectParameter param{};
     param.is_safety_check_target = is_target;
@@ -566,9 +583,9 @@ TEST(TestUtils, isSafetyCheckTargetObjectType)
       autoware_perception_msgs::build<ObjectClassification>()
         .label(ObjectClassification::TRUCK)
         .probability(1.0));
-    EXPECT_TRUE(isSafetyCheckTargetObjectType(object_data.object, parameters));
-    EXPECT_TRUE(isVehicleTypeObject(object_data));
-    EXPECT_FALSE(isUnknownTypeObject(object_data));
+    EXPECT_TRUE(filtering_utils::isSafetyCheckTargetObjectType(object_data.object, parameters));
+    EXPECT_TRUE(filtering_utils::isVehicleTypeObject(object_data));
+    EXPECT_FALSE(filtering_utils::isUnknownTypeObject(object_data));
   }
 
   {
@@ -577,9 +594,9 @@ TEST(TestUtils, isSafetyCheckTargetObjectType)
       autoware_perception_msgs::build<ObjectClassification>()
         .label(ObjectClassification::UNKNOWN)
         .probability(1.0));
-    EXPECT_FALSE(isSafetyCheckTargetObjectType(object_data.object, parameters));
-    EXPECT_TRUE(isVehicleTypeObject(object_data));
-    EXPECT_TRUE(isUnknownTypeObject(object_data));
+    EXPECT_FALSE(filtering_utils::isSafetyCheckTargetObjectType(object_data.object, parameters));
+    EXPECT_TRUE(filtering_utils::isVehicleTypeObject(object_data));
+    EXPECT_TRUE(filtering_utils::isUnknownTypeObject(object_data));
   }
 
   {
@@ -588,18 +605,14 @@ TEST(TestUtils, isSafetyCheckTargetObjectType)
       autoware_perception_msgs::build<ObjectClassification>()
         .label(ObjectClassification::PEDESTRIAN)
         .probability(1.0));
-    EXPECT_FALSE(isSafetyCheckTargetObjectType(object_data.object, parameters));
-    EXPECT_FALSE(isVehicleTypeObject(object_data));
-    EXPECT_FALSE(isUnknownTypeObject(object_data));
+    EXPECT_FALSE(filtering_utils::isSafetyCheckTargetObjectType(object_data.object, parameters));
+    EXPECT_FALSE(filtering_utils::isVehicleTypeObject(object_data));
+    EXPECT_FALSE(filtering_utils::isUnknownTypeObject(object_data));
   }
 }
 
 TEST(TestUtils, isSatisfiedWithCommonCondition)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isSatisfiedWithCommonCondition;
-
   constexpr double forward_detection_range = 5.5;
 
   const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
@@ -629,7 +642,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
         .label(ObjectClassification::PEDESTRIAN)
         .probability(1.0));
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::IS_NOT_TARGET_OBJECT);
@@ -643,7 +656,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
         .label(ObjectClassification::UNKNOWN)
         .probability(1.0));
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::IS_NOT_TARGET_OBJECT);
@@ -658,7 +671,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
         .probability(1.0));
     object_data.move_time = 0.6;
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::MOVING_OBJECT);
@@ -689,7 +702,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(8.0, 0.5, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::FURTHER_THAN_THRESHOLD);
@@ -720,7 +733,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::FURTHER_THAN_THRESHOLD);
@@ -751,7 +764,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::FURTHER_THAN_GOAL);
@@ -782,7 +795,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_FALSE(isSatisfiedWithCommonCondition(
+    EXPECT_FALSE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 6.4, createPoint(0.0, 0.0, 0.0), false,
       parameters));
     EXPECT_EQ(object_data.info, ObjectInfo::TOO_NEAR_TO_GOAL);
@@ -813,7 +826,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_TRUE(isSatisfiedWithCommonCondition(
+    EXPECT_TRUE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 6.6, createPoint(0.0, 0.0, 0.0), false,
       parameters));
   }
@@ -843,7 +856,7 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
     object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    EXPECT_TRUE(isSatisfiedWithCommonCondition(
+    EXPECT_TRUE(filtering_utils::isSatisfiedWithCommonCondition(
       object_data, path, forward_detection_range, 4.0, createPoint(0.0, 0.0, 0.0), true,
       parameters));
   }
@@ -851,9 +864,6 @@ TEST(TestUtils, isSatisfiedWithCommonCondition)
 
 TEST(TestUtils, isSameDirectionShift)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::isOnRight;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::isSameDirectionShift;
-
   constexpr double negative_shift_length = -1.0;
   constexpr double positive_shift_length = 1.0;
 
@@ -881,9 +891,6 @@ TEST(TestUtils, isSameDirectionShift)
 
 TEST(TestUtils, isShiftNecessary)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::isOnRight;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::isShiftNecessary;
-
   constexpr double negative_shift_length = -1.0;
   constexpr double positive_shift_length = 1.0;
 
@@ -911,8 +918,6 @@ TEST(TestUtils, isShiftNecessary)
 
 TEST(TestUtils, calcShiftLength)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::calcShiftLength;
-
   {
     constexpr bool is_on_right = true;
     constexpr double overhang = -1.0;
@@ -934,8 +939,6 @@ TEST(TestUtils, calcShiftLength)
 
 TEST(TestUtils, insertDecelPoint)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::insertDecelPoint;
-
   // invalid target decel point
   {
     const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
@@ -985,7 +988,6 @@ TEST(TestUtils, insertDecelPoint)
 TEST(TestUtils, fillObjectMovingTime)
 {
   using namespace std::literals::chrono_literals;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::fillObjectMovingTime;
 
   const auto create_params = [](const double th_speed, const double th_time) {
     ObjectParameter param{};
@@ -1110,10 +1112,6 @@ TEST(TestUtils, fillObjectMovingTime)
 
 TEST(TestUtils, calcEnvelopeOverhangDistance)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    calcEnvelopeOverhangDistance;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-
   const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                            .position(createPoint(0.0, 0.0, 0.0))
                            .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
@@ -1207,8 +1205,6 @@ TEST(TestUtils, calcEnvelopeOverhangDistance)
 
 TEST(TestUtils, createEnvelopePolygon)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-
   Polygon2d footprint;
   footprint.outer() = {
     Point2d{1.0, 0.0}, Point2d{3.0, 0.0}, Point2d{3.0, 1.0}, Point2d{1.0, 1.0}, Point2d{1.0, 0.0}};
@@ -1236,10 +1232,6 @@ TEST(TestUtils, createEnvelopePolygon)
 
 TEST(TestUtils, generateObstaclePolygonsForDrivableArea)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    generateObstaclePolygonsForDrivableArea;
-
   const auto create_params = [](
                                const double envelope_buffer, const double hard, const double soft) {
     ObjectParameter param{};
@@ -1355,63 +1347,51 @@ TEST(TestUtils, generateObstaclePolygonsForDrivableArea)
 
 TEST(TestUtils, fillLongitudinalAndLengthByClosestEnvelopeFootprint)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    fillLongitudinalAndLengthByClosestEnvelopeFootprint;
-
   const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                            .position(createPoint(0.0, 0.0, 0.0))
                            .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
 
-  auto path = generatePath(edge_pose);
+  const auto path = generatePath(edge_pose);
 
-  {
-    const auto object_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
-                               .position(createPoint(2.5, 1.0, 0.0))
-                               .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
+  const auto object_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                             .position(createPoint(2.5, 1.0, 0.0))
+                             .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
 
-    ObjectData object_data;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.8284271247461901;
-    object_data.object.shape.dimensions.y = 1.41421356237309505;
-    object_data.object.kinematics.initial_pose_with_covariance.pose = object_pose;
-    object_data.direction = Direction::LEFT;
+  ObjectData object_data;
+  object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+  object_data.object.shape.dimensions.x = 2.8284271247461901;
+  object_data.object.shape.dimensions.y = 1.41421356237309505;
+  object_data.object.kinematics.initial_pose_with_covariance.pose = object_pose;
+  object_data.direction = Direction::LEFT;
 
-    constexpr double margin = 0.0;
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
-        .point.pose;
+  constexpr double margin = 0.0;
+  const auto pose =
+    path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+      .point.pose;
 
-    object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
+  object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
 
-    constexpr auto epsilon = 1e-6;
-    ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -0.5, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.0, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.0, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -0.5, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
-    EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -0.5, epsilon);
+  constexpr auto epsilon = 1e-6;
+  ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(0).x(), 1.0, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(0).y(), -0.5, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(1).x(), 1.0, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(1).y(), 2.5, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(2).x(), 4.0, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(2).y(), 2.5, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(3).x(), 4.0, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(3).y(), -0.5, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(4).x(), 1.0, epsilon);
+  EXPECT_NEAR(object_data.envelope_poly.outer().at(4).y(), -0.5, epsilon);
 
-    fillLongitudinalAndLengthByClosestEnvelopeFootprint(
-      path, createPoint(0.0, 0.0, 0.0), object_data);
-    EXPECT_NEAR(object_data.longitudinal, 1.0, epsilon);
-    EXPECT_NEAR(object_data.length, 3.0, epsilon);
-  }
+  fillLongitudinalAndLengthByClosestEnvelopeFootprint(
+    path, createPoint(0.0, 0.0, 0.0), object_data);
+  EXPECT_NEAR(object_data.longitudinal, 1.0, epsilon);
+  EXPECT_NEAR(object_data.length, 3.0, epsilon);
 }
 
 TEST(TestUtils, fillObjectEnvelopePolygon)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    calcErrorEclipseLongRadius;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    fillObjectEnvelopePolygon;
-
   const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                            .position(createPoint(0.0, 0.0, 0.0))
                            .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
@@ -1434,11 +1414,19 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
                              .position(createPoint(2.5, 1.0, 0.0))
                              .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
 
-  ObjectData stored_object;
+  const auto nearest_path_pose =
+    path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
+      .point.pose;
+
+  const auto shape = autoware_perception_msgs::build<Shape>()
+                       .type(Shape::BOUNDING_BOX)
+                       .footprint(geometry_msgs::msg::Polygon{})
+                       .dimensions(createVector3(2.8284271247461901, 1.41421356237309505, 2.0));
+
+  auto stored_object = createDefaultObjectData(
+    object_pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::TRUCK);
   stored_object.object.object_id = uuid;
-  stored_object.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-  stored_object.object.shape.dimensions.x = 2.8284271247461901;
-  stored_object.object.shape.dimensions.y = 1.41421356237309505;
+  stored_object.envelope_poly = createEnvelopePolygon(stored_object, nearest_path_pose, 0.0);
   // clang-format off
   stored_object.object.kinematics.initial_pose_with_covariance =
     geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
@@ -1452,48 +1440,24 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
   stored_object.error_eclipse_max =
     calcErrorEclipseLongRadius(stored_object.object.kinematics.initial_pose_with_covariance);
   stored_object.direction = Direction::LEFT;
-  stored_object.object.classification.emplace_back(
-    autoware_perception_msgs::build<ObjectClassification>()
-      .label(ObjectClassification::TRUCK)
-      .probability(1.0));
 
-  const auto pose =
-    path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
-      .point.pose;
-
-  constexpr double margin = 0.0;
-  stored_object.envelope_poly = createEnvelopePolygon(stored_object, pose, margin);
+  auto object_data = createDefaultObjectData(
+    object_pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::TRUCK);
 
   // new object.
   {
-    ObjectData object_data;
-    object_data.object.object_id = generateUUID();
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.8284271247461901;
-    object_data.object.shape.dimensions.y = 1.41421356237309505;
-    // clang-format off
-    object_data.object.kinematics.initial_pose_with_covariance =
-      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
-        {1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-         0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-         0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-         0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
-         0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-         0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
-    // clang-format on
-    object_data.direction = Direction::LEFT;
-    object_data.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
-
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
-        .point.pose;
-
     ObjectDataArray stored_objects{};
 
-    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+    object_data.object.object_id = generateUUID();
+    object_data.object.kinematics.initial_pose_with_covariance =
+      geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>()
+        .pose(object_pose)
+        .covariance({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                     0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
+    // clang-format on
+    object_data.direction = Direction::LEFT;
+    fillObjectEnvelopePolygon(object_data, stored_objects, nearest_path_pose, parameters);
 
     constexpr auto epsilon = 1e-6;
     ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
@@ -1511,15 +1475,13 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
 
   // update envelope polygon by new pose.
   {
+    ObjectDataArray stored_objects{stored_object};
+
     const auto new_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                             .position(createPoint(3.0, 0.5, 0.0))
                             .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
 
-    ObjectData object_data;
     object_data.object.object_id = uuid;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.8284271247461901;
-    object_data.object.shape.dimensions.y = 1.41421356237309505;
     // clang-format off
     object_data.object.kinematics.initial_pose_with_covariance =
       geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
@@ -1531,18 +1493,7 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
          0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
     // clang-format on
     object_data.direction = Direction::LEFT;
-    object_data.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
-
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, new_pose.position))
-        .point.pose;
-
-    ObjectDataArray stored_objects{stored_object};
-
-    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+    fillObjectEnvelopePolygon(object_data, stored_objects, nearest_path_pose, parameters);
 
     constexpr auto epsilon = 1e-6;
     ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
@@ -1561,15 +1512,13 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
   // use previous envelope polygon because new pose's error eclipse long radius is larger than
   // threshold. error eclipse long radius: 2.1213203435596
   {
+    ObjectDataArray stored_objects{stored_object};
+
     const auto new_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                             .position(createPoint(3.0, 0.5, 0.0))
                             .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
 
-    ObjectData object_data;
     object_data.object.object_id = uuid;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.8284271247461901;
-    object_data.object.shape.dimensions.y = 1.41421356237309505;
     // clang-format off
     object_data.object.kinematics.initial_pose_with_covariance =
       geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
@@ -1581,18 +1530,7 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
          0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
     // clang-format on
     object_data.direction = Direction::LEFT;
-    object_data.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
-
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, new_pose.position))
-        .point.pose;
-
-    ObjectDataArray stored_objects{stored_object};
-
-    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+    fillObjectEnvelopePolygon(object_data, stored_objects, nearest_path_pose, parameters);
 
     constexpr auto epsilon = 1e-6;
     ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
@@ -1611,11 +1549,9 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
   // use new envelope polygon because new pose's error eclipse long radius is smaller than
   // threshold.
   {
-    ObjectData huge_covariance_object;
+    auto huge_covariance_object = createDefaultObjectData(
+      object_pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::TRUCK);
     huge_covariance_object.object.object_id = uuid;
-    huge_covariance_object.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    huge_covariance_object.object.shape.dimensions.x = 2.8284271247461901;
-    huge_covariance_object.object.shape.dimensions.y = 1.41421356237309505;
     // clang-format off
     huge_covariance_object.object.kinematics.initial_pose_with_covariance =
       geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
@@ -1629,28 +1565,17 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
     huge_covariance_object.error_eclipse_max = calcErrorEclipseLongRadius(
       huge_covariance_object.object.kinematics.initial_pose_with_covariance);
     huge_covariance_object.direction = Direction::LEFT;
-    huge_covariance_object.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
 
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
-        .point.pose;
-
-    constexpr double margin = 0.0;
     huge_covariance_object.envelope_poly =
-      createEnvelopePolygon(huge_covariance_object, pose, margin);
+      createEnvelopePolygon(huge_covariance_object, nearest_path_pose, 0.0);
+
+    ObjectDataArray stored_objects{huge_covariance_object};
 
     const auto new_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                             .position(createPoint(3.0, 0.5, 0.0))
                             .orientation(createQuaternionFromRPY(0.0, 0.0, deg2rad(45)));
 
-    ObjectData object_data;
     object_data.object.object_id = uuid;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.8284271247461901;
-    object_data.object.shape.dimensions.y = 1.41421356237309505;
     // clang-format off
     object_data.object.kinematics.initial_pose_with_covariance =
       geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(new_pose).covariance(
@@ -1662,14 +1587,7 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
          0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
     // clang-format on
     object_data.direction = Direction::LEFT;
-    object_data.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
-
-    ObjectDataArray stored_objects{huge_covariance_object};
-
-    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+    fillObjectEnvelopePolygon(object_data, stored_objects, nearest_path_pose, parameters);
 
     constexpr auto epsilon = 1e-6;
     ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
@@ -1687,11 +1605,9 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
 
   // use previous envelope polygon because the new one is within old one.
   {
-    ObjectData object_data;
+    ObjectDataArray stored_objects{stored_object};
+
     object_data.object.object_id = uuid;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 2.0;
-    object_data.object.shape.dimensions.y = 1.0;
     // clang-format off
     object_data.object.kinematics.initial_pose_with_covariance =
       geometry_msgs::build<geometry_msgs::msg::PoseWithCovariance>().pose(object_pose).covariance(
@@ -1703,18 +1619,7 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
          0.0, 0.0, 0.0, 0.0, 0.0, 1.0});
     // clang-format on
     object_data.direction = Direction::LEFT;
-    object_data.object.classification.emplace_back(
-      autoware_perception_msgs::build<ObjectClassification>()
-        .label(ObjectClassification::TRUCK)
-        .probability(1.0));
-
-    const auto pose =
-      path.points.at(autoware::motion_utils::findNearestIndex(path.points, object_pose.position))
-        .point.pose;
-
-    ObjectDataArray stored_objects{stored_object};
-
-    fillObjectEnvelopePolygon(object_data, stored_objects, pose, parameters);
+    fillObjectEnvelopePolygon(object_data, stored_objects, nearest_path_pose, parameters);
 
     constexpr auto epsilon = 1e-6;
     ASSERT_EQ(object_data.envelope_poly.outer().size(), 5);
@@ -1734,8 +1639,6 @@ TEST(TestUtils, fillObjectEnvelopePolygon)
 TEST(TestUtils, compensateLostTargetObjects)
 {
   using namespace std::literals::chrono_literals;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    compensateLostTargetObjects;
 
   const auto parameters = std::make_shared<AvoidanceParameters>();
   parameters->object_last_seen_threshold = 0.2;
@@ -1895,8 +1798,6 @@ TEST(TestUtils, compensateLostTargetObjects)
 
 TEST(TestUtils, calcErrorEclipseLongRadius)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    calcErrorEclipseLongRadius;
   const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
                       .position(createPoint(3.0, 3.0, 0.0))
                       .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
@@ -1916,9 +1817,6 @@ TEST(TestUtils, calcErrorEclipseLongRadius)
 
 TEST_F(TestRouteHandler, isOnEgoLane)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isOnEgoLane;
-
   ASSERT_TRUE(route_handler_->isHandlerReady());
 
   {
@@ -1930,7 +1828,7 @@ TEST_F(TestRouteHandler, isOnEgoLane)
 
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_FALSE(isOnEgoLane(object_data, route_handler_));
+    EXPECT_FALSE(filtering_utils::isOnEgoLane(object_data, route_handler_));
   }
 
   {
@@ -1942,7 +1840,7 @@ TEST_F(TestRouteHandler, isOnEgoLane)
 
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isOnEgoLane(object_data, route_handler_));
+    EXPECT_TRUE(filtering_utils::isOnEgoLane(object_data, route_handler_));
   }
 
   {
@@ -1954,7 +1852,7 @@ TEST_F(TestRouteHandler, isOnEgoLane)
 
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isOnEgoLane(object_data, route_handler_));
+    EXPECT_TRUE(filtering_utils::isOnEgoLane(object_data, route_handler_));
   }
 
   {
@@ -1966,20 +1864,12 @@ TEST_F(TestRouteHandler, isOnEgoLane)
 
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isOnEgoLane(object_data, route_handler_));
+    EXPECT_TRUE(filtering_utils::isOnEgoLane(object_data, route_handler_));
   }
 }
 
 TEST_F(TestRouteHandler, getRoadShoulderDistance)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    calcEnvelopeOverhangDistance;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::createEnvelopePolygon;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::
-    fillLongitudinalAndLengthByClosestEnvelopeFootprint;
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    getRoadShoulderDistance;
-
   ASSERT_TRUE(route_handler_->isHandlerReady());
 
   const auto edge_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
@@ -2003,196 +1893,166 @@ TEST_F(TestRouteHandler, getRoadShoulderDistance)
   const auto planner_data = std::make_shared<PlannerData>();
   planner_data->route_handler = route_handler_;
 
+  const auto shape = autoware_perception_msgs::build<Shape>()
+                       .type(Shape::BOUNDING_BOX)
+                       .footprint(geometry_msgs::msg::Polygon{})
+                       .dimensions(createVector3(4.0, 2.0, 2.0));
+
+  // create common object data
+  const auto object_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                             .position(createPoint(12.5, 1.75, 0.0))
+                             .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+
+  const auto ego_pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                          .position(createPoint(0.0, 0.0, 0.0))
+                          .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+
+  auto object_data = createDefaultObjectData(
+    object_pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
+  const auto idx = autoware::motion_utils::findNearestIndex(path.points, object_data.getPosition());
+  object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
+
   {
-    ObjectData object_data;
     object_data.direction = Direction::RIGHT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 1.75, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
-
-    object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
-
-    constexpr double margin = 0.0;
-    const auto pose =
-      path.points
-        .at(autoware::motion_utils::findNearestIndex(path.points, object_data.getPosition()))
-        .point.pose;
-
-    object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
+    object_data.envelope_poly =
+      createEnvelopePolygon(object_data, getPose(path.points.at(idx)), 0.0);
     object_data.overhang_points = calcEnvelopeOverhangDistance(object_data, path);
-    fillLongitudinalAndLengthByClosestEnvelopeFootprint(
-      path, createPoint(0.0, 0.0, 0.0), object_data);
+    fillLongitudinalAndLengthByClosestEnvelopeFootprint(path, ego_pose.position, object_data);
 
     EXPECT_NEAR(
-      getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data), 0.75, 1e-6);
+      filtering_utils::getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data),
+      0.75, 1e-6);
   }
 
   {
-    ObjectData object_data;
     object_data.direction = Direction::LEFT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 1.75, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
-
-    object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
-
-    constexpr double margin = 0.0;
-    const auto pose =
-      path.points
-        .at(autoware::motion_utils::findNearestIndex(path.points, object_data.getPosition()))
-        .point.pose;
-
-    object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
+    object_data.envelope_poly =
+      createEnvelopePolygon(object_data, getPose(path.points.at(idx)), 0.0);
     object_data.overhang_points = calcEnvelopeOverhangDistance(object_data, path);
     fillLongitudinalAndLengthByClosestEnvelopeFootprint(
       path, createPoint(0.0, 0.0, 0.0), object_data);
 
     EXPECT_NEAR(
-      getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data), 4.25, 1e-6);
+      filtering_utils::getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data),
+      4.25, 1e-6);
   }
 
   {
-    ObjectData object_data;
     object_data.direction = Direction::RIGHT;
     object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
     object_data.object.shape.dimensions.x = 4.0;
     object_data.object.shape.dimensions.y = 4.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 1.75, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
-
-    object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
-
-    constexpr double margin = 0.0;
-    const auto pose =
-      path.points
-        .at(autoware::motion_utils::findNearestIndex(path.points, object_data.getPosition()))
-        .point.pose;
-
-    object_data.envelope_poly = createEnvelopePolygon(object_data, pose, margin);
+    object_data.envelope_poly =
+      createEnvelopePolygon(object_data, getPose(path.points.at(idx)), 0.0);
     object_data.overhang_points = calcEnvelopeOverhangDistance(object_data, path);
     fillLongitudinalAndLengthByClosestEnvelopeFootprint(
       path, createPoint(0.0, 0.0, 0.0), object_data);
 
     EXPECT_NEAR(
-      getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data), -0.25, 1e-6);
+      filtering_utils::getRoadShoulderDistance(object_data, avoidance_planning_data, planner_data),
+      -0.25, 1e-6);
   }
 }
 
 TEST_F(TestRouteHandler, isParkedVehicle)
 {
-  using autoware::behavior_path_planner::utils::static_obstacle_avoidance::filtering_utils::
-    isParkedVehicle;
-
-  const auto parameters = std::make_shared<AvoidanceParameters>();
-  parameters->object_check_shiftable_ratio = 0.6;
-  parameters->object_check_min_road_shoulder_width = 0.5;
-  parameters->threshold_distance_object_is_on_center = 1.0;
-
   ASSERT_TRUE(route_handler_->isHandlerReady());
 
   AvoidancePlanningData avoidance_planning_data;
   avoidance_planning_data.current_lanelets = {route_handler_->getLaneletsFromId(4424)};
 
+  // create common object data
+  const auto shape = autoware_perception_msgs::build<Shape>()
+                       .type(Shape::BOUNDING_BOX)
+                       .footprint(geometry_msgs::msg::Polygon{})
+                       .dimensions(createVector3(4.0, 2.0, 2.0));
+
   {
-    ObjectData object_data;
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(0.0, 0.0, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
     object_data.is_within_intersection = true;
 
-    EXPECT_FALSE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_FALSE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 
   {
-    ObjectData object_data;
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(12.5, 2.8, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
     object_data.direction = Direction::LEFT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 2.8, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
-
     object_data.is_within_intersection = false;
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_TRUE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 
   {
-    ObjectData object_data;
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(12.5, 2.7, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
     object_data.direction = Direction::LEFT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 2.7, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
-
     object_data.is_within_intersection = false;
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_FALSE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_FALSE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 
   {
-    ObjectData object_data;
-    object_data.direction = Direction::RIGHT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, -2.8, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(12.5, -2.8, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
 
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
+    object_data.direction = Direction::RIGHT;
     object_data.is_within_intersection = false;
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_TRUE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 
   {
-    ObjectData object_data;
-    object_data.direction = Direction::RIGHT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, -2.7, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(12.5, -2.7, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
 
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
+    object_data.direction = Direction::RIGHT;
     object_data.is_within_intersection = false;
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_TRUE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_TRUE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 
   {
-    ObjectData object_data;
-    object_data.direction = Direction::RIGHT;
-    object_data.object.shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    object_data.object.shape.dimensions.x = 4.0;
-    object_data.object.shape.dimensions.y = 2.0;
-    object_data.object.kinematics.initial_pose_with_covariance.pose =
-      geometry_msgs::build<geometry_msgs::msg::Pose>()
-        .position(createPoint(12.5, 0.0, 0.0))
-        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
+    const auto pose = geometry_msgs::build<geometry_msgs::msg::Pose>()
+                        .position(createPoint(12.5, 0.0, 0.0))
+                        .orientation(createQuaternionFromRPY(0.0, 0.0, 0.0));
 
+    auto object_data =
+      createDefaultObjectData(pose, createVector3(0.0, 0.0, 0.0), shape, ObjectClassification::CAR);
+    object_data.direction = Direction::RIGHT;
     object_data.is_within_intersection = false;
     object_data.overhang_lanelet = route_handler_->getLaneletsFromId(4424);
 
-    EXPECT_FALSE(isParkedVehicle(object_data, avoidance_planning_data, route_handler_, parameters));
+    EXPECT_FALSE(filtering_utils::isParkedVehicle(
+      object_data, avoidance_planning_data, route_handler_, get_parameters()));
   }
 }
-}  // namespace autoware::behavior_path_planner::static_obstacle_avoidance
+}  // namespace autoware::behavior_path_planner::utils::static_obstacle_avoidance

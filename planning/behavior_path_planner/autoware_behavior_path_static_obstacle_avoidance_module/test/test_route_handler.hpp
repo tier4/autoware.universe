@@ -33,7 +33,7 @@
 
 #include <memory>
 #include <string>
-namespace autoware::behavior_path_planner::static_obstacle_avoidance
+namespace autoware::behavior_path_planner::utils::static_obstacle_avoidance
 {
 
 using autoware::test_utils::get_absolute_path_to_lanelet_map;
@@ -93,6 +93,6 @@ public:
   static constexpr double backward_path_length{5.0};
   static constexpr double forward_path_length{300.0};
 };
-}  // namespace autoware::behavior_path_planner::static_obstacle_avoidance
+}  // namespace autoware::behavior_path_planner::utils::static_obstacle_avoidance
 
 #endif  // TEST_ROUTE_HANDLER_HPP_
