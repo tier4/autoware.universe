@@ -320,6 +320,10 @@ bool LaneChangeInterface::canTransitFailureState()
       return false;
     }
 
+    if (module_type_->is_within_turn_direction_lanes()) {
+      return true;
+    }
+
     if (module_type_->isAbleToReturnCurrentLane()) {
       log_debug_throttled("It's possible to return to current lane. Cancel lane change.");
       updateRTCStatus(
