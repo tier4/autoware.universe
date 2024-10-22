@@ -44,6 +44,7 @@ using autoware::behavior_path_planner::utils::path_safety_checker::
 using autoware::behavior_path_planner::utils::path_safety_checker::PoseWithVelocityStamped;
 using autoware::behavior_path_planner::utils::path_safety_checker::PredictedPathWithPolygon;
 using autoware::route_handler::Direction;
+using autoware::universe_utils::LineString2d;
 using autoware::universe_utils::Polygon2d;
 using autoware::vehicle_info_utils::VehicleInfo;
 using autoware_perception_msgs::msg::PredictedObject;
@@ -309,6 +310,10 @@ double get_min_dist_to_current_lanes_obj(
 bool has_blocking_target_object(
   const CommonDataPtr & common_data_ptr, const FilteredByLanesExtendedObjects & filtered_objects,
   const double stop_arc_length, const PathWithLaneId & path);
-}  // namespace autoware::behavior_path_planner::utils::lane_change
 
+std::vector<LineString2d> get_line_string_paths(const ExtendedPredictedObject & object);
+
+bool has_overtaking_turn_lane_object(
+  const CommonDataPtr & common_data_ptr, const ExtendedPredictedObjects & trailing_objects);
+}  // namespace autoware::behavior_path_planner::utils::lane_change
 #endif  // AUTOWARE__BEHAVIOR_PATH_LANE_CHANGE_MODULE__UTILS__UTILS_HPP_

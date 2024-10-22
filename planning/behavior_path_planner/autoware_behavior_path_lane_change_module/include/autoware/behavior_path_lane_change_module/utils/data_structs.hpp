@@ -348,6 +348,7 @@ struct TransientData
 
   bool is_ego_near_current_terminal_start{false};
   bool is_ego_stuck{false};
+  bool is_ego_in_turn_direction_lane{false};
 };
 
 using RouteHandlerPtr = std::shared_ptr<RouteHandler>;

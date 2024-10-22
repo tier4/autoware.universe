@@ -145,6 +145,15 @@ void NormalLaneChange::update_transient_data()
   transient_data.ego_polygon = utils::lane_change::get_ego_current_polygon(
     common_data_ptr_->get_ego_pose(), common_data_ptr_->bpp_param_ptr->vehicle_info);
 
+  lanelet::ConstLanelet current_lane;
+  if (!common_data_ptr_->route_handler_ptr->getClosestLaneletWithinRoute(
+        common_data_ptr_->get_ego_pose(), &current_lane)) {
+    RCLCPP_DEBUG(logger_, "ego's current lane not in route");
+  }
+
+  transient_data.is_ego_in_turn_direction_lane = utils::lane_change::is_within_turn_direction_lanes(
+    current_lane, common_data_ptr_->transient_data.ego_polygon);
+
   updateStopTime();
   transient_data.is_ego_stuck = is_ego_stuck();
 
@@ -546,7 +555,12 @@ void NormalLaneChange::insert_stop_point_on_current_lanes(PathWithLaneId & path)
   const auto has_blocking_target_lane_obj = utils::lane_change::has_blocking_target_object(
     common_data_ptr_, filtered_objects_, stop_arc_length_behind_obj, path);
 
-  if (has_blocking_target_lane_obj || stop_arc_length_behind_obj <= 0.0) {
+  const auto has_overtaking_turn_lane_object = utils::lane_change::has_overtaking_turn_lane_object(
+    common_data_ptr_, filtered_objects_.target_lane_trailing);
+
+  if (
+    has_overtaking_turn_lane_object || has_blocking_target_lane_obj ||
+    stop_arc_length_behind_obj <= 0.0) {
     set_stop_pose(dist_to_terminal_stop, path);
     return;
   }
@@ -753,7 +767,7 @@ bool NormalLaneChange::isAbleToReturnCurrentLane() const
     return false;
   }
 
-  if (is_within_turn_direction_lanes()) {
+  if (common_data_ptr_->transient_data.is_ego_in_turn_direction_lane) {
     return true;
   }
 
@@ -782,23 +796,6 @@ bool NormalLaneChange::isAbleToReturnCurrentLane() const
   lane_change_debug_.is_able_to_return_to_current_lane = true;
   return true;
 }
-
-bool NormalLaneChange::is_within_turn_direction_lanes() const
-{
-  if (!common_data_ptr_ || !common_data_ptr_->is_lanes_available()) {
-    return false;
-  }
-  const auto & route_handler_ptr = common_data_ptr_->route_handler_ptr;
-
-  lanelet::ConstLanelet current_lane;
-  if (!route_handler_ptr->getClosestLaneletWithinRoute(
-        common_data_ptr_->get_ego_pose(), &current_lane)) {
-    return false;
-  }
-
-  return utils::lane_change::is_within_turn_direction_lanes(
-    current_lane, common_data_ptr_->transient_data.ego_polygon);
-};
 
 bool NormalLaneChange::is_near_terminal() const
 {
@@ -2238,7 +2235,7 @@ bool NormalLaneChange::check_prepare_phase() const
       return false;
     }
 
-    return is_within_turn_direction_lanes();
+    return common_data_ptr_->transient_data.is_ego_in_turn_direction_lane;
   });
 
   return check_in_intersection || check_in_turns || check_in_general_lanes;

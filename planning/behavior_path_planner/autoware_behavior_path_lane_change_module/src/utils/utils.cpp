@@ -1059,6 +1059,10 @@ bool isWithinIntersection(
 bool is_within_turn_direction_lanes(
   const lanelet::ConstLanelet & lanelet, const Polygon2d & polygon)
 {
+  if (lanelet.centerline().empty()) {
+    return false;
+  }
+
   const std::string_view turn_direction = lanelet.attributeOr("turn_direction", "else");
   if (turn_direction == "else" || turn_direction == "straight") {
     return false;
@@ -1310,5 +1314,55 @@ bool has_blocking_target_object(
       const auto width_margin = object.shape.dimensions.x / 2;
       return (arc_length_to_target_lane_obj - width_margin) >= stop_arc_length;
     });
+}
+
+std::vector<LineString2d> get_line_string_paths(const ExtendedPredictedObject & object)
+{
+  const auto transform = [](const auto & predicted_path) -> LineString2d {
+    LineString2d line_string;
+    const auto & path = predicted_path.path;
+    line_string.reserve(path.size());
+    for (const auto & path_point : path) {
+      const auto point = universe_utils::fromMsg(path_point.pose.position).to_2d();
+      line_string.push_back(point);
+    }
+
+    return line_string;
+  };
+
+  const auto paths = object.predicted_paths;
+  std::vector<LineString2d> line_strings;
+  std::transform(paths.begin(), paths.end(), std::back_inserter(line_strings), transform);
+
+  return line_strings;
+}
+
+bool has_overtaking_turn_lane_object(
+  const CommonDataPtr & common_data_ptr, const ExtendedPredictedObjects & trailing_objects)
+{
+  // Note: This situation is only applicable if the ego is in a turn lane.
+  if (!common_data_ptr->transient_data.is_ego_in_turn_direction_lane) {
+    return false;
+  }
+
+  const auto is_overlap_with_target = [&](const LineString2d & path) {
+    return !boost::geometry::disjoint(
+      path, common_data_ptr->lanes_polygon_ptr->target.value());
+  };
+
+  const auto & route_handler_ptr = common_data_ptr->route_handler_ptr;
+  return std::any_of(trailing_objects.begin(), trailing_objects.end(), [&](const auto & object) {
+    lanelet::ConstLanelet obj_lane;
+    if (!route_handler_ptr->getClosestLaneletWithinRoute(object.initial_pose, &obj_lane)) {
+      return false;
+    }
+
+    if (!is_within_turn_direction_lanes(obj_lane, object.initial_polygon)) {
+      return false;
+    }
+
+    const auto paths = get_line_string_paths(object);
+    return std::any_of(paths.begin(), paths.end(), is_overlap_with_target);
+  });
 }
 }  // namespace autoware::behavior_path_planner::utils::lane_change

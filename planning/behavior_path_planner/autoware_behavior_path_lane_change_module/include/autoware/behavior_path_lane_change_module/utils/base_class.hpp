@@ -98,7 +98,10 @@ public:
 
   virtual bool isAbleToReturnCurrentLane() const = 0;
 
-  virtual bool is_within_turn_direction_lanes() const = 0;
+  bool is_within_turn_direction_lanes() const
+  {
+    return common_data_ptr_->transient_data.is_ego_in_turn_direction_lane;
+  }
 
   virtual bool is_near_terminal() const = 0;
 
