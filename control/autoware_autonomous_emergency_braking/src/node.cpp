@@ -484,16 +484,13 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
   };
 
   auto check_collision = [&](const Path & path, std::vector<ObjectData> & objects) {
-    time_keeper_->start_track("has_collision");
     const auto closest_object_point = std::invoke([&]() -> std::optional<ObjectData> {
       // Attempt to find the closest object
       const auto closest_object_itr =
         std::min_element(objects.begin(), objects.end(), [](const auto & o1, const auto & o2) {
           // target objects have priority
-          if (o1.is_target != o2.is_target) {
-            return o1.is_target;
-          }
-          return o1.distance_to_object < o2.distance_to_object;
+          return (o1.is_target != o2.is_target) ? o1.is_target
+                                                : o1.distance_to_object < o2.distance_to_object;
         });
 
       if (closest_object_itr != objects.end()) {
@@ -517,7 +514,6 @@ bool AEB::checkCollision(MarkerArray & debug_markers)
         ? hasCollision(current_v, closest_object_point.value())
         : false;
 
-    time_keeper_->end_track("has_collision");
     // check collision using rss distance
     return has_collision;
   };
@@ -687,7 +683,6 @@ std::optional<Path> AEB::generateEgoPath(const Trajectory & predicted_traj)
     utils::getTransform("base_link", predicted_traj.header.frame_id, tf_buffer_, logger);
   if (!transform_stamped.has_value()) return std::nullopt;
   // create path
-  time_keeper_->start_track("createPath");
   Path path;
   path.reserve(predicted_traj.points.size());
   constexpr double minimum_distance_between_points{1e-2};
@@ -708,7 +703,6 @@ std::optional<Path> AEB::generateEgoPath(const Trajectory & predicted_traj)
       break;
     }
   }
-  time_keeper_->end_track("createPath");
   return (!path.empty()) ? std::make_optional(path) : std::nullopt;
 }
 
